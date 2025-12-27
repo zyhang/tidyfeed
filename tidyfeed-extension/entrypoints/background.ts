@@ -4,10 +4,71 @@
  */
 
 export default defineBackground(() => {
+  // Cloud Regex Sync Logic
+  const REMOTE_REGEX_URL = 'https://tidyfeed.app/regex_rules.json';
+  const REGEX_SYNC_ALARM = 'tidyfeed_regex_sync';
+
+  // Function to sync regex rules
+  async function syncRegexRules(): Promise<number> {
+    try {
+      console.log('[TidyFeed] Syncing regex rules from cloud...');
+      const response = await fetch(REMOTE_REGEX_URL);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+      const data = await response.json();
+
+      // Validate data structure (must be array of strings)
+      if (Array.isArray(data) && data.every(i => typeof i === 'string')) {
+        await browser.storage.local.set({
+          cloud_regex_list: data,
+          regex_last_updated: Date.now()
+        });
+        console.log(`[TidyFeed] Regex rules updated: ${data.length} rules`);
+        return data.length;
+      } else {
+        console.error('[TidyFeed] Invalid regex rules format');
+        return 0;
+      }
+    } catch (error) {
+      console.error('[TidyFeed] Error syncing regex rules:', error);
+      return 0;
+    }
+  }
+
+  // Initial Sync & Alarm Setup
+  browser.runtime.onInstalled.addListener(async (details) => {
+    console.log('[TidyFeed] Extension installed/updated:', details.reason);
+    await syncRegexRules();
+
+    // Create alarm for daily sync
+    browser.alarms.create(REGEX_SYNC_ALARM, {
+      periodInMinutes: 60 * 24 // 24 hours
+    });
+  });
+
+  // Alarm Listener
+  browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === REGEX_SYNC_ALARM) {
+      syncRegexRules();
+    }
+  });
+
+  // Run sync on startup as well
+  syncRegexRules();
+
+
   console.log('[TidyFeed] Background script loaded', { id: browser.runtime.id });
 
   // Handle messages from content script
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'FORCE_REGEX_SYNC') {
+      console.log('[TidyFeed] Manual sync requested');
+      syncRegexRules().then((count) => {
+        sendResponse({ success: true, count });
+      });
+      return true; // Async response
+    }
+
     if (message.type === 'EXTRACT_VIDEO_URL') {
       handleVideoExtraction(message.tweetId, sender.tab?.id)
         .then((result) => {
