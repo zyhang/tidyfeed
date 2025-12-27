@@ -1,0 +1,6 @@
+name = "tidyfeed-admin"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# 👇 这一行就是用来替代界面上那个“Build output directory”选项的
+pages_build_output_dir = ".vercel/output/static"
