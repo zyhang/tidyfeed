@@ -35,6 +35,7 @@ function updateRegexCache(patterns: string[]): void {
     cachedRegexPatterns = [];
     for (const pattern of patterns) {
         try {
+            // Default to case-insensitive matching ('i' flag)
             cachedRegexPatterns.push(new RegExp(pattern, 'i'));
         } catch (e) {
             console.warn('[TidyFeed] Invalid regex pattern:', pattern, e);
