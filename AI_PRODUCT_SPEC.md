@@ -31,19 +31,19 @@ The project consists of two distinct parts that communicate:
 ## 4. Feature Specifications
 
 ### 4.1 Feature: Noise Filter (Extension)
-* **Logic:** content_script injects into `twitter.com`, `reddit.com`.
-* **Action:** Detects elements with specific attributes (e.g., `aria-label="Promoted"`, `span:contains("Ad")`).
-* **Behavior:** Apply `display: none` or collapse to a 20px height "Hidden Spam" bar.
-* **Config:** User can toggle "Strict Mode" (Aggressive) vs "Safe Mode" via Popup.
+* **Logic:** content_script injects into `twitter.com`, `x.com`.
+* **Action:** Detects promoted tweets and ads using DOM observation (e.g., specific SVG paths, text indicators).
+* **Behavior:** Automatically hides ad elements and updates a "Blocked Ads" counter in the sidebar.
+* **Status:** ✅ Implemented (Ad Blocker active).
 
 ### 4.2 Feature: Media Clipper (Extension)
-* **Trigger:** "Download" button injected into the Tweet/Post action bar.
+* **Trigger:** "Download" button injected into the Tweet action bar.
 * **Data Capture:**
-    * Text content (full thread).
-    * Media URLs (highest resolution video/image).
-    * Author Metadata (Handle, Name, Profile Pic).
-    * Source URL & Timestamp.
-* **Output:** Zip file download (Client-side) OR Sync to Supabase (if logged in).
+    * **Main Tweet:** Text, Media (Images/Videos), Metadata.
+    * **Quote Tweet:** Full support for extracting Quote Tweet text and media (including videos).
+    * **Tech:** Robust fallback to Syndication API for video extraction and metadata when DOM is insufficient.
+* **Output:** ZIP file with structured folders (`main/`, `quote/`) and smart naming (`handle_tweetId_type_index.ext`).
+* **Status:** ✅ Implemented (Robust Quote Tweet support added).
 
 ### 4.3 Feature: AI Second Brain (Dashboard)
 * **Input:** Text from saved posts.
@@ -87,8 +87,11 @@ Dashboard: Show Toast notifications for API errors.
 Privacy First: Never log user content or API keys to the server logs.
 
 ## 7. Immediate Roadmap (MVP)
-[ ] Phase 1: Setup WXT + Tailwind + Manifest V3.
-[ ] Phase 2: Implement "Ad Hiding" on X.com (DOM injection).
-[ ] Phase 3: Implement "Download Media" button on X.com.
+[x] Phase 1: Setup WXT + Tailwind + Manifest V3.
+[x] Phase 2: Implement "Ad Hiding" on X.com (DOM injection).
+[x] Phase 3: Implement "Download Media" button on X.com.
+    [x] Basic Image/Text Download.
+    [x] Video Download (Syndication API).
+    [x] Quote Tweet Support (Media + Text + Video Fallback).
 [ ] Phase 4: Setup Supabase Auth & DB connection.
 [ ] Phase 5: Integrate DeepSeek API for summarization.
