@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStorageValue } from './useStorageValue';
 
 // User info type
 interface UserInfo {
+  id?: string;
   name?: string;
   email?: string;
   avatar_url?: string;
@@ -16,82 +17,70 @@ function App() {
   const blockedKeywords = useStorageValue<string[]>('user_blocked_keywords', []);
   const enableRegex = useStorageValue<boolean>('enable_regex_filter', false);
   const cloudRegexList = useStorageValue<string[]>('cloud_regex_list', []);
-  const authToken = useStorageValue<string | null>('auth_token', null);
-  const userInfo = useStorageValue<UserInfo | null>('user_info', null);
 
   const [inputValue, setInputValue] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  const isLoggedIn = !!authToken && !!userInfo;
+  const isLoggedIn = !!userInfo;
 
-  const handleGoogleLogin = async () => {
-    setLoginLoading(true);
-    setLoginError(null);
-
-    try {
-      // Step 1: Get Google OAuth token via chrome.identity
-      const token = await new Promise<string>((resolve, reject) => {
-        chrome.identity.getAuthToken({ interactive: true }, (token) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else if (token) {
-            resolve(token);
-          } else {
-            reject(new Error('No token received'));
-          }
+  // Check auth status on mount by calling /auth/me
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/auth/me`, {
+          method: 'GET',
+          credentials: 'include', // Send HttpOnly cookies
         });
-      });
 
-      console.log('[TidyFeed] Got Google token');
-
-      // Step 2: Send token to backend
-      const response = await fetch(`${BACKEND_URL}/auth/google`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Auth failed: ${response.status}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('[TidyFeed] Auth check successful:', data);
+          // API returns user object with camelCase fields
+          const user = data.user || data;
+          setUserInfo({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            avatar_url: user.avatarUrl || user.avatar_url || user.picture, // API uses camelCase
+          });
+          await browser.storage.local.set({ user_type: 'authenticated' });
+        } else {
+          console.log('[TidyFeed] Not logged in');
+          setUserInfo(null);
+          await browser.storage.local.set({ user_type: 'guest' });
+        }
+      } catch (error) {
+        console.error('[TidyFeed] Auth check error:', error);
+        setUserInfo(null);
+      } finally {
+        setAuthLoading(false);
       }
+    };
 
-      const data = await response.json();
-      console.log('[TidyFeed] Auth response:', data);
+    checkAuthStatus();
+  }, []);
 
-      // Step 3: Store JWT and user info
-      await browser.storage.local.set({
-        auth_token: data.jwt || data.token,
-        user_info: {
-          name: data.user?.name || data.name,
-          email: data.user?.email || data.email,
-          avatar_url: data.user?.avatar_url || data.avatar_url,
-        },
-        user_type: 'authenticated',
-      });
-
-      console.log('[TidyFeed] Login successful');
-    } catch (error) {
-      console.error('[TidyFeed] Login error:', error);
-      setLoginError(error instanceof Error ? error.message : 'Login failed');
-    } finally {
-      setLoginLoading(false);
-    }
+  // Open Google OAuth login in new tab
+  const handleGoogleLogin = () => {
+    setLoginError(null);
+    chrome.tabs.create({ url: `${BACKEND_URL}/auth/login/google` });
   };
 
   const handleLogout = async () => {
-    // Revoke token if available
-    if (authToken) {
-      chrome.identity.removeCachedAuthToken({ token: authToken }, () => {
-        console.log('[TidyFeed] Token cache cleared');
+    try {
+      // Call backend logout endpoint to clear cookies
+      await fetch(`${BACKEND_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
       });
+    } catch (error) {
+      console.error('[TidyFeed] Logout request error:', error);
     }
 
-    // Clear storage
-    await browser.storage.local.remove(['auth_token', 'user_info']);
+    // Clear local state
+    setUserInfo(null);
     await browser.storage.local.set({ user_type: 'guest' });
     console.log('[TidyFeed] Logged out');
   };
@@ -153,6 +142,7 @@ function App() {
                 src={userInfo.avatar_url}
                 alt={userInfo.name || 'User'}
                 className="w-8 h-8 rounded-full border-2 border-white/30"
+                referrerPolicy="no-referrer"
               />
             ) : (
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">
@@ -171,11 +161,11 @@ function App() {
               <div className="text-sm text-zinc-400 mb-3">Sign in to sync your settings</div>
               <button
                 onClick={handleGoogleLogin}
-                disabled={loginLoading}
+                disabled={authLoading}
                 className="w-full flex items-center justify-center gap-2 bg-white text-zinc-900 px-4 py-2.5 rounded-lg font-medium hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {loginLoading ? (
-                  <span className="animate-pulse">Signing in...</span>
+                {authLoading ? (
+                  <span className="animate-pulse">Checking...</span>
                 ) : (
                   <>
                     <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -202,6 +192,13 @@ function App() {
                     src={userInfo.avatar_url}
                     alt={userInfo.name || 'User'}
                     className="w-10 h-10 rounded-full"
+                    onError={(e) => {
+                      console.error('[TidyFeed] Avatar load failed:', userInfo.avatar_url);
+                      // Fallback to initials on error
+                      e.currentTarget.style.display = 'none';
+                    }}
+                    onLoad={() => console.log('[TidyFeed] Avatar loaded successfully')}
+                    referrerPolicy="no-referrer"
                   />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-lg font-bold">

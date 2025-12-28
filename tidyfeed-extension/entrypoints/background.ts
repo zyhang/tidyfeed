@@ -51,6 +51,7 @@ export default defineBackground(() => {
 
       const response = await fetch(`${BACKEND_URL}/api/report`, {
         method: 'POST',
+        credentials: 'include', // Send HttpOnly auth cookie
         headers: {
           'Content-Type': 'application/json',
           'X-User-Id': tidyfeed_uid,
