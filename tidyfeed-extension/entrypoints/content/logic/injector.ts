@@ -1019,9 +1019,12 @@ async function createBookmarkButton(tweetId: string): Promise<HTMLButtonElement>
  * Inject buttons into a tweet's action bar
  */
 async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
+    // Set flag IMMEDIATELY to prevent race conditions with async operations
     if (article.dataset.tidyfeedInjected === 'true') {
         return false;
     }
+    // Mark as injected BEFORE any async work
+    article.dataset.tidyfeedInjected = 'true';
 
     const actionBar = article.querySelector('div[role="group"]');
     if (!actionBar) {
@@ -1039,6 +1042,7 @@ async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
     // Create wrapper for all buttons
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'display: flex; align-items: center; gap: 0;';
+    wrapper.setAttribute('data-tidyfeed-wrapper', 'true');
 
     // Add bookmark button
     if (tweetId) {
@@ -1055,7 +1059,6 @@ async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
     wrapper.appendChild(blockBtn);
 
     actionBar.appendChild(wrapper);
-    article.dataset.tidyfeedInjected = 'true';
 
     return true;
 }
