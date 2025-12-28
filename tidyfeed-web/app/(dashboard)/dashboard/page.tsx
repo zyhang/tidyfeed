@@ -101,7 +101,7 @@ function DashboardContent() {
             <div className="flex flex-col gap-2">
                 <h1 className="text-2xl font-bold">Saved Posts</h1>
                 <p className="text-muted-foreground">
-                    Your bookmarked tweets from X
+                    Your bookmarked posts from across platforms
                 </p>
             </div>
 
@@ -140,9 +140,9 @@ function DashboardContent() {
                 </div>
             )}
 
-            {/* Posts Grid */}
+            {/* Posts Masonry Grid */}
             {!loading && !error && posts.length > 0 && (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="columns-1 md:columns-2 lg:columns-3 gap-4">
                     {posts.map((post) => (
                         <TweetCard
                             key={post.id}
