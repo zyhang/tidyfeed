@@ -32,4 +32,22 @@ describe('TidyFeed API', () => {
 		const res = await app.request('/api/reports', {}, env);
 		expect(res.status).toBe(401);
 	});
+
+	it('GET /auth/login/google redirects to Google OAuth', async () => {
+		const res = await app.request('/auth/login/google', {}, env);
+		expect(res.status).toBe(302);
+		const location = res.headers.get('Location');
+		expect(location).toContain('accounts.google.com');
+		expect(location).toContain('scope=openid+email+profile');
+	});
+
+	it('GET /auth/callback/google returns 400 without code', async () => {
+		const res = await app.request('/auth/callback/google', {}, env);
+		expect(res.status).toBe(400);
+	});
+
+	it('GET /auth/me returns 401 without cookie', async () => {
+		const res = await app.request('/auth/me', {}, env);
+		expect(res.status).toBe(401);
+	});
 });

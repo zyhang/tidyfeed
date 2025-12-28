@@ -6,7 +6,7 @@ export default defineConfig({
   manifest: {
     name: 'TidyFeed - AdBlock & Downloader',
     description: 'Filter social media noise, capture valuable content.',
-    permissions: ['storage', 'activeTab', 'scripting', 'alarms', 'cookies'],
+    permissions: ['storage', 'activeTab', 'scripting', 'alarms', 'cookies', 'identity'],
     host_permissions: [
       '*://*.x.com/*',
       '*://*.twitter.com/*',
@@ -16,6 +16,10 @@ export default defineConfig({
       'https://tidyfeed.app/*',
       'https://api.tidyfeed.app/*',
     ],
+    oauth2: {
+      client_id: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+      scopes: ['openid', 'email', 'profile'],
+    },
     action: {
       default_title: 'TidyFeed',
     },
