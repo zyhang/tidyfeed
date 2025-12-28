@@ -196,7 +196,7 @@ app.get('/auth/callback/google', async (c) => {
 
 		if (error) {
 			console.error('Google OAuth error:', error);
-			return c.redirect('https://tidyfeed.app/?error=oauth_denied');
+			return c.redirect('https://a.tidyfeed.app/?error=oauth_denied');
 		}
 
 		if (!code) {
@@ -224,7 +224,7 @@ app.get('/auth/callback/google', async (c) => {
 		if (!tokenResponse.ok) {
 			const errorData = await tokenResponse.text();
 			console.error('Token exchange failed:', errorData);
-			return c.redirect('https://tidyfeed.app/?error=token_exchange_failed');
+			return c.redirect('https://a.tidyfeed.app/?error=token_exchange_failed');
 		}
 
 		const tokens = await tokenResponse.json<{ access_token: string; id_token: string }>();
@@ -239,7 +239,7 @@ app.get('/auth/callback/google', async (c) => {
 			payload = result.payload;
 		} catch (jwtError) {
 			console.error('ID token verification failed:', jwtError);
-			return c.redirect('https://tidyfeed.app/?error=token_verification_failed');
+			return c.redirect('https://a.tidyfeed.app/?error=token_verification_failed');
 		}
 
 		// Extract user info
@@ -249,7 +249,7 @@ app.get('/auth/callback/google', async (c) => {
 		const avatarUrl = (payload.picture as string) || null;
 
 		if (!googleId || !email) {
-			return c.redirect('https://tidyfeed.app/?error=invalid_token_payload');
+			return c.redirect('https://a.tidyfeed.app/?error=invalid_token_payload');
 		}
 
 		// Upsert user in D1
@@ -287,7 +287,7 @@ app.get('/auth/callback/google', async (c) => {
 		// Determine redirect destination
 		const dashboardUrl = isDev
 			? 'http://localhost:3000/dashboard'
-			: 'https://tidyfeed.app/dashboard';
+			: 'https://a.tidyfeed.app/dashboard';
 
 		// Set HttpOnly cookie and redirect
 		const cookieOptions = [
@@ -313,7 +313,7 @@ app.get('/auth/callback/google', async (c) => {
 	} catch (error: any) {
 		console.error('Google OAuth callback error:', error?.message || error);
 		console.error('Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
-		return c.redirect('https://tidyfeed.app/?error=internal_error');
+		return c.redirect('https://a.tidyfeed.app/?error=internal_error');
 	}
 });
 
