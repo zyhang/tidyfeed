@@ -94,6 +94,7 @@ interface MediaItem {
 
 interface TweetData {
     authorName: string;
+    authorAvatar: string | null;
     handle: string;
     timestamp: string;
     text: string;
@@ -259,6 +260,19 @@ function extractTweetData(article: HTMLElement): TweetData {
     const authorName = authorNameEl?.textContent?.trim() || 'Unknown';
     const handle = handleLink?.getAttribute('href')?.replace('/', '@') || '@unknown';
 
+    // Author avatar - find the profile image
+    let authorAvatar: string | null = null;
+    const allAvatars = article.querySelectorAll('img[src*="profile_images"]');
+    for (const avatar of allAvatars) {
+        if (isInsideQuote(avatar)) continue;
+        const src = avatar.getAttribute('src');
+        if (src) {
+            // Get higher quality version by replacing _normal with _bigger or _400x400
+            authorAvatar = src.replace('_normal', '_bigger');
+            break;
+        }
+    }
+
     // Timestamp - get the first time element not in quote
     let timestamp = '';
     const allTimeEls = article.querySelectorAll('time');
@@ -421,6 +435,7 @@ function extractTweetData(article: HTMLElement): TweetData {
 
     return {
         authorName,
+        authorAvatar,
         handle,
         timestamp,
         text,
@@ -934,7 +949,8 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
                 content: data.text || null,
                 author: {
                     name: data.authorName,
-                    handle: data.handle
+                    handle: data.handle,
+                    avatar: data.authorAvatar
                 },
                 media: data.mediaItems.map(m => m.url),
                 url: data.tweetUrl

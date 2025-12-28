@@ -8,6 +8,7 @@ import { Trash2, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 interface Author {
     name?: string
     handle?: string
+    avatar?: string
 }
 
 interface TweetCardProps {
@@ -58,9 +59,18 @@ export function TweetCard({
                 {/* Author */}
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
-                            {author?.name?.charAt(0) || author?.handle?.replace('@', '').charAt(0) || '?'}
-                        </div>
+                        {author?.avatar ? (
+                            <img
+                                src={author.avatar}
+                                alt={author.name || author.handle || 'Avatar'}
+                                className="w-10 h-10 rounded-full object-cover"
+                                referrerPolicy="no-referrer"
+                            />
+                        ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                                {author?.name?.charAt(0) || author?.handle?.replace('@', '').charAt(0) || '?'}
+                            </div>
+                        )}
                         <div>
                             <p className="font-semibold text-sm">{author?.name || 'Unknown'}</p>
                             <p className="text-xs text-muted-foreground">{author?.handle || '@unknown'}</p>
