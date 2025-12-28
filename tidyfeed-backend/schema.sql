@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS saved_posts (
     content TEXT,
     media_urls TEXT,  -- JSON array stored as TEXT
     author_info TEXT,  -- JSON object stored as TEXT
+    url TEXT,
+    platform TEXT DEFAULT 'x',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE (user_id, x_post_id)

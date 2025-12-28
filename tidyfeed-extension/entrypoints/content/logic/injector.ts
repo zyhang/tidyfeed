@@ -59,6 +59,34 @@ const BLOCK_BUTTON_HOVER_STYLES = `
   color: rgb(244, 67, 54);
 `;
 
+// Bookmark button icons
+const BOOKMARK_ICON_OUTLINE = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+</svg>`;
+
+const BOOKMARK_ICON_FILLED = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+</svg>`;
+
+const BOOKMARK_BUTTON_HOVER_STYLES = `
+  background-color: rgba(29, 155, 240, 0.1);
+  color: rgb(29, 155, 240);
+`;
+
+const BOOKMARK_BUTTON_ACTIVE_STYLES = `
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9999px;
+  cursor: pointer;
+  color: rgb(29, 155, 240);
+  background: transparent;
+  border: none;
+  transition: background-color 0.2s, color 0.2s;
+`;
+
 interface MediaItem {
     url: string;
     type: 'img' | 'video';
@@ -855,9 +883,142 @@ function createBlockButton(): HTMLButtonElement {
 }
 
 /**
+ * Handle bookmark button click - optimistic UI
+ */
+async function handleBookmarkClick(event: MouseEvent): Promise<void> {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const button = event.currentTarget as HTMLButtonElement;
+    const article = button.closest('article');
+
+    if (!article) {
+        console.error('[TidyFeed] Could not find tweet article');
+        return;
+    }
+
+    const data = extractTweetData(article as HTMLElement);
+    const xId = data.tweetId;
+
+    if (!xId) {
+        console.error('[TidyFeed] Could not extract tweet ID');
+        return;
+    }
+
+    // Check current saved state
+    const storage = await browser.storage.local.get('saved_x_ids');
+    const savedIds: string[] = (storage.saved_x_ids as string[]) || [];
+    const isCurrentlySaved = savedIds.includes(xId);
+
+    // OPTIMISTIC UI: Toggle the icon immediately
+    const newSavedState = !isCurrentlySaved;
+    button.innerHTML = newSavedState ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
+    button.style.cssText = newSavedState ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+
+    // Update storage immediately (optimistic)
+    if (newSavedState) {
+        savedIds.push(xId);
+    } else {
+        const idx = savedIds.indexOf(xId);
+        if (idx > -1) savedIds.splice(idx, 1);
+    }
+    await browser.storage.local.set({ saved_x_ids: savedIds });
+
+    // Send message to background for API call
+    try {
+        const result = await browser.runtime.sendMessage({
+            type: 'TOGGLE_SAVE',
+            action: newSavedState ? 'save' : 'unsave',
+            postData: {
+                x_id: xId,
+                content: data.text || null,
+                author: {
+                    name: data.authorName,
+                    handle: data.handle
+                },
+                media: data.mediaItems.map(m => m.url),
+                url: data.tweetUrl
+            }
+        });
+
+        if (!result.success) {
+            // ROLLBACK: Revert UI and storage on failure
+            console.error('[TidyFeed] API failed, rolling back:', result.error);
+            button.innerHTML = isCurrentlySaved ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
+            button.style.cssText = isCurrentlySaved ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+
+            // Rollback storage
+            if (newSavedState) {
+                const idx = savedIds.indexOf(xId);
+                if (idx > -1) savedIds.splice(idx, 1);
+            } else {
+                savedIds.push(xId);
+            }
+            await browser.storage.local.set({ saved_x_ids: savedIds });
+
+            showToast('Failed to sync bookmark');
+        } else {
+            console.log('[TidyFeed] Bookmark toggled successfully:', xId, newSavedState ? 'saved' : 'removed');
+        }
+    } catch (error) {
+        console.error('[TidyFeed] Toggle save error:', error);
+        // Rollback on error
+        button.innerHTML = isCurrentlySaved ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
+        button.style.cssText = isCurrentlySaved ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+
+        const storageRollback = await browser.storage.local.get('saved_x_ids');
+        const rollbackIds: string[] = (storageRollback.saved_x_ids as string[]) || [];
+        if (newSavedState) {
+            const idx = rollbackIds.indexOf(xId);
+            if (idx > -1) rollbackIds.splice(idx, 1);
+        } else {
+            if (!rollbackIds.includes(xId)) rollbackIds.push(xId);
+        }
+        await browser.storage.local.set({ saved_x_ids: rollbackIds });
+
+        showToast('Failed to sync bookmark');
+    }
+}
+
+/**
+ * Create the bookmark button element
+ */
+async function createBookmarkButton(tweetId: string): Promise<HTMLButtonElement> {
+    const button = document.createElement('button');
+    button.className = 'tidyfeed-bookmark-btn';
+    button.setAttribute('data-tidyfeed-btn', 'true');
+    button.setAttribute('data-tweet-id', tweetId);
+    button.setAttribute('aria-label', 'Bookmark tweet');
+    button.setAttribute('title', 'TidyFeed: Bookmark tweet');
+
+    // Check initial saved state
+    const storage = await browser.storage.local.get('saved_x_ids');
+    const savedIds: string[] = (storage.saved_x_ids as string[]) || [];
+    const isSaved = savedIds.includes(tweetId);
+
+    button.innerHTML = isSaved ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
+    button.style.cssText = isSaved ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+
+    button.addEventListener('mouseenter', () => {
+        if (!button.disabled) {
+            button.style.cssText = (button.innerHTML === BOOKMARK_ICON_FILLED ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES) + BOOKMARK_BUTTON_HOVER_STYLES;
+        }
+    });
+    button.addEventListener('mouseleave', () => {
+        if (!button.disabled) {
+            button.style.cssText = button.innerHTML === BOOKMARK_ICON_FILLED ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+        }
+    });
+
+    button.addEventListener('click', handleBookmarkClick);
+
+    return button;
+}
+
+/**
  * Inject buttons into a tweet's action bar
  */
-function injectButtonIntoTweet(article: HTMLElement): boolean {
+async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
     if (article.dataset.tidyfeedInjected === 'true') {
         return false;
     }
@@ -871,9 +1032,19 @@ function injectButtonIntoTweet(article: HTMLElement): boolean {
         return false;
     }
 
-    // Create wrapper for both buttons
+    // Extract tweet ID for bookmark button
+    const data = extractTweetData(article);
+    const tweetId = data.tweetId;
+
+    // Create wrapper for all buttons
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'display: flex; align-items: center; gap: 0;';
+
+    // Add bookmark button
+    if (tweetId) {
+        const bookmarkBtn = await createBookmarkButton(tweetId);
+        wrapper.appendChild(bookmarkBtn);
+    }
 
     // Add download button
     const downloadBtn = createDownloadButton();

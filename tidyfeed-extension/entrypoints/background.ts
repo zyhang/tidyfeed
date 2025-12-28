@@ -38,6 +38,91 @@ export default defineBackground(() => {
     }
   }
 
+  // Saved Posts Sync Logic
+  const SAVED_POSTS_SYNC_ALARM = 'tidyfeed_saved_posts_sync';
+
+  // Function to sync saved post IDs from API
+  async function syncSavedPostIds(): Promise<number> {
+    try {
+      console.log('[TidyFeed] Syncing saved post IDs from API...');
+      const response = await fetch(`${BACKEND_URL}/api/posts/ids`, {
+        method: 'GET',
+        credentials: 'include', // Send HttpOnly auth cookie
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.log('[TidyFeed] Not authenticated, skipping saved posts sync');
+          return 0;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.ids && Array.isArray(data.ids)) {
+        await browser.storage.local.set({
+          saved_x_ids: data.ids,
+          saved_posts_last_synced: Date.now()
+        });
+        console.log(`[TidyFeed] Saved post IDs synced: ${data.ids.length} posts`);
+        return data.ids.length;
+      }
+      return 0;
+    } catch (error) {
+      console.error('[TidyFeed] Error syncing saved post IDs:', error);
+      return 0;
+    }
+  }
+
+  // Handle TOGGLE_SAVE message
+  async function handleToggleSave(
+    action: 'save' | 'unsave',
+    postData: { x_id: string; content?: string; author?: any; media?: any; url?: string }
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (action === 'save') {
+        // POST to save the post
+        const response = await fetch(`${BACKEND_URL}/api/posts`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            x_id: postData.x_id,
+            content: postData.content || null,
+            author: postData.author || null,
+            media: postData.media || null,
+            url: postData.url || null,
+            platform: 'x'
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          return { success: false, error: err.error || 'Failed to save post' };
+        }
+
+        return { success: true };
+      } else {
+        // DELETE to unsave the post
+        const response = await fetch(`${BACKEND_URL}/api/posts/x/${postData.x_id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          return { success: false, error: err.error || 'Failed to unsave post' };
+        }
+
+        return { success: true };
+      }
+    } catch (error) {
+      console.error('[TidyFeed] Toggle save error:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
   // Handle report block request to backend
   async function handleReportBlock(
     blockedId: string,
@@ -189,10 +274,16 @@ export default defineBackground(() => {
     }
 
     await syncRegexRules();
+    await syncSavedPostIds();
 
-    // Create alarm for daily sync
+    // Create alarm for daily sync (regex)
     browser.alarms.create(REGEX_SYNC_ALARM, {
       periodInMinutes: 60 * 24 // 24 hours
+    });
+
+    // Create alarm for saved posts sync (every 30 mins)
+    browser.alarms.create(SAVED_POSTS_SYNC_ALARM, {
+      periodInMinutes: 30
     });
   });
 
@@ -201,10 +292,14 @@ export default defineBackground(() => {
     if (alarm.name === REGEX_SYNC_ALARM) {
       syncRegexRules();
     }
+    if (alarm.name === SAVED_POSTS_SYNC_ALARM) {
+      syncSavedPostIds();
+    }
   });
 
   // Run sync on startup as well
   syncRegexRules();
+  syncSavedPostIds();
 
 
   console.log('[TidyFeed] Background script loaded', { id: browser.runtime.id });
@@ -266,6 +361,19 @@ export default defineBackground(() => {
         })
         .catch((error) => {
           console.error('[TidyFeed] Block user error:', error);
+          sendResponse({ success: false, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message.type === 'TOGGLE_SAVE') {
+      handleToggleSave(message.action, message.postData)
+        .then((result) => {
+          sendResponse(result);
+        })
+        .catch((error) => {
+          console.error('[TidyFeed] Toggle save error:', error);
           sendResponse({ success: false, error: error.message });
         });
 

@@ -422,6 +422,131 @@ app.post('/api/report', async (c) => {
 });
 
 // ============================================
+// Posts API Routes (Authenticated via Cookie)
+// ============================================
+
+// Create a saved post
+app.post('/api/posts', cookieAuthMiddleware, async (c) => {
+	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+
+		const { x_id, content, author, media, url, platform } = await c.req.json();
+
+		if (!x_id) {
+			return c.json({ error: 'x_id is required' }, 400);
+		}
+
+		// Serialize author and media to JSON strings
+		const authorInfo = author ? JSON.stringify(author) : null;
+		const mediaUrls = media ? JSON.stringify(media) : null;
+
+		try {
+			await c.env.DB.prepare(
+				`INSERT INTO saved_posts (user_id, x_post_id, content, author_info, media_urls, url, platform)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)`
+			).bind(userId, x_id, content || null, authorInfo, mediaUrls, url || null, platform || 'x').run();
+
+			return c.json({ success: true, message: 'Post saved' });
+		} catch (dbError: any) {
+			if (dbError.message?.includes('UNIQUE constraint failed')) {
+				return c.json({ success: true, message: 'Post already saved' });
+			}
+			throw dbError;
+		}
+	} catch (error) {
+		console.error('Save post error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// Delete a saved post by X ID
+app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
+	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+		const xId = c.req.param('x_id');
+
+		const result = await c.env.DB.prepare(
+			'DELETE FROM saved_posts WHERE user_id = ? AND x_post_id = ?'
+		).bind(userId, xId).run();
+
+		if (result.meta.changes === 0) {
+			return c.json({ error: 'Post not found' }, 404);
+		}
+
+		return c.json({ success: true, message: 'Post deleted' });
+	} catch (error) {
+		console.error('Delete post error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// Get all post IDs for the user (for extension sync)
+app.get('/api/posts/ids', cookieAuthMiddleware, async (c) => {
+	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+
+		const posts = await c.env.DB.prepare(
+			'SELECT x_post_id FROM saved_posts WHERE user_id = ?'
+		).bind(userId).all<{ x_post_id: string }>();
+
+		const ids = posts.results?.map((p) => p.x_post_id) || [];
+
+		return c.json({ ids });
+	} catch (error) {
+		console.error('Get post IDs error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// Get full posts with search and pagination
+app.get('/api/posts', cookieAuthMiddleware, async (c) => {
+	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+
+		const search = c.req.query('search') || '';
+		const limit = Math.min(parseInt(c.req.query('limit') || '20'), 100);
+		const offset = parseInt(c.req.query('offset') || '0');
+
+		let query = 'SELECT * FROM saved_posts WHERE user_id = ?';
+		const params: any[] = [userId];
+
+		if (search) {
+			query += ' AND (content LIKE ? OR author_info LIKE ?)';
+			params.push(`%${search}%`, `%${search}%`);
+		}
+
+		query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+		params.push(limit, offset);
+
+		const posts = await c.env.DB.prepare(query).bind(...params).all();
+
+		// Parse JSON fields
+		const formattedPosts = (posts.results || []).map((post: any) => ({
+			id: post.id,
+			xId: post.x_post_id,
+			content: post.content,
+			author: post.author_info ? JSON.parse(post.author_info) : null,
+			media: post.media_urls ? JSON.parse(post.media_urls) : null,
+			url: post.url,
+			platform: post.platform,
+			createdAt: post.created_at,
+		}));
+
+		return c.json({
+			count: formattedPosts.length,
+			posts: formattedPosts,
+		});
+	} catch (error) {
+		console.error('Get posts error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// ============================================
 // Protected Admin Routes
 // ============================================
 
