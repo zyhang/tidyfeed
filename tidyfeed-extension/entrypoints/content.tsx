@@ -1,40 +1,18 @@
-import ReactDOM from 'react-dom/client';
-import '../assets/tailwind.css';
-import { Sidebar } from './content/components/Sidebar';
 import { initAdBlocker } from './content/logic/adBlocker';
 import { initTweetInjector } from './content/logic/injector';
 
 // Content script for Twitter/X
+// Headless - no UI injection, all UI is in the popup
 export default defineContentScript({
     matches: ['*://*.x.com/*', '*://*.twitter.com/*'],
-    cssInjectionMode: 'ui',
 
-    async main(ctx) {
-        // Initialize the ad blocker
+    async main() {
+        console.log('[TidyFeed] Content script loaded (headless mode)');
+
+        // Initialize the ad blocker (reads settings from storage)
         initAdBlocker();
 
-        // Initialize the tweet button injector
+        // Initialize the tweet button injector (download + block buttons)
         initTweetInjector();
-
-        // Create a Shadow DOM UI container for the sidebar
-        const ui = await createShadowRootUi(ctx, {
-            name: 'tidyfeed-sidebar',
-            position: 'inline',
-            anchor: 'body',
-            onMount: (container) => {
-                const app = document.createElement('div');
-                app.id = 'tidyfeed-root';
-                container.append(app);
-
-                const root = ReactDOM.createRoot(app);
-                root.render(<Sidebar />);
-                return root;
-            },
-            onRemove: (root) => {
-                root?.unmount();
-            },
-        });
-
-        ui.mount();
     },
 });
