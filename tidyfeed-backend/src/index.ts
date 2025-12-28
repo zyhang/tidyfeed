@@ -28,7 +28,12 @@ app.use('*', cors());
 
 // Health check
 app.get('/', (c) => {
-	return c.json({ status: 'ok', service: 'TidyFeed API' });
+	return c.json({
+		status: 'ok',
+		service: 'TidyFeed API',
+		// Debug: show if GOOGLE_CLIENT_ID is configured (only first 20 chars)
+		google_client_id_prefix: c.env.GOOGLE_CLIENT_ID?.substring(0, 20) || 'NOT_SET',
+	});
 });
 
 // ============================================
