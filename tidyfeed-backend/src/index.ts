@@ -23,8 +23,11 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// CORS middleware - allow all origins
-app.use('*', cors());
+// CORS middleware - allow specific origins for credentials
+app.use('*', cors({
+	origin: ['https://a.tidyfeed.app', 'https://tidyfeed.app', 'http://localhost:3000'],
+	credentials: true,
+}));
 
 // Health check
 app.get('/', (c) => {
