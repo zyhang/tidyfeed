@@ -16,7 +16,8 @@
 			"database_name": "tidyfeed-db",
 			"database_id": "1960d09e-e5a0-440d-a3f4-ffd58b6c1c8a"
 		}
-	]
+	],
+	"keep_vars": true
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
