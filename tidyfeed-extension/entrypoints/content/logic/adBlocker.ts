@@ -252,6 +252,9 @@ function collapseTweet(container: HTMLElement, reason: string): void {
         return;
     }
 
+    // Extract user info for potential reporting
+    const userHandle = extractUserHandle(container);
+
     // Hide the content initially
     const contentEl = tweetContent as HTMLElement;
     contentEl.style.display = 'none';
@@ -264,48 +267,97 @@ function collapseTweet(container: HTMLElement, reason: string): void {
     // Create the fold bar
     const foldBar = document.createElement('div');
     foldBar.className = 'tidyfeed-fold-bar';
-    foldBar.innerHTML = `<span>👁️ Hidden ${reason} - Click to View</span>`;
+    foldBar.innerHTML = `
+        <span class="tidyfeed-fold-text">👁️ Hidden ${reason} - Click to View</span>
+        <button class="tidyfeed-block-btn" title="Block & Report this account">🚫 Block</button>
+    `;
 
     // Style the bar directly
     Object.assign(foldBar.style, {
-        height: '32px',
+        height: '36px',
         backgroundColor: theme.bgColor,
         border: `1px dashed ${theme.borderColor}`,
         color: theme.textColor,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         fontSize: '13px',
         cursor: 'pointer',
         borderRadius: '4px',
         margin: '4px 0',
+        padding: '0 12px',
         transition: 'all 0.2s',
         userSelect: 'none',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
     });
 
-    // Add click handler to restore with animation
-    foldBar.onclick = (e) => {
-        e.stopPropagation();
-        e.preventDefault();
+    // Style the block button
+    const blockBtn = foldBar.querySelector('.tidyfeed-block-btn') as HTMLButtonElement;
+    if (blockBtn) {
+        Object.assign(blockBtn.style, {
+            background: 'transparent',
+            border: '1px solid rgba(244, 67, 54, 0.5)',
+            borderRadius: '4px',
+            padding: '4px 8px',
+            fontSize: '12px',
+            cursor: 'pointer',
+            color: '#f44336',
+            transition: 'all 0.2s'
+        });
 
-        // 1. Make space visible but transparent
-        contentEl.style.display = '';
+        blockBtn.onmouseenter = () => {
+            blockBtn.style.background = 'rgba(244, 67, 54, 0.1)';
+            blockBtn.style.borderColor = '#f44336';
+        };
+        blockBtn.onmouseleave = () => {
+            blockBtn.style.background = 'transparent';
+            blockBtn.style.borderColor = 'rgba(244, 67, 54, 0.5)';
+        };
 
-        // 2. Remove bar
-        foldBar.remove();
+        // Block button click handler
+        blockBtn.onclick = async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
 
-        // 3. Trigger reflow to enable transition
-        void contentEl.offsetHeight;
+            // Import reporter dynamically to avoid circular deps
+            const { reportBlock } = await import('./reporter');
 
-        // 4. Fade in
-        contentEl.style.opacity = '1';
+            // Hide tweet permanently
+            container.style.display = 'none';
+            container.dataset.tidyfeedBlocked = 'true';
 
-        // Mark as manually revealed so we don't re-collapse it immediately if logic runs again
-        container.dataset.tidyfeedRevealed = 'true';
-    };
+            // Send report to backend
+            await reportBlock(userHandle, userHandle, reason);
+            console.log(`[TidyFeed] 🚫 Blocked and reported: ${userHandle}`);
+        };
+    }
 
-    // Hover effect
+    // Add click handler to restore with animation (on the text span only)
+    const textSpan = foldBar.querySelector('.tidyfeed-fold-text') as HTMLElement;
+    if (textSpan) {
+        textSpan.style.cursor = 'pointer';
+        textSpan.onclick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+
+            // 1. Make space visible but transparent
+            contentEl.style.display = '';
+
+            // 2. Remove bar
+            foldBar.remove();
+
+            // 3. Trigger reflow to enable transition
+            void contentEl.offsetHeight;
+
+            // 4. Fade in
+            contentEl.style.opacity = '1';
+
+            // Mark as manually revealed so we don't re-collapse it immediately if logic runs again
+            container.dataset.tidyfeedRevealed = 'true';
+        };
+    }
+
+    // Hover effect for the bar
     foldBar.onmouseenter = () => {
         foldBar.style.backgroundColor = theme.hoverColor;
     };
@@ -314,6 +366,33 @@ function collapseTweet(container: HTMLElement, reason: string): void {
     };
 
     container.appendChild(foldBar);
+}
+
+/**
+ * Extract user handle from a tweet container
+ */
+function extractUserHandle(container: HTMLElement): string {
+    // Method 1: Look for the user link in the tweet header
+    const userLinks = container.querySelectorAll('a[href^="/"][role="link"]');
+    for (const link of userLinks) {
+        const href = link.getAttribute('href');
+        // User profile links are like "/username" (no status, no other paths)
+        if (href && href.match(/^\/[a-zA-Z0-9_]+$/)) {
+            return href.replace('/', '');
+        }
+    }
+
+    // Method 2: Try to extract from status link
+    const statusLink = container.querySelector('a[href*="/status/"]');
+    if (statusLink) {
+        const href = statusLink.getAttribute('href') || '';
+        const match = href.match(/\/([^/]+)\/status\//);
+        if (match) {
+            return match[1];
+        }
+    }
+
+    return 'unknown';
 }
 
 // Update the blocked ads counter in storage

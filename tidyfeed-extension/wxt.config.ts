@@ -6,7 +6,7 @@ export default defineConfig({
   manifest: {
     name: 'TidyFeed - AdBlock & Downloader',
     description: 'Filter social media noise, capture valuable content.',
-    permissions: ['storage', 'activeTab', 'scripting', 'alarms'],
+    permissions: ['storage', 'activeTab', 'scripting', 'alarms', 'cookies'],
     host_permissions: [
       '*://*.x.com/*',
       '*://*.twitter.com/*',
@@ -14,6 +14,7 @@ export default defineConfig({
       '*://video.twimg.com/*',
       '*://pbs.twimg.com/*',
       'https://tidyfeed.app/*',
+      'https://api.tidyfeed.app/*',
     ],
     action: {
       default_title: 'TidyFeed',

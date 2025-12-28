@@ -49,6 +49,16 @@ const BUTTON_LOADING_STYLES = `
   border: none;
 `;
 
+// Block button specific styles
+const BLOCK_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/>
+</svg>`;
+
+const BLOCK_BUTTON_HOVER_STYLES = `
+  background-color: rgba(244, 67, 54, 0.1);
+  color: rgb(244, 67, 54);
+`;
+
 interface MediaItem {
     url: string;
     type: 'img' | 'video';
@@ -698,7 +708,154 @@ function createDownloadButton(): HTMLButtonElement {
 }
 
 /**
- * Inject button into a tweet's action bar
+ * Show a toast notification
+ */
+function showToast(message: string): void {
+    // Remove existing toast if any
+    const existingToast = document.getElementById('tidyfeed-toast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'tidyfeed-toast';
+    toast.textContent = message;
+    Object.assign(toast.style, {
+        position: 'fixed',
+        bottom: '24px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        color: '#fff',
+        padding: '12px 24px',
+        borderRadius: '8px',
+        fontSize: '14px',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        zIndex: '10000',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        transition: 'opacity 0.3s ease',
+        opacity: '0',
+    });
+
+    document.body.appendChild(toast);
+
+    // Fade in
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+    });
+
+    // Auto remove after 2.5s
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 2500);
+}
+
+/**
+ * Handle block button click - optimistic UI
+ */
+async function handleBlockClick(event: MouseEvent): Promise<void> {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const button = event.currentTarget as HTMLButtonElement;
+    const article = button.closest('article');
+    const container = article?.closest('[data-testid="cellInnerDiv"]') as HTMLElement;
+
+    if (!article || !container) {
+        console.error('[TidyFeed] Could not find tweet container');
+        return;
+    }
+
+    // Extract user info for reporting
+    const data = extractTweetData(article as HTMLElement);
+    const userHandle = data.handle.replace('@', '');
+    const tweetId = data.tweetId;
+
+    // OPTIMISTIC UI: Immediately hide the tweet with animation
+    container.style.transition = 'opacity 0.3s ease, max-height 0.3s ease';
+    container.style.opacity = '0';
+    container.style.maxHeight = container.offsetHeight + 'px';
+    container.style.overflow = 'hidden';
+
+    setTimeout(() => {
+        container.style.maxHeight = '0';
+        container.style.padding = '0';
+        container.style.margin = '0';
+    }, 50);
+
+    setTimeout(() => {
+        container.style.display = 'none';
+    }, 350);
+
+    // Block user on X natively via internal API
+    let numericUserId: string | null = null;
+    let blockedScreenName = userHandle;
+
+    try {
+        const blockResult = await browser.runtime.sendMessage({
+            type: 'BLOCK_USER',
+            userId: userHandle  // This is the screen_name (handle)
+        });
+
+        if (blockResult?.success) {
+            // Capture numeric user ID from response for backend report
+            numericUserId = blockResult.userId || null;
+            blockedScreenName = blockResult.screenName || userHandle;
+            showToast(`已在 X 上屏蔽 @${blockedScreenName}`);
+            console.log(`[TidyFeed] ✅ Blocked on X: @${blockedScreenName} (ID: ${numericUserId})`);
+        } else {
+            // Show error but don't undo the hide
+            showToast(blockResult?.error || '屏蔽失败，请确保已登录 X');
+            console.error('[TidyFeed] X Block failed:', blockResult?.error);
+        }
+    } catch (error) {
+        showToast('屏蔽失败，请确保已登录 X');
+        console.error('[TidyFeed] X Block error:', error);
+    }
+
+    // Also send report to our backend (async, silent)
+    // Use numeric userId if available, otherwise fallback to handle
+    if (numericUserId) {
+        try {
+            const { reportBlock } = await import('./reporter');
+            await reportBlock(numericUserId, blockedScreenName, 'manual_block');
+            console.log(`[TidyFeed] 📊 Reported to backend: ID ${numericUserId} (@${blockedScreenName})`);
+        } catch (error) {
+            // Silent failure - don't disturb user
+            console.error('[TidyFeed] Backend report failed (silent):', error);
+        }
+    }
+}
+
+/**
+ * Create the block button element
+ */
+function createBlockButton(): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.className = 'tidyfeed-block-btn';
+    button.setAttribute('data-tidyfeed-block-btn', 'true');
+    button.setAttribute('aria-label', 'Block this content');
+    button.setAttribute('title', '屏蔽此内容');
+    button.innerHTML = BLOCK_ICON;
+    button.style.cssText = BUTTON_STYLES;
+
+    button.addEventListener('mouseenter', () => {
+        if (!button.disabled) {
+            button.style.cssText = BUTTON_STYLES + BLOCK_BUTTON_HOVER_STYLES;
+        }
+    });
+    button.addEventListener('mouseleave', () => {
+        if (!button.disabled) {
+            button.style.cssText = BUTTON_STYLES;
+        }
+    });
+
+    button.addEventListener('click', handleBlockClick);
+
+    return button;
+}
+
+/**
+ * Inject buttons into a tweet's action bar
  */
 function injectButtonIntoTweet(article: HTMLElement): boolean {
     if (article.dataset.tidyfeedInjected === 'true') {
@@ -714,10 +871,17 @@ function injectButtonIntoTweet(article: HTMLElement): boolean {
         return false;
     }
 
-    const button = createDownloadButton();
+    // Create wrapper for both buttons
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'display: flex; align-items: center;';
-    wrapper.appendChild(button);
+    wrapper.style.cssText = 'display: flex; align-items: center; gap: 0;';
+
+    // Add download button
+    const downloadBtn = createDownloadButton();
+    wrapper.appendChild(downloadBtn);
+
+    // Add block button
+    const blockBtn = createBlockButton();
+    wrapper.appendChild(blockBtn);
 
     actionBar.appendChild(wrapper);
     article.dataset.tidyfeedInjected = 'true';

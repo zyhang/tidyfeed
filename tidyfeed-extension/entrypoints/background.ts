@@ -4,6 +4,9 @@
  */
 
 export default defineBackground(() => {
+  // Configuration
+  const BACKEND_URL = 'https://api.tidyfeed.app';
+
   // Cloud Regex Sync Logic
   const REMOTE_REGEX_URL = 'https://tidyfeed.app/regex_rules.json';
   const REGEX_SYNC_ALARM = 'tidyfeed_regex_sync';
@@ -35,9 +38,155 @@ export default defineBackground(() => {
     }
   }
 
-  // Initial Sync & Alarm Setup
+  // Handle report block request to backend
+  async function handleReportBlock(
+    blockedId: string,
+    blockedName: string,
+    reason: string
+  ): Promise<{ success: boolean; data?: unknown; error?: string }> {
+    try {
+      const storage = await browser.storage.local.get(['tidyfeed_uid', 'user_type']);
+      const tidyfeed_uid = (storage.tidyfeed_uid as string) || 'unknown';
+      const user_type = (storage.user_type as string) || 'guest';
+
+      const response = await fetch(`${BACKEND_URL}/api/report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': tidyfeed_uid,
+          'X-User-Type': user_type,
+        },
+        body: JSON.stringify({
+          blocked_x_id: blockedId,
+          blocked_x_name: blockedName,
+          reason: reason || 'manual_block'
+        }),
+      });
+
+      const data = await response.json();
+      console.log('[TidyFeed] Report sent:', data);
+      return { success: response.ok, data };
+    } catch (error) {
+      console.error('[TidyFeed] Report error:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  // X Web Client Bearer Token (public, used by X web app)
+  const X_BEARER_TOKEN = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
+
+  /**
+   * Perform native X/Twitter block using internal API
+   * Uses user's login session via cookies
+   */
+  async function performBlockOnX(targetUserId: string): Promise<{
+    success: boolean;
+    userId?: string | null;       // Numeric user ID from response
+    screenName?: string;          // Screen name from response
+    error?: string;
+    errorCode?: 'CSRF_MISSING' | 'AUTH_FAILED' | 'RATE_LIMITED' | 'NETWORK_ERROR';
+  }> {
+    try {
+      // Add random delay (500ms - 2000ms) for anti-detection
+      const delay = Math.floor(Math.random() * 1500) + 500;
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      // Step A: Get CSRF token from cookies
+      const csrfCookie = await browser.cookies.get({
+        url: 'https://x.com',
+        name: 'ct0'
+      });
+
+      if (!csrfCookie?.value) {
+        console.error('[TidyFeed] CSRF token (ct0) not found - user may not be logged in');
+        return {
+          success: false,
+          error: '请确保已在浏览器登录 X',
+          errorCode: 'CSRF_MISSING'
+        };
+      }
+
+      const csrfToken = csrfCookie.value;
+      console.log('[TidyFeed] Got CSRF token:', csrfToken.substring(0, 10) + '...');
+
+      // Step B: Construct and send block request
+      // Use screen_name since we extract handles from DOM (not numeric user IDs)
+      const response = await fetch('https://x.com/i/api/1.1/blocks/create.json', {
+        method: 'POST',
+        headers: {
+          'authorization': X_BEARER_TOKEN,
+          'x-csrf-token': csrfToken,
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-twitter-active-user': 'yes',
+          'x-twitter-client-language': 'en',
+        },
+        body: `screen_name=${encodeURIComponent(targetUserId)}`,
+        credentials: 'include', // Include cookies
+      });
+
+      // Step C: Handle response
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[TidyFeed] ✅ X Block successful:', data?.screen_name, 'ID:', data?.id_str);
+        return {
+          success: true,
+          userId: data?.id_str || null,       // Numeric user ID
+          screenName: data?.screen_name || targetUserId
+        };
+      }
+
+      // Error handling
+      if (response.status === 401 || response.status === 403) {
+        console.error('[TidyFeed] Auth failed:', response.status);
+        return {
+          success: false,
+          error: '请确保已在浏览器登录 X',
+          errorCode: 'AUTH_FAILED'
+        };
+      }
+
+      if (response.status === 429) {
+        console.error('[TidyFeed] Rate limited');
+        return {
+          success: false,
+          error: '操作太快，请稍后再试',
+          errorCode: 'RATE_LIMITED'
+        };
+      }
+
+      // Other errors
+      const errorText = await response.text();
+      console.error('[TidyFeed] Block API error:', response.status, errorText);
+      return {
+        success: false,
+        error: `Block failed: ${response.status}`
+      };
+
+    } catch (error) {
+      console.error('[TidyFeed] Network error during block:', error);
+      return {
+        success: false,
+        error: String(error),
+        errorCode: 'NETWORK_ERROR'
+      };
+    }
+  }
+
+  // Initial Sync & Alarm Setup + User Identification
   browser.runtime.onInstalled.addListener(async (details) => {
     console.log('[TidyFeed] Extension installed/updated:', details.reason);
+
+    // User identification - generate UUID if not exists
+    const { tidyfeed_uid } = await browser.storage.local.get('tidyfeed_uid');
+    if (!tidyfeed_uid) {
+      const uid = crypto.randomUUID();
+      await browser.storage.local.set({
+        tidyfeed_uid: uid,
+        user_type: 'guest'
+      });
+      console.log('[TidyFeed] Generated new user ID:', uid);
+    }
+
     await syncRegexRules();
 
     // Create alarm for daily sync
@@ -90,6 +239,33 @@ export default defineBackground(() => {
         .catch((error) => {
           console.error('[TidyFeed] Tweet data fetch error:', error);
           sendResponse({ text: null, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message.type === 'REPORT_BLOCK') {
+      handleReportBlock(message.blockedId, message.blockedName, message.reason)
+        .then((result) => {
+          sendResponse(result);
+        })
+        .catch((error) => {
+          console.error('[TidyFeed] Report block error:', error);
+          sendResponse({ success: false, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message.type === 'BLOCK_USER') {
+      // Block user via X's internal API
+      performBlockOnX(message.userId)
+        .then((result) => {
+          sendResponse(result);
+        })
+        .catch((error) => {
+          console.error('[TidyFeed] Block user error:', error);
+          sendResponse({ success: false, error: error.message });
         });
 
       return true;
