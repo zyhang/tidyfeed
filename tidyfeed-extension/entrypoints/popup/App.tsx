@@ -86,7 +86,7 @@ function App() {
   };
 
   const handleGoToDashboard = () => {
-    chrome.tabs.create({ url: 'https://tidyfeed.app/dashboard' });
+    chrome.tabs.create({ url: 'https://a.tidyfeed.app/dashboard' });
   };
 
   const handleToggleRegex = () => {
