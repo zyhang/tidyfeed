@@ -47,9 +47,14 @@ export default function Home() {
         </CardContent>
       </Card>
 
-      <p className="mt-6 text-sm text-muted-foreground">
-        © {new Date().getFullYear()} TidyFeed. All rights reserved.
-      </p>
+      <div className="mt-6 flex flex-col items-center gap-2">
+        <Link href="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          Privacy Policy
+        </Link>
+        <p className="text-sm text-muted-foreground">
+          © {new Date().getFullYear()} TidyFeed. All rights reserved.
+        </p>
+      </div>
     </div>
   )
 }
