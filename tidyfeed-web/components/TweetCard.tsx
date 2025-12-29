@@ -1,15 +1,19 @@
-'use client'
-
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Trash2, ExternalLink, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash } from 'lucide-react'
 import { TagInput } from '@/components/TagInput'
 
 interface Author {
     name?: string
     handle?: string
     avatar?: string
+}
+
+interface Tag {
+    id: number
+    name: string
 }
 
 interface TweetCardProps {
@@ -21,6 +25,7 @@ interface TweetCardProps {
     url: string | null
     platform: string
     createdAt: string
+    tags?: Tag[]
     onDelete: (xId: string) => void
 }
 
@@ -32,11 +37,17 @@ export function TweetCard({
     url,
     platform,
     createdAt,
+    tags: initialTags = [],
     onDelete,
 }: TweetCardProps) {
     const [expanded, setExpanded] = useState(false)
     const [deleting, setDeleting] = useState(false)
     const [lightboxImage, setLightboxImage] = useState<string | null>(null)
+    const [tags, setTags] = useState<Tag[]>(initialTags)
+
+    useEffect(() => {
+        setTags(initialTags)
+    }, [initialTags])
 
     const handleDelete = async () => {
         if (deleting) return
@@ -45,6 +56,16 @@ export function TweetCard({
             await onDelete(xId)
         } finally {
             setDeleting(false)
+        }
+    }
+
+    const handleTagAdded = (tagName: string) => {
+        // Optimistically add tag if not already present
+        if (!tags.some(t => t.name === tagName)) {
+            // We don't have the ID yet, but for display purposes it's fine.
+            // Ideally we should refetch or the API should return the tag object.
+            // For now, use a temporary ID or just ignore ID for key
+            setTags([...tags, { id: Date.now(), name: tagName }])
         }
     }
 
@@ -148,6 +169,18 @@ export function TweetCard({
                         </div>
                     )}
 
+                    {/* Tags */}
+                    {tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                            {tags.map((tag) => (
+                                <Badge key={tag.name} variant="secondary" className="text-xs font-normal">
+                                    <Hash className="h-3 w-3 mr-0.5 opacity-70" />
+                                    {tag.name}
+                                </Badge>
+                            ))}
+                        </div>
+                    )}
+
                     {/* Actions */}
                     <div className="flex items-center justify-between pt-2 border-t">
                         <div className="flex items-center gap-1">
@@ -162,6 +195,7 @@ export function TweetCard({
                             <TagInput
                                 tweetId={xId}
                                 tweetData={{ content, author, media, url, platform }}
+                                onTagAdded={handleTagAdded}
                             />
                         </div>
                         <Button

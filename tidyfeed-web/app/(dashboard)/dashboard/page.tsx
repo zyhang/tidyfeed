@@ -23,7 +23,10 @@ interface Post {
     url: string | null
     platform: string
     createdAt: string
+    tags?: { id: number; name: string }[]
 }
+
+import { toast } from 'sonner'
 
 function DashboardContent() {
     const router = useRouter()
@@ -35,21 +38,20 @@ function DashboardContent() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
-    const fetchPosts = useCallback(async (search: string) => {
+    const fetchPosts = useCallback(async (searchQuery: string = '') => {
         setLoading(true)
         setError(null)
         try {
-            const url = new URL(`${API_URL}/api/posts`)
-            if (search) url.searchParams.set('search', search)
+            const params = new URLSearchParams()
+            if (searchQuery) params.append('search', searchQuery)
 
-            const response = await fetch(url.toString(), {
+            const response = await fetch(`${API_URL}/api/posts?${params.toString()}`, {
                 credentials: 'include',
             })
 
             if (!response.ok) {
                 if (response.status === 401) {
-                    setError('Please log in to view your saved posts')
-                    setPosts([])
+                    router.push('/')
                     return
                 }
                 throw new Error('Failed to fetch posts')
@@ -58,22 +60,20 @@ function DashboardContent() {
             const data = await response.json()
             setPosts(data.posts || [])
         } catch (err) {
-            console.error('Error fetching posts:', err)
-            setError('Failed to load posts')
+            console.error('Fetch error:', err)
+            setError('Failed to load posts. Please try again.')
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [router])
 
     useEffect(() => {
         fetchPosts(initialQuery)
-    }, [initialQuery, fetchPosts])
+    }, [fetchPosts, initialQuery])
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault()
-        const params = new URLSearchParams()
-        if (query) params.set('q', query)
-        router.push(`/dashboard${params.toString() ? `?${params.toString()}` : ''}`)
+        fetchPosts(query)
     }
 
     const handleDelete = async (xId: string) => {
@@ -83,20 +83,19 @@ function DashboardContent() {
                 credentials: 'include',
             })
 
-            if (!response.ok) {
-                throw new Error('Failed to delete post')
-            }
+            if (!response.ok) throw new Error('Failed to delete post')
 
             // Remove from local state
             setPosts(prev => prev.filter(p => p.xId !== xId))
-        } catch (err) {
-            console.error('Error deleting post:', err)
-            alert('Failed to delete post')
+            toast.success('Post deleted')
+        } catch (error) {
+            console.error('Delete error:', error)
+            toast.error('Failed to delete post')
         }
     }
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="space-y-6">
             {/* Header */}
             <div className="flex flex-col gap-2">
                 <h1 className="text-2xl font-bold">Saved Posts</h1>
@@ -154,6 +153,7 @@ function DashboardContent() {
                             url={post.url}
                             platform={post.platform}
                             createdAt={post.createdAt}
+                            tags={post.tags}
                             onDelete={handleDelete}
                         />
                     ))}

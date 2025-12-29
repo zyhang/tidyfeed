@@ -537,6 +537,7 @@ app.get('/api/posts/ids', cookieAuthMiddleware, async (c) => {
 });
 
 // Get full posts with search and pagination
+// Get all saved posts (with pagination, search, and tags)
 app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 	try {
 		const payload = c.get('jwtPayload') as { sub: string };
@@ -557,10 +558,18 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 		query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
 		params.push(limit, offset);
 
-		const posts = await c.env.DB.prepare(query).bind(...params).all();
+		const posts = await c.env.DB.prepare(query).bind(...params).all<any>();
 
-		// Parse JSON fields
-		const formattedPosts = (posts.results || []).map((post: any) => ({
+		// If no posts, return early
+		if (!posts.results || posts.results.length === 0) {
+			return c.json({
+				count: 0,
+				posts: [],
+			});
+		}
+
+		// Parse JSON fields and extract IDs for tag fetching
+		const formattedPosts = posts.results.map((post) => ({
 			id: post.id,
 			xId: post.x_post_id,
 			content: post.content,
@@ -569,7 +578,42 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 			url: post.url,
 			platform: post.platform,
 			createdAt: post.created_at,
+			tags: [] as { id: number; name: string }[], // Initialize empty tags
 		}));
+
+		// Fetch tags for these posts
+		const xIds = formattedPosts.map(p => p.xId);
+		if (xIds.length > 0) {
+			const placeholders = xIds.map(() => '?').join(',');
+			const tagsQuery = `
+				SELECT ttr.tweet_id, t.id, t.name 
+				FROM tags t 
+				JOIN tweet_tag_refs ttr ON t.id = ttr.tag_id 
+				WHERE ttr.tweet_id IN (${placeholders}) AND t.user_id = ?
+			`;
+
+			const tagsResult = await c.env.DB.prepare(tagsQuery)
+				.bind(...xIds, userId)
+				.all<{ tweet_id: string; id: number; name: string }>();
+
+			// Map tags to posts
+			if (tagsResult.results && tagsResult.results.length > 0) {
+				const tagsMap = new Map<string, { id: number; name: string }[]>();
+
+				tagsResult.results.forEach(row => {
+					if (!tagsMap.has(row.tweet_id)) {
+						tagsMap.set(row.tweet_id, []);
+					}
+					tagsMap.get(row.tweet_id)!.push({ id: row.id, name: row.name });
+				});
+
+				formattedPosts.forEach(post => {
+					if (tagsMap.has(post.xId)) {
+						post.tags = tagsMap.get(post.xId)!;
+					}
+				});
+			}
+		}
 
 		return c.json({
 			count: formattedPosts.length,
