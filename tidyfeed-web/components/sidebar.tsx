@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Tag, Settings, ChevronLeft, Menu, Hash, ChevronDown, ChevronRight, Loader2 } from "lucide-react"
+import { Home, Tag, Settings, ChevronLeft, Menu, Hash, ChevronDown, ChevronRight, Loader2, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -146,6 +146,20 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                     </div>
                 ))}
             </nav>
+
+            {/* Logout Button */}
+            <div className="p-2 border-t">
+                <a
+                    href={`${API_URL}/auth/logout`}
+                    className={cn(
+                        "flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground",
+                        isCollapsed && "justify-center px-2"
+                    )}
+                >
+                    <LogOut className="h-5 w-5" />
+                    {!isCollapsed && <span>Sign Out</span>}
+                </a>
+            </div>
         </aside>
     )
 }

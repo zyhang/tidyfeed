@@ -298,12 +298,14 @@ app.get('/auth/callback/google', async (c) => {
 			'Path=/',
 			'HttpOnly',
 			`Max-Age=${30 * 24 * 60 * 60}`, // 30 days
-			'SameSite=Lax',
 		];
 
 		if (!isDev) {
 			cookieOptions.push('Secure');
 			cookieOptions.push('Domain=.tidyfeed.app');
+			cookieOptions.push('SameSite=None'); // Required for cross-origin requests
+		} else {
+			cookieOptions.push('SameSite=Lax');
 		}
 
 		return new Response(null, {
@@ -378,6 +380,36 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 		console.error('Get user error:', error);
 		return c.json({ error: 'Internal server error' }, 500);
 	}
+});
+
+// Logout - clear auth cookie
+app.get('/auth/logout', (c) => {
+	const isDev = c.req.url.includes('localhost') || c.req.url.includes('127.0.0.1');
+	const redirectUrl = isDev ? 'http://localhost:3000' : 'https://a.tidyfeed.app';
+
+	// Clear the auth cookie by setting it to expire immediately
+	const cookieOptions = [
+		'auth_token=',
+		'Path=/',
+		'HttpOnly',
+		'Max-Age=0', // Expire immediately
+	];
+
+	if (!isDev) {
+		cookieOptions.push('Secure');
+		cookieOptions.push('Domain=.tidyfeed.app');
+		cookieOptions.push('SameSite=None');
+	} else {
+		cookieOptions.push('SameSite=Lax');
+	}
+
+	return new Response(null, {
+		status: 302,
+		headers: {
+			'Location': redirectUrl,
+			'Set-Cookie': cookieOptions.join('; '),
+		},
+	});
 });
 
 // ============================================
