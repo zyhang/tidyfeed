@@ -21,7 +21,7 @@ export default function PrivacyPage() {
 
                 {/* Title */}
                 <h1 className="text-3xl font-bold tracking-tight mb-2">Privacy Policy</h1>
-                <p className="text-muted-foreground mb-8">Last updated: December 29, 2024</p>
+                <p className="text-muted-foreground mb-8">Last updated: December 29, 2025</p>
 
                 {/* Content */}
                 <div className="prose prose-zinc dark:prose-invert max-w-none space-y-8">
