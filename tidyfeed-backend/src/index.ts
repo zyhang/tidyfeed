@@ -550,6 +550,240 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 });
 
 // ============================================
+// Tagging System API Routes (Authenticated via Cookie)
+// ============================================
+
+// Get all tags with tweet count
+app.get('/api/tags', cookieAuthMiddleware, async (c) => {
+	try {
+		const tags = await c.env.DB.prepare(
+			`SELECT 
+				t.id, 
+				t.name, 
+				t.created_at,
+				COUNT(ttr.tweet_id) as tweet_count
+			 FROM tags t
+			 LEFT JOIN tweet_tag_refs ttr ON t.id = ttr.tag_id
+			 GROUP BY t.id, t.name, t.created_at
+			 ORDER BY t.name ASC`
+		).all<{ id: number; name: string; created_at: string; tweet_count: number }>();
+
+		return c.json({
+			success: true,
+			tags: tags.results || [],
+		});
+	} catch (error) {
+		console.error('Get tags error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// Create a new tag
+app.post('/api/tags', cookieAuthMiddleware, async (c) => {
+	try {
+		const { name } = await c.req.json();
+
+		if (!name || typeof name !== 'string' || name.trim().length === 0) {
+			return c.json({ error: 'Tag name is required' }, 400);
+		}
+
+		const tagName = name.trim().toLowerCase();
+
+		// Use INSERT OR IGNORE to prevent duplicates
+		await c.env.DB.prepare(
+			'INSERT OR IGNORE INTO tags (name) VALUES (?)'
+		).bind(tagName).run();
+
+		// Fetch the tag (whether newly created or existing)
+		const tag = await c.env.DB.prepare(
+			'SELECT id, name, created_at FROM tags WHERE name = ?'
+		).bind(tagName).first<{ id: number; name: string; created_at: string }>();
+
+		return c.json({
+			success: true,
+			tag,
+		});
+	} catch (error) {
+		console.error('Create tag error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// Delete a tag by ID
+app.delete('/api/tags/:id', cookieAuthMiddleware, async (c) => {
+	try {
+		const tagId = parseInt(c.req.param('id'));
+
+		if (isNaN(tagId)) {
+			return c.json({ error: 'Invalid tag ID' }, 400);
+		}
+
+		const result = await c.env.DB.prepare(
+			'DELETE FROM tags WHERE id = ?'
+		).bind(tagId).run();
+
+		if (result.meta.changes === 0) {
+			return c.json({ error: 'Tag not found' }, 404);
+		}
+
+		// Note: tweet_tag_refs entries are automatically deleted via CASCADE
+
+		return c.json({ success: true, message: 'Tag deleted' });
+	} catch (error) {
+		console.error('Delete tag error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// Rename a tag by ID
+app.patch('/api/tags/:id', cookieAuthMiddleware, async (c) => {
+	try {
+		const tagId = parseInt(c.req.param('id'));
+		const { name } = await c.req.json();
+
+		if (isNaN(tagId)) {
+			return c.json({ error: 'Invalid tag ID' }, 400);
+		}
+
+		if (!name || typeof name !== 'string' || name.trim().length === 0) {
+			return c.json({ error: 'Tag name is required' }, 400);
+		}
+
+		const tagName = name.trim().toLowerCase();
+
+		// Check if tag name already exists
+		const existing = await c.env.DB.prepare(
+			'SELECT id FROM tags WHERE name = ? AND id != ?'
+		).bind(tagName, tagId).first();
+
+		if (existing) {
+			return c.json({ error: 'Tag name already exists' }, 409);
+		}
+
+		const result = await c.env.DB.prepare(
+			'UPDATE tags SET name = ? WHERE id = ?'
+		).bind(tagName, tagId).run();
+
+		if (result.meta.changes === 0) {
+			return c.json({ error: 'Tag not found' }, 404);
+		}
+
+		return c.json({ success: true, message: 'Tag renamed' });
+	} catch (error) {
+		console.error('Rename tag error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// Tag a tweet (atomic operation)
+app.post('/api/tweets/tag', cookieAuthMiddleware, async (c) => {
+	try {
+		const { tweet_id, tag_name, tweet_data } = await c.req.json();
+
+		if (!tweet_id || typeof tweet_id !== 'string') {
+			return c.json({ error: 'tweet_id is required' }, 400);
+		}
+
+		if (!tag_name || typeof tag_name !== 'string' || tag_name.trim().length === 0) {
+			return c.json({ error: 'tag_name is required' }, 400);
+		}
+
+		const tagName = tag_name.trim().toLowerCase();
+		const dataJson = tweet_data ? JSON.stringify(tweet_data) : '{}';
+
+		// Use DB.batch() for atomic operations
+		const statements = [
+			// 1. Upsert tweet into tweet_cache
+			c.env.DB.prepare(
+				`INSERT OR REPLACE INTO tweet_cache (tweet_id, data_json, updated_at)
+				 VALUES (?, ?, CURRENT_TIMESTAMP)`
+			).bind(tweet_id, dataJson),
+
+			// 2. Insert tag if not exists
+			c.env.DB.prepare(
+				'INSERT OR IGNORE INTO tags (name) VALUES (?)'
+			).bind(tagName),
+
+			// 3. Create relationship using subquery to get tag_id
+			c.env.DB.prepare(
+				`INSERT OR IGNORE INTO tweet_tag_refs (tweet_id, tag_id)
+				 VALUES (?, (SELECT id FROM tags WHERE name = ?))`
+			).bind(tweet_id, tagName),
+		];
+
+		await c.env.DB.batch(statements);
+
+		return c.json({ success: true, message: 'Tweet tagged successfully' });
+	} catch (error) {
+		console.error('Tag tweet error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// Get tweets by tag
+app.get('/api/tweets/by-tag/:tagId', cookieAuthMiddleware, async (c) => {
+	try {
+		const tagId = parseInt(c.req.param('tagId'));
+
+		if (isNaN(tagId)) {
+			return c.json({ error: 'Invalid tag ID' }, 400);
+		}
+
+		const tweets = await c.env.DB.prepare(
+			`SELECT tc.tweet_id, tc.data_json, tc.updated_at
+			 FROM tweet_cache tc
+			 INNER JOIN tweet_tag_refs ttr ON tc.tweet_id = ttr.tweet_id
+			 WHERE ttr.tag_id = ?
+			 ORDER BY tc.updated_at DESC`
+		).bind(tagId).all<{ tweet_id: string; data_json: string; updated_at: string }>();
+
+		// Parse data_json for each tweet
+		const formattedTweets = (tweets.results || []).map((tweet) => ({
+			tweetId: tweet.tweet_id,
+			data: JSON.parse(tweet.data_json || '{}'),
+			updatedAt: tweet.updated_at,
+		}));
+
+		return c.json({
+			success: true,
+			tweets: formattedTweets,
+		});
+	} catch (error) {
+		console.error('Get tweets by tag error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// Remove tag from tweet
+app.delete('/api/tweets/:tweetId/tags/:tagId', cookieAuthMiddleware, async (c) => {
+	try {
+		const tweetId = c.req.param('tweetId');
+		const tagId = parseInt(c.req.param('tagId'));
+
+		if (!tweetId) {
+			return c.json({ error: 'Tweet ID is required' }, 400);
+		}
+
+		if (isNaN(tagId)) {
+			return c.json({ error: 'Invalid tag ID' }, 400);
+		}
+
+		const result = await c.env.DB.prepare(
+			'DELETE FROM tweet_tag_refs WHERE tweet_id = ? AND tag_id = ?'
+		).bind(tweetId, tagId).run();
+
+		if (result.meta.changes === 0) {
+			return c.json({ error: 'Tag relationship not found' }, 404);
+		}
+
+		return c.json({ success: true, message: 'Tag removed from tweet' });
+	} catch (error) {
+		console.error('Remove tag from tweet error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// ============================================
 // Protected Admin Routes
 // ============================================
 
