@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import {
     Shield,
@@ -126,12 +127,15 @@ export default function LandingPage() {
             {/* Subtle Background Gradient */}
             <div className="fixed inset-0 bg-gradient-to-b from-zinc-50 via-white to-zinc-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 pointer-events-none" />
 
-            {/* Navigation */}
             <nav className="relative z-10 flex items-center justify-between px-6 py-4 md:px-12 lg:px-24">
                 <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-lg bg-zinc-900 dark:bg-white flex items-center justify-center">
-                        <span className="text-white dark:text-zinc-900 font-bold text-sm">T</span>
-                    </div>
+                    <Image
+                        src="/logo.jpg"
+                        alt="TidyFeed Logo"
+                        width={32}
+                        height={32}
+                        className="rounded-lg"
+                    />
                     <span className="font-semibold text-lg">TidyFeed</span>
                 </div>
                 <Link
@@ -345,9 +349,13 @@ export default function LandingPage() {
             <footer className="relative z-10 px-6 py-12 md:px-12 lg:px-24 border-t border-zinc-100 dark:border-zinc-800">
                 <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex items-center gap-2">
-                        <div className="h-7 w-7 rounded-lg bg-zinc-900 dark:bg-white flex items-center justify-center">
-                            <span className="text-white dark:text-zinc-900 font-bold text-xs">T</span>
-                        </div>
+                        <Image
+                            src="/logo.jpg"
+                            alt="TidyFeed Logo"
+                            width={28}
+                            height={28}
+                            className="rounded-lg"
+                        />
                         <span className="font-medium text-zinc-700 dark:text-zinc-300">TidyFeed</span>
                     </div>
 
