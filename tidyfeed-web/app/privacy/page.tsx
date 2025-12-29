@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
 export const metadata = {
-    title: "Privacy Policy - TidyFeed",
+    title: "Privacy Policy",
     description: "Privacy Policy for TidyFeed Chrome Extension and Services",
 }
 

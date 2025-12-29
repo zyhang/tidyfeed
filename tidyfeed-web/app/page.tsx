@@ -1,7 +1,12 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Activity } from "lucide-react"
+
+export const metadata: Metadata = {
+  title: "Sign In",
+}
 
 export default function Home() {
   // Use env var if set, otherwise default to production API
