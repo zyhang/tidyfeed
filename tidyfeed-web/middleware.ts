@@ -12,9 +12,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // Protect dashboard routes - redirect to login if not authenticated
+  // Protect dashboard routes - redirect to login page if not authenticated
   if (pathname.startsWith('/dashboard') && !token) {
-    return NextResponse.redirect(`${API_URL}/auth/login/google`)
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   return NextResponse.next()
