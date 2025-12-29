@@ -23,9 +23,9 @@ export default function Home() {
         </CardHeader>
         <CardContent className="grid gap-4">
           <Button asChild className="w-full" size="lg">
-            <Link href={`${apiUrl}/auth/login/google`}>
+            <a href={`${apiUrl}/auth/login/google`}>
               Login with Google
-            </Link>
+            </a>
           </Button>
 
           <div className="relative">
