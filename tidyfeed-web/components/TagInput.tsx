@@ -118,6 +118,12 @@ export function TagInput({ tweetId, tweetData, onTagAdded }: TagInputProps) {
                         placeholder="Search or create tag..."
                         value={searchValue}
                         onValueChange={setSearchValue}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && showCreateOption) {
+                                e.preventDefault()
+                                handleCreateAndTag()
+                            }
+                        }}
                     />
                     <CommandList>
                         {loading && (
@@ -133,8 +139,9 @@ export function TagInput({ tweetId, tweetData, onTagAdded }: TagInputProps) {
                         {showCreateOption && (
                             <CommandGroup heading="Create new">
                                 <CommandItem
-                                    onSelect={handleCreateAndTag}
+                                    onSelect={() => handleCreateAndTag()}
                                     className="cursor-pointer"
+                                    value={`create-${searchValue}`} // Unique value to prevent filtering issues
                                 >
                                     <Plus className="mr-2 h-4 w-4" />
                                     Create &quot;{searchValue.trim()}&quot;

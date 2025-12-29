@@ -588,17 +588,20 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 // Get all tags with tweet count
 app.get('/api/tags', cookieAuthMiddleware, async (c) => {
 	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+
 		const tags = await c.env.DB.prepare(
 			`SELECT 
 				t.id, 
 				t.name, 
-				t.created_at,
 				COUNT(ttr.tweet_id) as tweet_count
 			 FROM tags t
 			 LEFT JOIN tweet_tag_refs ttr ON t.id = ttr.tag_id
-			 GROUP BY t.id, t.name, t.created_at
+			 WHERE t.user_id = ?
+			 GROUP BY t.id, t.name
 			 ORDER BY t.name ASC`
-		).all<{ id: number; name: string; created_at: string; tweet_count: number }>();
+		).bind(userId).all<{ id: number; name: string; tweet_count: number }>();
 
 		return c.json({
 			success: true,
@@ -613,6 +616,8 @@ app.get('/api/tags', cookieAuthMiddleware, async (c) => {
 // Create a new tag
 app.post('/api/tags', cookieAuthMiddleware, async (c) => {
 	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
 		const { name } = await c.req.json();
 
 		if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -621,15 +626,15 @@ app.post('/api/tags', cookieAuthMiddleware, async (c) => {
 
 		const tagName = name.trim().toLowerCase();
 
-		// Use INSERT OR IGNORE to prevent duplicates
+		// Use INSERT OR IGNORE to prevent duplicates for this user
 		await c.env.DB.prepare(
-			'INSERT OR IGNORE INTO tags (name) VALUES (?)'
-		).bind(tagName).run();
+			'INSERT OR IGNORE INTO tags (name, user_id) VALUES (?, ?)'
+		).bind(tagName, userId).run();
 
-		// Fetch the tag (whether newly created or existing)
+		// Fetch the tag
 		const tag = await c.env.DB.prepare(
-			'SELECT id, name, created_at FROM tags WHERE name = ?'
-		).bind(tagName).first<{ id: number; name: string; created_at: string }>();
+			'SELECT id, name FROM tags WHERE name = ? AND user_id = ?'
+		).bind(tagName, userId).first<{ id: number; name: string }>();
 
 		return c.json({
 			success: true,
@@ -644,15 +649,18 @@ app.post('/api/tags', cookieAuthMiddleware, async (c) => {
 // Delete a tag by ID
 app.delete('/api/tags/:id', cookieAuthMiddleware, async (c) => {
 	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
 		const tagId = parseInt(c.req.param('id'));
 
 		if (isNaN(tagId)) {
 			return c.json({ error: 'Invalid tag ID' }, 400);
 		}
 
+		// Delete tag and its references (CASCADE should handle references, but we filter by user_id)
 		const result = await c.env.DB.prepare(
-			'DELETE FROM tags WHERE id = ?'
-		).bind(tagId).run();
+			'DELETE FROM tags WHERE id = ? AND user_id = ?'
+		).bind(tagId, userId).run();
 
 		if (result.meta.changes === 0) {
 			return c.json({ error: 'Tag not found' }, 404);
@@ -667,40 +675,39 @@ app.delete('/api/tags/:id', cookieAuthMiddleware, async (c) => {
 	}
 });
 
-// Rename a tag by ID
+// Rename a tag
 app.patch('/api/tags/:id', cookieAuthMiddleware, async (c) => {
 	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
 		const tagId = parseInt(c.req.param('id'));
 		const { name } = await c.req.json();
 
-		if (isNaN(tagId)) {
-			return c.json({ error: 'Invalid tag ID' }, 400);
-		}
-
-		if (!name || typeof name !== 'string' || name.trim().length === 0) {
+		if (isNaN(tagId)) return c.json({ error: 'Invalid tag ID' }, 400);
+		if (!name || typeof name !== 'string' || !name.trim()) {
 			return c.json({ error: 'Tag name is required' }, 400);
 		}
 
 		const tagName = name.trim().toLowerCase();
 
-		// Check if tag name already exists
+		// Check for duplicate name for this user (excluding current tag)
 		const existing = await c.env.DB.prepare(
-			'SELECT id FROM tags WHERE name = ? AND id != ?'
-		).bind(tagName, tagId).first();
+			'SELECT id FROM tags WHERE name = ? AND user_id = ? AND id != ?'
+		).bind(tagName, userId, tagId).first();
 
 		if (existing) {
 			return c.json({ error: 'Tag name already exists' }, 409);
 		}
 
 		const result = await c.env.DB.prepare(
-			'UPDATE tags SET name = ? WHERE id = ?'
-		).bind(tagName, tagId).run();
+			'UPDATE tags SET name = ? WHERE id = ? AND user_id = ?'
+		).bind(tagName, tagId, userId).run();
 
-		if (result.meta.changes === 0) {
-			return c.json({ error: 'Tag not found' }, 404);
+		if (!result.success || result.meta.changes === 0) {
+			return c.json({ error: 'Tag not found or update failed' }, 404);
 		}
 
-		return c.json({ success: true, message: 'Tag renamed' });
+		return c.json({ success: true });
 	} catch (error) {
 		console.error('Rename tag error:', error);
 		return c.json({ error: 'Internal server error' }, 500);
@@ -720,6 +727,9 @@ app.post('/api/tweets/tag', cookieAuthMiddleware, async (c) => {
 			return c.json({ error: 'tag_name is required' }, 400);
 		}
 
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+
 		const tagName = tag_name.trim().toLowerCase();
 		const dataJson = tweet_data ? JSON.stringify(tweet_data) : '{}';
 
@@ -731,16 +741,16 @@ app.post('/api/tweets/tag', cookieAuthMiddleware, async (c) => {
 				 VALUES (?, ?, CURRENT_TIMESTAMP)`
 			).bind(tweet_id, dataJson),
 
-			// 2. Insert tag if not exists
+			// 2. Insert tag if not exists for this user
 			c.env.DB.prepare(
-				'INSERT OR IGNORE INTO tags (name) VALUES (?)'
-			).bind(tagName),
+				'INSERT OR IGNORE INTO tags (name, user_id) VALUES (?, ?)'
+			).bind(tagName, userId),
 
 			// 3. Create relationship using subquery to get tag_id
 			c.env.DB.prepare(
 				`INSERT OR IGNORE INTO tweet_tag_refs (tweet_id, tag_id)
-				 VALUES (?, (SELECT id FROM tags WHERE name = ?))`
-			).bind(tweet_id, tagName),
+				 VALUES (?, (SELECT id FROM tags WHERE name = ? AND user_id = ?))`
+			).bind(tweet_id, tagName, userId),
 		];
 
 		await c.env.DB.batch(statements);
@@ -755,19 +765,23 @@ app.post('/api/tweets/tag', cookieAuthMiddleware, async (c) => {
 // Get tweets by tag
 app.get('/api/tweets/by-tag/:tagId', cookieAuthMiddleware, async (c) => {
 	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
 		const tagId = parseInt(c.req.param('tagId'));
 
 		if (isNaN(tagId)) {
 			return c.json({ error: 'Invalid tag ID' }, 400);
 		}
 
+		// Verify tag ownership & fetch tweets
 		const tweets = await c.env.DB.prepare(
 			`SELECT tc.tweet_id, tc.data_json, tc.updated_at
 			 FROM tweet_cache tc
 			 INNER JOIN tweet_tag_refs ttr ON tc.tweet_id = ttr.tweet_id
-			 WHERE ttr.tag_id = ?
+			 INNER JOIN tags t ON ttr.tag_id = t.id
+			 WHERE ttr.tag_id = ? AND t.user_id = ?
 			 ORDER BY tc.updated_at DESC`
-		).bind(tagId).all<{ tweet_id: string; data_json: string; updated_at: string }>();
+		).bind(tagId, userId).all<{ tweet_id: string; data_json: string; updated_at: string }>();
 
 		// Parse data_json for each tweet
 		const formattedTweets = (tweets.results || []).map((tweet) => ({
