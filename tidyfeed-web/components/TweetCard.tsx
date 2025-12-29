@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Trash2, ExternalLink, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { TagInput } from '@/components/TagInput'
 
 interface Author {
     name?: string
@@ -149,20 +150,26 @@ export function TweetCard({
 
                     {/* Actions */}
                     <div className="flex items-center justify-between pt-2 border-t">
-                        {url && (
-                            <Button variant="ghost" size="sm" asChild>
-                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs">
-                                    <ExternalLink className="h-3 w-3 mr-1" />
-                                    View on {platformLabel}
-                                </a>
-                            </Button>
-                        )}
+                        <div className="flex items-center gap-1">
+                            {url && (
+                                <Button variant="ghost" size="sm" asChild>
+                                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs">
+                                        <ExternalLink className="h-3 w-3 mr-1" />
+                                        View on {platformLabel}
+                                    </a>
+                                </Button>
+                            )}
+                            <TagInput
+                                tweetId={xId}
+                                tweetData={{ content, author, media, url, platform }}
+                            />
+                        </div>
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={handleDelete}
                             disabled={deleting}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-auto"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
                             <Trash2 className="h-3 w-3 mr-1" />
                             {deleting ? 'Deleting...' : 'Delete'}
