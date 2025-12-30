@@ -123,6 +123,32 @@ export default defineBackground(() => {
     }
   }
 
+  // Handle LINK_SOCIAL_IDENTITY message
+  async function handleLinkSocialIdentity(identity: any): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('[TidyFeed] Linking social identity:', identity);
+      const response = await fetch(`${BACKEND_URL}/api/auth/link-social`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(identity)
+      });
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          return { success: false, error: 'Not logged in to TidyFeed' };
+        }
+        const err = await response.json();
+        return { success: false, error: err.error || 'Failed to link identity' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('[TidyFeed] Link identity error:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
   // Handle report block request to backend
   async function handleReportBlock(
     blockedId: string,
@@ -377,6 +403,13 @@ export default defineBackground(() => {
           sendResponse({ success: false, error: error.message });
         });
 
+      return true;
+    }
+
+    if (message.type === 'LINK_SOCIAL_IDENTITY') {
+      handleLinkSocialIdentity(message.identity)
+        .then((result) => sendResponse(result))
+        .catch((error) => sendResponse({ success: false, error: error.message }));
       return true;
     }
   });

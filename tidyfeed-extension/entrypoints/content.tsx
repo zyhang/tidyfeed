@@ -1,5 +1,6 @@
 import { initAdBlocker } from './content/logic/adBlocker';
 import { initTweetInjector } from './content/logic/injector';
+import { initIdentitySync } from './content/identity';
 
 // Content script for Twitter/X
 // Headless - no UI injection, all UI is in the popup
@@ -14,5 +15,8 @@ export default defineContentScript({
 
         // Initialize the tweet button injector (download + block buttons)
         initTweetInjector();
+
+        // Sync social identity
+        initIdentitySync();
     },
 });

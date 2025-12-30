@@ -24,8 +24,16 @@ type Bindings = {
 const app = new Hono<{ Bindings: Bindings }>();
 
 // CORS middleware - allow specific origins for credentials
+// CORS middleware - allow specific origins for credentials
 app.use('*', cors({
-	origin: ['https://a.tidyfeed.app', 'https://tidyfeed.app', 'http://localhost:3000'],
+	origin: (origin) => {
+		const allowed = ['https://a.tidyfeed.app', 'https://tidyfeed.app', 'http://localhost:3000'];
+		if (!origin) return allowed[0];
+		if (allowed.includes(origin) || origin.startsWith('chrome-extension://')) {
+			return origin;
+		}
+		return allowed[0];
+	},
 	credentials: true,
 }));
 
@@ -305,7 +313,8 @@ app.get('/auth/callback/google', async (c) => {
 			cookieOptions.push('Domain=.tidyfeed.app');
 			cookieOptions.push('SameSite=None'); // Required for cross-origin requests
 		} else {
-			cookieOptions.push('SameSite=Lax');
+			cookieOptions.push('SameSite=None');
+			cookieOptions.push('Secure');
 		}
 
 		return new Response(null, {
@@ -439,7 +448,8 @@ app.get('/auth/logout', (c) => {
 		cookieOptions.push('Domain=.tidyfeed.app');
 		cookieOptions.push('SameSite=None');
 	} else {
-		cookieOptions.push('SameSite=Lax');
+		cookieOptions.push('SameSite=None');
+		cookieOptions.push('Secure');
 	}
 
 	return new Response(null, {
