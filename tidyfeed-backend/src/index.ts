@@ -382,6 +382,45 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 	}
 });
 
+// Link a social account
+app.post('/api/auth/link-social', cookieAuthMiddleware, async (c) => {
+	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+		const { platform, platform_user_id, platform_username, display_name, avatar_url } = await c.req.json();
+
+		if (!platform || !platform_user_id) {
+			return c.json({ error: 'Platform and Platform User ID are required' }, 400);
+		}
+
+		// Check if account is already linked to another user
+		const existing = await c.env.DB.prepare(
+			'SELECT user_id FROM social_accounts WHERE platform = ? AND platform_user_id = ?'
+		).bind(platform, platform_user_id).first<{ user_id: string }>();
+
+		if (existing && existing.user_id !== userId) {
+			return c.json({ error: 'Account already linked to another user' }, 409);
+		}
+
+		// Atomic Upsert
+		await c.env.DB.prepare(
+			`INSERT INTO social_accounts (user_id, platform, platform_user_id, platform_username, display_name, avatar_url, updated_at, last_synced_at)
+			 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			 ON CONFLICT(platform, platform_user_id) DO UPDATE SET
+				platform_username = excluded.platform_username,
+				display_name = excluded.display_name,
+				avatar_url = excluded.avatar_url,
+				updated_at = CURRENT_TIMESTAMP,
+				last_synced_at = CURRENT_TIMESTAMP`
+		).bind(userId, platform, platform_user_id, platform_username || null, display_name || null, avatar_url || null).run();
+
+		return c.json({ success: true, message: 'Social account linked' });
+	} catch (error) {
+		console.error('Link social account error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
 // Logout - clear auth cookie
 app.get('/auth/logout', (c) => {
 	const isDev = c.req.url.includes('localhost') || c.req.url.includes('127.0.0.1');
