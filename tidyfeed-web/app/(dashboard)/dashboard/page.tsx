@@ -23,6 +23,7 @@ interface Post {
     url: string | null
     platform: string
     createdAt: string
+    pinnedAt?: string | null
     tags?: { id: number; name: string }[]
 }
 
@@ -74,6 +75,58 @@ function DashboardContent() {
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault()
         fetchPosts(query)
+    }
+
+    const handlePin = async (xId: string, pinned: boolean) => {
+        // Optimistic update
+        const currentPosts = [...posts]
+        const postIndex = currentPosts.findIndex(p => p.xId === xId)
+        if (postIndex === -1) return
+
+        const updatedPost = {
+            ...currentPosts[postIndex],
+            pinnedAt: pinned ? new Date().toISOString() : null
+        }
+
+        // Create new list and re-sort
+        // 1. Remove the post
+        currentPosts.splice(postIndex, 1)
+        // 2. Add modified post back
+        currentPosts.push(updatedPost)
+
+        // 3. Sort: Pinned first (descending timestamp), then CreatedAt desc
+        currentPosts.sort((a, b) => {
+            if (a.pinnedAt && b.pinnedAt) {
+                return new Date(b.pinnedAt).getTime() - new Date(a.pinnedAt).getTime()
+            }
+            if (a.pinnedAt) return -1
+            if (b.pinnedAt) return 1
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        })
+
+        setPosts(currentPosts)
+
+        try {
+            const response = await fetch(`${API_URL}/api/posts/${xId}/pin`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ pinned }),
+            })
+
+            if (!response.ok) {
+                // Revert on error
+                // We could implement a full revert, but for now just fetching again or showing error is safer
+                throw new Error('Failed to update pin status')
+            }
+
+            toast.success(pinned ? 'Post pinned' : 'Post unpinned')
+        } catch (error) {
+            console.error('Pin error:', error)
+            toast.error('Failed to update pin status')
+            // Revert by re-fetching (simpler than manual revert logic)
+            fetchPosts(query)
+        }
     }
 
     const handleDelete = async (xId: string) => {
@@ -154,7 +207,9 @@ function DashboardContent() {
                             platform={post.platform}
                             createdAt={post.createdAt}
                             tags={post.tags}
+                            pinnedAt={post.pinnedAt}
                             onDelete={handleDelete}
+                            onPin={handlePin}
                         />
                     ))}
                 </div>

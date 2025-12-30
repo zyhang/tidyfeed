@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash } from 'lucide-react'
+import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash, Pin } from 'lucide-react'
 import { TagInput } from '@/components/TagInput'
+import { cn } from '@/lib/utils'
 
 interface Author {
     name?: string
@@ -26,7 +27,9 @@ interface TweetCardProps {
     platform: string
     createdAt: string
     tags?: Tag[]
+    pinnedAt?: string | null
     onDelete: (xId: string) => void
+    onPin?: (xId: string, pinned: boolean) => void
 }
 
 export function TweetCard({
@@ -38,12 +41,17 @@ export function TweetCard({
     platform,
     createdAt,
     tags: initialTags = [],
+    pinnedAt,
     onDelete,
+    onPin,
 }: TweetCardProps) {
     const [expanded, setExpanded] = useState(false)
     const [deleting, setDeleting] = useState(false)
+    const [pinning, setPinning] = useState(false)
     const [lightboxImage, setLightboxImage] = useState<string | null>(null)
     const [tags, setTags] = useState<Tag[]>(initialTags)
+
+    const isPinned = !!pinnedAt
 
     useEffect(() => {
         setTags(initialTags)
@@ -56,6 +64,16 @@ export function TweetCard({
             await onDelete(xId)
         } finally {
             setDeleting(false)
+        }
+    }
+
+    const handlePin = async () => {
+        if (pinning || !onPin) return
+        setPinning(true)
+        try {
+            await onPin(xId, !isPinned)
+        } finally {
+            setPinning(false)
         }
     }
 
@@ -103,7 +121,17 @@ export function TweetCard({
                 </div>
             )}
 
-            <Card className="overflow-hidden hover:shadow-md transition-shadow break-inside-avoid mb-4">
+            <Card className={cn(
+                "overflow-hidden hover:shadow-md transition-all break-inside-avoid mb-4 relative group",
+                isPinned && "border-blue-500/50 shadow-sm bg-blue-50/10 dark:bg-blue-900/10"
+            )}>
+                {/* Pin Indicator */}
+                {isPinned && (
+                    <div className="absolute top-0 right-0 p-2">
+                        <Pin className="h-3 w-3 text-blue-500 rotate-45 fill-current" />
+                    </div>
+                )}
+
                 <CardContent className="p-4">
                     {/* Author */}
                     <div className="flex items-center justify-between mb-3">
@@ -198,16 +226,34 @@ export function TweetCard({
                                 onTagAdded={handleTagAdded}
                             />
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleDelete}
-                            disabled={deleting}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            {deleting ? 'Deleting...' : 'Delete'}
-                        </Button>
+                        <div className="flex items-center gap-1">
+                            {/* Pin Button */}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handlePin}
+                                disabled={pinning}
+                                className={cn(
+                                    "text-muted-foreground hover:text-foreground",
+                                    isPinned && "text-blue-500 hover:text-blue-600"
+                                )}
+                                title={isPinned ? "Unpin post" : "Pin post"}
+                            >
+                                <Pin className={cn("h-3 w-3 mr-1", isPinned && "fill-current rotate-45")} />
+                                {pinning ? '...' : (isPinned ? 'Unpin' : 'Pin')}
+                            </Button>
+
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                {deleting ? 'Deleting...' : 'Delete'}
+                            </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

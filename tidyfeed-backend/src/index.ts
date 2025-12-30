@@ -538,6 +538,7 @@ app.get('/api/posts/ids', cookieAuthMiddleware, async (c) => {
 
 // Get full posts with search and pagination
 // Get all saved posts (with pagination, search, and tags)
+// Get all saved posts (with pagination, search, and tags)
 app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 	try {
 		const payload = c.get('jwtPayload') as { sub: string };
@@ -555,7 +556,8 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 			params.push(`%${search}%`, `%${search}%`);
 		}
 
-		query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+		// Sort by pinned_at DESC first (pinned items), then created_at DESC
+		query += ' ORDER BY pinned_at DESC, created_at DESC LIMIT ? OFFSET ?';
 		params.push(limit, offset);
 
 		const posts = await c.env.DB.prepare(query).bind(...params).all<any>();
@@ -578,6 +580,7 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 			url: post.url,
 			platform: post.platform,
 			createdAt: post.created_at,
+			pinnedAt: post.pinned_at,
 			tags: [] as { id: number; name: string }[], // Initialize empty tags
 		}));
 
@@ -621,6 +624,39 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 		});
 	} catch (error) {
 		console.error('Get posts error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// Pin/Unpin a post
+app.patch('/api/posts/:x_id/pin', cookieAuthMiddleware, async (c) => {
+	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+		const xId = c.req.param('x_id');
+		const { pinned } = await c.req.json();
+
+		if (typeof pinned !== 'boolean') {
+			return c.json({ error: 'Pinned status (boolean) is required' }, 400);
+		}
+
+		// Update pinned_at timestamp
+		// If pinned is true, set to current time. If false, set to NULL.
+		const query = pinned
+			? 'UPDATE saved_posts SET pinned_at = CURRENT_TIMESTAMP WHERE user_id = ? AND x_post_id = ?'
+			: 'UPDATE saved_posts SET pinned_at = NULL WHERE user_id = ? AND x_post_id = ?';
+
+		const result = await c.env.DB.prepare(query)
+			.bind(userId, xId)
+			.run();
+
+		if (result.meta.changes === 0) {
+			return c.json({ error: 'Post not found' }, 404);
+		}
+
+		return c.json({ success: true, message: pinned ? 'Post pinned' : 'Post unpinned' });
+	} catch (error) {
+		console.error('Pin post error:', error);
 		return c.json({ error: 'Internal server error' }, 500);
 	}
 });
