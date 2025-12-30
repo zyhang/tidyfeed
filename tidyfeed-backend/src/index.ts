@@ -402,7 +402,18 @@ app.post('/api/auth/link-social', cookieAuthMiddleware, async (c) => {
 	try {
 		const payload = c.get('jwtPayload') as { sub: string };
 		const userId = payload.sub;
-		const { platform, platform_user_id, platform_username, display_name, avatar_url } = await c.req.json();
+
+		let body;
+		try {
+			body = await c.req.json();
+		} catch (e) {
+			console.error('Link social - JSON parse error:', e);
+			return c.json({ error: 'Invalid JSON body' }, 400);
+		}
+
+		const { platform, platform_user_id, platform_username, display_name, avatar_url } = body;
+
+		console.log('Link social request:', { userId, platform, platform_user_id, platform_username });
 
 		if (!platform || !platform_user_id) {
 			return c.json({ error: 'Platform and Platform User ID are required' }, 400);
@@ -411,7 +422,7 @@ app.post('/api/auth/link-social', cookieAuthMiddleware, async (c) => {
 		// Check if account is already linked to another user
 		const existing = await c.env.DB.prepare(
 			'SELECT user_id FROM social_accounts WHERE platform = ? AND platform_user_id = ?'
-		).bind(platform, platform_user_id).first<{ user_id: string }>();
+		).bind(platform, String(platform_user_id)).first<{ user_id: string }>();
 
 		if (existing && existing.user_id !== userId) {
 			return c.json({ error: 'Account already linked to another user' }, 409);
@@ -422,17 +433,18 @@ app.post('/api/auth/link-social', cookieAuthMiddleware, async (c) => {
 			`INSERT INTO social_accounts (user_id, platform, platform_user_id, platform_username, display_name, avatar_url, updated_at, last_synced_at)
 			 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 			 ON CONFLICT(platform, platform_user_id) DO UPDATE SET
-				platform_username = excluded.platform_username,
-				display_name = excluded.display_name,
-				avatar_url = excluded.avatar_url,
+				platform_username = COALESCE(excluded.platform_username, social_accounts.platform_username),
+				display_name = COALESCE(excluded.display_name, social_accounts.display_name),
+				avatar_url = COALESCE(excluded.avatar_url, social_accounts.avatar_url),
 				updated_at = CURRENT_TIMESTAMP,
 				last_synced_at = CURRENT_TIMESTAMP`
-		).bind(userId, platform, platform_user_id, platform_username || null, display_name || null, avatar_url || null).run();
+		).bind(userId, platform, String(platform_user_id), platform_username || null, display_name || null, avatar_url || null).run();
 
+		console.log('Link social success:', { userId, platform, platform_user_id });
 		return c.json({ success: true, message: 'Social account linked' });
 	} catch (error) {
 		console.error('Link social account error:', error);
-		return c.json({ error: 'Internal server error' }, 500);
+		return c.json({ error: 'Internal server error', details: String(error) }, 500);
 	}
 });
 
