@@ -191,10 +191,25 @@ export default defineBackground(() => {
         func: extractXIdentityInPage,
       });
 
-      const identity = results?.[0]?.result;
+      let identity = results?.[0]?.result;
 
       if (!identity) {
         return { success: false, skipped: true, reason: 'No identity found (not logged in to X?)' };
+      }
+
+      // If we only have partial data (missing username), fetch full profile from X API
+      if (!identity.platform_username && identity.platform_user_id) {
+        console.log('[TidyFeed] Partial identity found, fetching full profile from X API...');
+        const fullProfile = await fetchXUserProfile();
+        if (fullProfile) {
+          identity = {
+            ...identity,
+            platform_username: fullProfile.screen_name,
+            display_name: fullProfile.name,
+            avatar_url: fullProfile.profile_image_url_https?.replace('_normal', '_bigger')
+          };
+          console.log('[TidyFeed] Full profile fetched:', identity.platform_username);
+        }
       }
 
       console.log('[TidyFeed] Extracted identity:', identity.platform_username);
@@ -210,6 +225,50 @@ export default defineBackground(() => {
     } catch (error) {
       console.error('[TidyFeed] Sync platform identity error:', error);
       return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Fetch the current user's X profile using verify_credentials API
+   */
+  async function fetchXUserProfile(): Promise<any | null> {
+    try {
+      // Get CSRF token from cookies
+      const csrfCookie = await browser.cookies.get({
+        url: 'https://x.com',
+        name: 'ct0'
+      });
+
+      if (!csrfCookie?.value) {
+        console.warn('[TidyFeed] CSRF token not found for X profile fetch');
+        return null;
+      }
+
+      console.log('[TidyFeed] Fetching X profile with CSRF token...');
+
+      // Use X's internal API endpoint format
+      const response = await fetch('https://x.com/i/api/1.1/account/verify_credentials.json', {
+        method: 'GET',
+        headers: {
+          'authorization': X_BEARER_TOKEN,
+          'x-csrf-token': csrfCookie.value,
+          'x-twitter-active-user': 'yes',
+          'x-twitter-client-language': 'en',
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        console.warn('[TidyFeed] verify_credentials API failed:', response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      console.log('[TidyFeed] verify_credentials success:', data.screen_name, data.name);
+      return data;
+    } catch (error) {
+      console.error('[TidyFeed] Error fetching X user profile:', error);
+      return null;
     }
   }
 
