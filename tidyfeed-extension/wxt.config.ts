@@ -16,6 +16,7 @@ export default defineConfig({
       'https://tidyfeed.app/*',
       'https://api.tidyfeed.app/*',
       'https://*.googleusercontent.com/*', // Google profile avatars
+      'http://localhost:*/*', // Local development
     ],
     content_security_policy: {
       extension_pages: "script-src 'self'; object-src 'self'; img-src 'self' https://*.googleusercontent.com",

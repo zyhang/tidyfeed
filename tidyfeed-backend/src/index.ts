@@ -331,23 +331,29 @@ app.get('/auth/callback/google', async (c) => {
 	}
 });
 
-// Cookie-based auth middleware
+// Auth middleware (Cookie or Bearer Token)
 const cookieAuthMiddleware = async (c: any, next: any) => {
-	const cookieHeader = c.req.header('Cookie');
+	let token: string | undefined;
 
-	if (!cookieHeader) {
-		return c.json({ error: 'Unauthorized' }, 401);
+	// 1. Try Authorization Header
+	const authHeader = c.req.header('Authorization');
+	if (authHeader && authHeader.startsWith('Bearer ')) {
+		token = authHeader.substring(7);
 	}
 
-	// Parse auth_token from cookies
-	const cookies = Object.fromEntries(
-		cookieHeader.split(';').map((c: string) => {
-			const [key, ...val] = c.trim().split('=');
-			return [key, val.join('=')];
-		})
-	);
-
-	const token = cookies['auth_token'];
+	// 2. Try Cookie if header missing
+	if (!token) {
+		const cookieHeader = c.req.header('Cookie');
+		if (cookieHeader) {
+			const cookies = Object.fromEntries(
+				cookieHeader.split(';').map((c: string) => {
+					const [key, ...val] = c.trim().split('=');
+					return [key, val.join('=')];
+				})
+			);
+			token = cookies['auth_token'];
+		}
+	}
 
 	if (!token) {
 		return c.json({ error: 'Unauthorized' }, 401);

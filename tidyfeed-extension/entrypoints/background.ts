@@ -127,10 +127,31 @@ export default defineBackground(() => {
   async function handleLinkSocialIdentity(identity: any): Promise<{ success: boolean; error?: string }> {
     try {
       console.log('[TidyFeed] Linking social identity:', identity);
+
+      // Try to get auth token manually to support localhost/HTTP where SameSite=None fails
+      let token: string | undefined;
+      try {
+        // Check both backend URL and localhost just in case
+        const cookie = await browser.cookies.get({ url: BACKEND_URL, name: 'auth_token' });
+        if (cookie) token = cookie.value;
+        else {
+          // Fallback for localhost dev
+          const localCookie = await browser.cookies.get({ url: 'http://localhost:3000', name: 'auth_token' });
+          if (localCookie) token = localCookie.value;
+        }
+      } catch (e) {
+        console.warn('[TidyFeed] Failed to read auth cookies:', e);
+      }
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${BACKEND_URL}/api/auth/link-social`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers,
+        credentials: 'include', // Keep this for standard flows
         body: JSON.stringify(identity)
       });
 
@@ -146,6 +167,151 @@ export default defineBackground(() => {
     } catch (error) {
       console.error('[TidyFeed] Link identity error:', error);
       return { success: false, error: String(error) };
+    }
+  }
+
+  // Handle SYNC_PLATFORM_IDENTITY - extracts identity using Main World script and links it
+  async function handleSyncPlatformIdentity(
+    platform: string,
+    tabId?: number
+  ): Promise<{ success: boolean; username?: string; skipped?: boolean; reason?: string; error?: string }> {
+    if (!tabId) {
+      return { success: false, error: 'No tab ID provided' };
+    }
+
+    if (platform !== 'x') {
+      return { success: false, skipped: true, reason: `Platform ${platform} not yet supported` };
+    }
+
+    try {
+      // Execute script in Main World to extract __INITIAL_STATE__
+      const results = await browser.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        func: extractXIdentityInPage,
+      });
+
+      const identity = results?.[0]?.result;
+
+      if (!identity) {
+        return { success: false, skipped: true, reason: 'No identity found (not logged in to X?)' };
+      }
+
+      console.log('[TidyFeed] Extracted identity:', identity.platform_username);
+
+      // Now link it via API
+      const linkResult = await handleLinkSocialIdentity(identity);
+
+      if (linkResult.success) {
+        return { success: true, username: identity.platform_username };
+      } else {
+        return linkResult;
+      }
+    } catch (error) {
+      console.error('[TidyFeed] Sync platform identity error:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  // This function runs in the MAIN world to access window.__INITIAL_STATE__
+  function extractXIdentityInPage(): any | null {
+    try {
+      const w = window as any;
+
+      // Debug: Log what globals are available
+      console.log('[TidyFeed] Checking for identity data...');
+      console.log('[TidyFeed] __INITIAL_STATE__ exists:', !!w.__INITIAL_STATE__);
+
+      // Method 1: Try __INITIAL_STATE__ with various structures
+      if (w.__INITIAL_STATE__) {
+        const state = w.__INITIAL_STATE__;
+
+        // Log structure for debugging
+        console.log('[TidyFeed] State keys:', Object.keys(state));
+
+        // Path 1: state.session + state.entities.users.entities
+        if (state.session?.user_id && state.entities?.users?.entities) {
+          const user = state.entities.users.entities[state.session.user_id];
+          if (user) {
+            console.log('[TidyFeed] Found user via Path 1');
+            return formatUser(user);
+          }
+        }
+
+        // Path 2: state.viewer (some X versions use this)
+        if (state.viewer) {
+          console.log('[TidyFeed] Found user via Path 2 (viewer)');
+          return formatUser(state.viewer);
+        }
+
+        // Path 3: state.user or state.currentUser
+        if (state.user) {
+          console.log('[TidyFeed] Found user via Path 3 (user)');
+          return formatUser(state.user);
+        }
+        if (state.currentUser) {
+          console.log('[TidyFeed] Found user via Path 3 (currentUser)');
+          return formatUser(state.currentUser);
+        }
+
+        // Path 4: Deep search for any user-like object
+        if (state.entities?.users) {
+          const users = state.entities.users;
+          // Try entities directly
+          if (users.entities) {
+            const userIds = Object.keys(users.entities);
+            console.log('[TidyFeed] Found', userIds.length, 'users in entities');
+            // If there's a session, use that user
+            if (state.session?.user_id && users.entities[state.session.user_id]) {
+              return formatUser(users.entities[state.session.user_id]);
+            }
+          }
+        }
+      }
+
+      // Method 2: Try __NEXT_DATA__ (some SSR apps use this)
+      if (w.__NEXT_DATA__?.props?.pageProps?.user) {
+        console.log('[TidyFeed] Found user via __NEXT_DATA__');
+        return formatUser(w.__NEXT_DATA__.props.pageProps.user);
+      }
+
+      // Method 3: Look for logged in user via DOM meta tags or cookies
+      // (X sometimes has screen_name in cookies)
+      const screenNameCookie = document.cookie.split(';')
+        .map(c => c.trim())
+        .find(c => c.startsWith('twid='));
+      if (screenNameCookie) {
+        // twid cookie contains user ID like "u%3D123456"
+        const match = screenNameCookie.match(/u%3D(\d+)/);
+        if (match) {
+          console.log('[TidyFeed] Found user ID via twid cookie:', match[1]);
+          // We have the ID but not the full profile - return partial
+          return {
+            platform: 'x',
+            platform_user_id: match[1],
+            platform_username: null, // Will be null, but ID is enough for backend
+            display_name: null,
+            avatar_url: null
+          };
+        }
+      }
+
+      console.log('[TidyFeed] No identity found via any method');
+      return null;
+
+    } catch (e) {
+      console.error('[TidyFeed] extractXIdentityInPage error:', e);
+      return null;
+    }
+
+    function formatUser(user: any) {
+      return {
+        platform: 'x',
+        platform_user_id: user.id_str || user.id || user.rest_id || String(user.userId),
+        platform_username: user.screen_name || user.screenName || user.username,
+        display_name: user.name || user.displayName,
+        avatar_url: (user.profile_image_url_https || user.profileImageUrl || user.avatar_url)?.replace('_normal', '_bigger')
+      };
     }
   }
 
@@ -408,6 +574,13 @@ export default defineBackground(() => {
 
     if (message.type === 'LINK_SOCIAL_IDENTITY') {
       handleLinkSocialIdentity(message.identity)
+        .then((result) => sendResponse(result))
+        .catch((error) => sendResponse({ success: false, error: error.message }));
+      return true;
+    }
+
+    if (message.type === 'SYNC_PLATFORM_IDENTITY') {
+      handleSyncPlatformIdentity(message.platform, sender.tab?.id)
         .then((result) => sendResponse(result))
         .catch((error) => sendResponse({ success: false, error: error.message }));
       return true;
