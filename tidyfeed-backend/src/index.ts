@@ -448,6 +448,28 @@ app.post('/api/auth/link-social', cookieAuthMiddleware, async (c) => {
 	}
 });
 
+// GET /api/auth/social-accounts - Fetch user's linked social accounts
+app.get('/api/auth/social-accounts', cookieAuthMiddleware, async (c) => {
+	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+
+		const results = await c.env.DB.prepare(
+			`SELECT platform, platform_user_id, platform_username, display_name, avatar_url, last_synced_at
+			 FROM social_accounts 
+			 WHERE user_id = ?
+			 ORDER BY created_at DESC`
+		).bind(userId).all();
+
+		return c.json({
+			accounts: results.results || []
+		});
+	} catch (error) {
+		console.error('Get social accounts error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
 // Logout - clear auth cookie
 app.get('/auth/logout', (c) => {
 	const isDev = c.req.url.includes('localhost') || c.req.url.includes('127.0.0.1');
