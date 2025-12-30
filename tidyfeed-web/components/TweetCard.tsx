@@ -30,6 +30,7 @@ interface TweetCardProps {
     pinnedAt?: string | null
     onDelete: (xId: string) => void
     onPin?: (xId: string, pinned: boolean) => void
+    onRemoveTag?: (xId: string, tagId: number) => void
 }
 
 export function TweetCard({
@@ -44,12 +45,14 @@ export function TweetCard({
     pinnedAt,
     onDelete,
     onPin,
+    onRemoveTag,
 }: TweetCardProps) {
     const [expanded, setExpanded] = useState(false)
     const [deleting, setDeleting] = useState(false)
     const [pinning, setPinning] = useState(false)
     const [lightboxImage, setLightboxImage] = useState<string | null>(null)
     const [tags, setTags] = useState<Tag[]>(initialTags)
+    const [removingTagId, setRemovingTagId] = useState<number | null>(null)
 
     const isPinned = !!pinnedAt
 
@@ -77,6 +80,16 @@ export function TweetCard({
         }
     }
 
+    const handleRemoveTag = async (tagId: number) => {
+        if (!onRemoveTag || removingTagId) return
+        setRemovingTagId(tagId)
+        try {
+            await onRemoveTag(xId, tagId)
+        } finally {
+            setRemovingTagId(null)
+        }
+    }
+
     const handleTagAdded = (tagName: string) => {
         // Optimistically add tag if not already present
         if (!tags.some(t => t.name === tagName)) {
@@ -86,6 +99,8 @@ export function TweetCard({
             setTags([...tags, { id: Date.now(), name: tagName }])
         }
     }
+
+    // ... existing date formatting and truncation logic ...
 
     const formattedDate = new Date(createdAt).toLocaleDateString('en-US', {
         month: 'short',
@@ -100,7 +115,7 @@ export function TweetCard({
 
     return (
         <>
-            {/* Lightbox */}
+            {/* ... existing Lightbox code ... */}
             {lightboxImage && (
                 <div
                     className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-pointer"
@@ -125,7 +140,7 @@ export function TweetCard({
                 "overflow-hidden hover:shadow-md transition-all break-inside-avoid mb-4 relative group",
                 isPinned && "border-blue-500/50 shadow-sm bg-blue-50/10 dark:bg-blue-900/10"
             )}>
-                {/* Pin Indicator */}
+                {/* ... existing Pin Indicator code ... */}
                 {isPinned && (
                     <div className="absolute top-0 right-0 p-2">
                         <Pin className="h-3 w-3 text-blue-500 rotate-45 fill-current" />
@@ -133,7 +148,7 @@ export function TweetCard({
                 )}
 
                 <CardContent className="p-4">
-                    {/* Author */}
+                    {/* ... existing Author code ... */}
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                             {author?.avatar ? (
@@ -156,7 +171,7 @@ export function TweetCard({
                         <span className="text-xs text-muted-foreground">{formattedDate}</span>
                     </div>
 
-                    {/* Content */}
+                    {/* ... existing Content code ... */}
                     {content && (
                         <div className="mb-3">
                             <p className={`text-sm whitespace-pre-wrap ${!expanded && shouldTruncate ? 'line-clamp-4' : ''}`}>
@@ -177,7 +192,7 @@ export function TweetCard({
                         </div>
                     )}
 
-                    {/* Media Grid */}
+                    {/* ... existing Media Grid code ... */}
                     {media && media.length > 0 && (
                         <div className={`grid gap-2 mb-3 ${media.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
                             {media.slice(0, 4).map((imgUrl, idx) => (
@@ -201,9 +216,30 @@ export function TweetCard({
                     {tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-3">
                             {tags.map((tag) => (
-                                <Badge key={tag.name} variant="secondary" className="text-xs font-normal">
+                                <Badge
+                                    key={tag.id || tag.name}
+                                    variant="secondary"
+                                    className="text-xs font-normal group/tag pr-1.5 transition-colors hover:bg-secondary/80"
+                                >
                                     <Hash className="h-3 w-3 mr-0.5 opacity-70" />
                                     {tag.name}
+                                    {onRemoveTag && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleRemoveTag(tag.id)
+                                            }}
+                                            className="ml-1 opacity-0 group-hover/tag:opacity-100 hover:text-red-500 transition-all focus:opacity-100 -mr-0.5"
+                                            title="Remove tag"
+                                            disabled={removingTagId === tag.id}
+                                        >
+                                            {removingTagId === tag.id ? (
+                                                <span className="animate-spin h-3 w-3 block border-2 border-current border-t-transparent rounded-full" />
+                                            ) : (
+                                                <X className="h-3 w-3" />
+                                            )}
+                                        </button>
+                                    )}
                                 </Badge>
                             ))}
                         </div>

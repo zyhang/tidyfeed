@@ -129,6 +129,49 @@ function DashboardContent() {
         }
     }
 
+    const handleRemoveTag = async (xId: string, tagId: number) => {
+        // Optimistic update
+        const currentPosts = [...posts]
+        const postIndex = currentPosts.findIndex(p => p.xId === xId)
+        if (postIndex === -1) return
+
+        const originalPost = currentPosts[postIndex]
+        const originalTags = originalPost.tags || []
+
+        // Remove tag from local state
+        const updatedPost = {
+            ...originalPost,
+            tags: originalTags.filter(t => t.id !== tagId)
+        }
+
+        currentPosts[postIndex] = updatedPost
+        setPosts(currentPosts)
+
+        try {
+            const response = await fetch(`${API_URL}/api/tweets/${xId}/tags/${tagId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to remove tag')
+            }
+
+            toast.success('Tag removed')
+        } catch (error) {
+            console.error('Remove tag error:', error)
+            toast.error('Failed to remove tag')
+
+            // Revert state
+            const revertedPosts = [...posts]
+            const revertedIndex = revertedPosts.findIndex(p => p.xId === xId)
+            if (revertedIndex !== -1) {
+                revertedPosts[revertedIndex] = originalPost
+                setPosts(revertedPosts)
+            }
+        }
+    }
+
     const handleDelete = async (xId: string) => {
         try {
             const response = await fetch(`${API_URL}/api/posts/x/${xId}`, {
@@ -210,6 +253,7 @@ function DashboardContent() {
                             pinnedAt={post.pinnedAt}
                             onDelete={handleDelete}
                             onPin={handlePin}
+                            onRemoveTag={handleRemoveTag}
                         />
                     ))}
                 </div>
