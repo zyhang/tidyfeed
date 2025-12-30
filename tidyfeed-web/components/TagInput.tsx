@@ -84,7 +84,7 @@ export function TagInput({ tweetId, tweetData, onTagAdded }: TagInputProps) {
 
     const handleCreateAndTag = async () => {
         if (!searchValue.trim()) return
-        await handleSelectTag(searchValue.trim().toLowerCase())
+        await handleSelectTag(searchValue.trim())
     }
 
     const filteredTags = tags.filter(tag =>

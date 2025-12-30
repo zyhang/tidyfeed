@@ -668,7 +668,7 @@ app.post('/api/tags', cookieAuthMiddleware, async (c) => {
 			return c.json({ error: 'Tag name is required' }, 400);
 		}
 
-		const tagName = name.trim().toLowerCase();
+		const tagName = name.trim();
 
 		// Use INSERT OR IGNORE to prevent duplicates for this user
 		await c.env.DB.prepare(
@@ -732,7 +732,7 @@ app.patch('/api/tags/:id', cookieAuthMiddleware, async (c) => {
 			return c.json({ error: 'Tag name is required' }, 400);
 		}
 
-		const tagName = name.trim().toLowerCase();
+		const tagName = name.trim();
 
 		// Check for duplicate name for this user (excluding current tag)
 		const existing = await c.env.DB.prepare(
@@ -774,7 +774,7 @@ app.post('/api/tweets/tag', cookieAuthMiddleware, async (c) => {
 		const payload = c.get('jwtPayload') as { sub: string };
 		const userId = payload.sub;
 
-		const tagName = tag_name.trim().toLowerCase();
+		const tagName = tag_name.trim();
 		const dataJson = tweet_data ? JSON.stringify(tweet_data) : '{}';
 
 		// Use DB.batch() for atomic operations
