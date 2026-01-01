@@ -16,7 +16,7 @@
             "rule_id": "redirect_signals",
             "name": "Redirect Signals",
             "category": "crypto_scam",
-            "pattern": "t\\.me|telegram|dm\\s*me|link\\s*(in|on)\\s*bio|bit\\.ly|tinyurl|cutt\\.ly|discord\\.gg",
+            "pattern": "t\\.me|telegram|dm\\s*me|link\\s*(in|on)\\s*bio|bit\\.ly|tinyurl|cutt\\.ly|discord\\.gg|t\\.co\\/",
             "score": 0,
             "severity": "weak",
             "enabled": true
@@ -55,8 +55,26 @@
             "rule_id": "tp_signal",
             "name": "Take Profit Signal",
             "category": "pump_dump",
-            "pattern": "\\b(TP[1-9]|take\\s*profit|target\\s*[1-9]|entry|exit)\\s*[:\\-]?\\s*[0-9\\.]+\\s*[✅✓☑️]?",
+            "pattern": "\\b(TP[1-9]|take[\\-\\s]*profit|target\\s*[1-9]|entry|exit)\\s*[:\\-]?\\s*[0-9\\.]+\\s*[✅✓☑️😎📈]?",
             "score": 45,
+            "severity": "medium",
+            "enabled": true
+        },
+        {
+            "rule_id": "profit_percentage",
+            "name": "Profit Percentage Claims",
+            "category": "pump_dump",
+            "pattern": "profit\\s*[:\\-]?\\s*[0-9]+\\.?[0-9]*\\s*%|[0-9]+\\.?[0-9]*\\s*%\\s*profit|[0-9]{2,}x\\s*(profit|gain|return)",
+            "score": 50,
+            "severity": "strong",
+            "enabled": true
+        },
+        {
+            "rule_id": "exchange_futures",
+            "name": "Exchange Futures Signal",
+            "category": "pump_dump",
+            "pattern": "\\b(binance|bybit|okx|kucoin|bitget)\\s*(futures|spot|signal)",
+            "score": 35,
             "severity": "medium",
             "enabled": true
         },

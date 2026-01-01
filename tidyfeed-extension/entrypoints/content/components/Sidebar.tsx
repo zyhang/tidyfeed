@@ -1,11 +1,33 @@
 import { useStorageValue } from '../hooks/useStorageValue';
 
+interface ScoringConfig {
+    version: number;
+    rules?: unknown[];
+    negative_rules?: unknown[];
+}
+
 export function Sidebar() {
     const adsBlocked = useStorageValue<number>('stats_ads_blocked', 0);
     const blockedKeywords = useStorageValue<string[]>('user_blocked_keywords', []);
     const enableRegex = useStorageValue<boolean>('enable_regex_filter', false);
-    const cloudRegexList = useStorageValue<string[]>('cloud_regex_list', []);
+    const scoringConfig = useStorageValue<ScoringConfig | null>('scoring_config', null);
+    const regexLastUpdated = useStorageValue<number | null>('regex_last_updated', null);
     const [inputValue, setInputValue] = useState('');
+
+    // Calculate rule count from scoring config
+    const ruleCount = scoringConfig
+        ? (scoringConfig.rules?.length || 0) + (scoringConfig.negative_rules?.length || 0)
+        : 0;
+
+    // Format last update time
+    const formatUpdateTime = (timestamp: number | null): string => {
+        if (!timestamp) return 'Connecting...';
+        const date = new Date(timestamp);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}/${month}/${day}`;
+    };
 
     const handleToggleRegex = () => {
         chrome.storage.local.set({ enable_regex_filter: !enableRegex });
@@ -74,7 +96,7 @@ export function Sidebar() {
                             </span>
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] text-zinc-500">
-                                    {cloudRegexList.length > 0 ? `${cloudRegexList.length} rules` : 'Connecting...'}
+                                    {ruleCount > 0 ? `${ruleCount} rules · ${formatUpdateTime(regexLastUpdated)}` : 'Connecting...'}
                                 </span>
                                 <button
                                     onClick={() => {
