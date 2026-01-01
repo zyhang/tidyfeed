@@ -1,3 +1,130 @@
-[
-    "(?i)(?=.*\\b(airdrop|whitelist|wl|allowlist|presale|ido|ico|mint|minting)\\b)(?=.*\\b(t\\.me|telegram|tg|dm|dms)\\b|link\\s+(in|on)\\s+bio|bit\\.ly|tinyurl|cutt\\.ly).+"
-]
+{
+    "version": 2,
+    "thresholds": {
+        "collapse": 50
+    },
+    "category_weights": {
+        "crypto_scam": 1.0,
+        "phishing": 1.2,
+        "promo_spam": 1.0,
+        "legitimate": 1.0
+    },
+    "max_score": 200,
+    "rules": [
+        {
+            "rule_id": "redirect_signals",
+            "name": "Redirect Signals",
+            "category": "crypto_scam",
+            "pattern": "t\\.me|telegram|dm\\s*me|link\\s*(in|on)\\s*bio|bit\\.ly|tinyurl|cutt\\.ly|discord\\.gg",
+            "score": 0,
+            "severity": "weak",
+            "enabled": true
+        },
+        {
+            "rule_id": "promo_signals",
+            "name": "Promo Signals",
+            "category": "promo_spam",
+            "pattern": "buy\\s*now|call|\\bsignal\\b|dm\\s*(for|me)|join\\s*(now|us)",
+            "score": 0,
+            "severity": "weak",
+            "enabled": true
+        },
+        {
+            "rule_id": "airdrop_combo",
+            "name": "Airdrop + Redirect",
+            "category": "crypto_scam",
+            "pattern": "\\b(airdrop|whitelist|wl|allowlist|presale|ido|ico|mint|minting)\\b",
+            "score": 60,
+            "severity": "strong",
+            "requires_any": [
+                "redirect_signals"
+            ],
+            "enabled": true
+        },
+        {
+            "rule_id": "moon_combo",
+            "name": "Moon/Pump + Promo",
+            "category": "crypto_scam",
+            "pattern": "\\b(100x|1000x|moon|pump|gem|lowcap|mcap)\\b",
+            "score": 55,
+            "severity": "strong",
+            "requires_any": [
+                "promo_signals",
+                "redirect_signals"
+            ],
+            "enabled": true
+        },
+        {
+            "rule_id": "phishing_wallet",
+            "name": "Wallet Phishing",
+            "category": "phishing",
+            "pattern": "connect\\s*(your)?\\s*wallet|verify\\s*(your)?\\s*wallet|sign\\s*(the)?\\s*tx|claim\\s*now|claim\\s*your",
+            "score": 80,
+            "severity": "strong",
+            "override_collapse": true,
+            "enabled": true
+        },
+        {
+            "rule_id": "airdrop_standalone",
+            "name": "Airdrop Mention",
+            "category": "crypto_scam",
+            "pattern": "\\b(airdrop|presale|mint|minting)\\b",
+            "score": 25,
+            "severity": "medium",
+            "enabled": true
+        },
+        {
+            "rule_id": "giveaway_spam",
+            "name": "Giveaway Spam",
+            "category": "promo_spam",
+            "pattern": "\\b(giveaway|giving\\s*away)\\b.{0,50}(follow|rt|retweet|like|tag)",
+            "score": 40,
+            "severity": "medium",
+            "enabled": true
+        },
+        {
+            "rule_id": "urgent_fomo",
+            "name": "Urgent FOMO",
+            "category": "crypto_scam",
+            "pattern": "(last\\s*chance|don'?t\\s*miss|hurry|limited\\s*spots?|act\\s*now|ending\\s*soon)",
+            "score": 20,
+            "severity": "weak",
+            "enabled": true
+        }
+    ],
+    "negative_rules": [
+        {
+            "rule_id": "crypto_discussion",
+            "name": "Crypto Discussion",
+            "category": "legitimate",
+            "pattern": "\\b(bitcoin|btc|ethereum|eth|solana|sol|rollup|zk|zkp|l2|layer\\s*2|defi|analysis|research|chart|price|market)\\b",
+            "score": 20,
+            "severity": "medium",
+            "enabled": true
+        },
+        {
+            "rule_id": "news_context",
+            "name": "News Context",
+            "category": "legitimate",
+            "pattern": "(breaking|update|announced|according\\s*to|report|news|sec|regulation|approval)",
+            "score": 15,
+            "severity": "weak",
+            "enabled": true
+        },
+        {
+            "rule_id": "educational",
+            "name": "Educational Content",
+            "category": "legitimate",
+            "pattern": "(how\\s*to|tutorial|guide|explained|learn|understand|what\\s*is|thread|🧵)",
+            "score": 15,
+            "severity": "weak",
+            "enabled": true
+        }
+    ],
+    "whitelist": {
+        "author_handles": [
+            "vaborsh",
+            "elonmusk"
+        ]
+    }
+}

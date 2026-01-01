@@ -11,7 +11,7 @@ export default defineBackground(() => {
   const REMOTE_REGEX_URL = 'https://tidyfeed.app/regex_rules.json';
   const REGEX_SYNC_ALARM = 'tidyfeed_regex_sync';
 
-  // Function to sync regex rules
+  // Function to sync regex rules (supports v1 and v2 config formats)
   async function syncRegexRules(): Promise<number> {
     try {
       console.log('[TidyFeed] Syncing regex rules from cloud...');
@@ -20,18 +20,31 @@ export default defineBackground(() => {
 
       const data = await response.json();
 
-      // Validate data structure (must be array of strings)
+      // Handle v2 config format (object with version field)
+      if (data && typeof data === 'object' && data.version === 2) {
+        const ruleCount = (data.rules?.length || 0) + (data.negative_rules?.length || 0);
+        await browser.storage.local.set({
+          scoring_config: data,
+          cloud_regex_list: [], // Clear legacy list
+          regex_last_updated: Date.now()
+        });
+        console.log(`[TidyFeed] Scoring config v2 loaded: ${ruleCount} rules`);
+        return ruleCount;
+      }
+
+      // Handle v1 legacy format (array of strings)
       if (Array.isArray(data) && data.every(i => typeof i === 'string')) {
         await browser.storage.local.set({
           cloud_regex_list: data,
+          scoring_config: null, // Clear v2 config
           regex_last_updated: Date.now()
         });
-        console.log(`[TidyFeed] Regex rules updated: ${data.length} rules`);
+        console.log(`[TidyFeed] Legacy regex rules updated: ${data.length} rules`);
         return data.length;
-      } else {
-        console.error('[TidyFeed] Invalid regex rules format');
-        return 0;
       }
+
+      console.error('[TidyFeed] Invalid config format (neither v1 nor v2)');
+      return 0;
     } catch (error) {
       console.error('[TidyFeed] Error syncing regex rules:', error);
       return 0;
