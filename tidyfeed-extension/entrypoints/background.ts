@@ -409,6 +409,75 @@ export default defineBackground(() => {
     }
   }
 
+  /**
+   * Handle Cloud Video Download request
+   * Captures Twitter cookies and sends to backend for server-side download
+   */
+  async function handleCloudDownload(
+    tweetUrl: string
+  ): Promise<{ success: boolean; task_id?: number; error?: string }> {
+    try {
+      // Step 1: Get auth_token cookie
+      const authCookie = await browser.cookies.get({
+        url: 'https://x.com',
+        name: 'auth_token'
+      });
+
+      // Step 2: Get ct0 (CSRF) cookie
+      const csrfCookie = await browser.cookies.get({
+        url: 'https://x.com',
+        name: 'ct0'
+      });
+
+      if (!authCookie?.value || !csrfCookie?.value) {
+        return {
+          success: false,
+          error: 'Please log in to X.com first'
+        };
+      }
+
+      // Step 3: Format cookies string
+      const cookiesString = `auth_token=${authCookie.value}; ct0=${csrfCookie.value}`;
+
+      console.log('[TidyFeed] Cloud download request:', tweetUrl);
+
+      // Step 4: Send to backend API
+      const response = await fetch(`${BACKEND_URL}/api/downloads/queue`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tweet_url: tweetUrl,
+          cookies: cookiesString
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('[TidyFeed] Cloud download API error:', data);
+        return {
+          success: false,
+          error: data.error || `API error: ${response.status}`
+        };
+      }
+
+      console.log('[TidyFeed] Cloud download queued:', data);
+      return {
+        success: true,
+        task_id: data.task_id
+      };
+    } catch (error) {
+      console.error('[TidyFeed] Cloud download error:', error);
+      return {
+        success: false,
+        error: String(error)
+      };
+    }
+  }
+
   // Handle report block request to backend
   async function handleReportBlock(
     blockedId: string,
@@ -681,6 +750,13 @@ export default defineBackground(() => {
 
     if (message.type === 'SYNC_PLATFORM_IDENTITY') {
       handleSyncPlatformIdentity(message.platform, sender.tab?.id)
+        .then((result) => sendResponse(result))
+        .catch((error) => sendResponse({ success: false, error: error.message }));
+      return true;
+    }
+
+    if (message.type === 'CLOUD_DOWNLOAD') {
+      handleCloudDownload(message.tweetUrl)
         .then((result) => sendResponse(result))
         .catch((error) => sendResponse({ success: false, error: error.message }));
       return true;

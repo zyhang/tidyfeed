@@ -29,6 +29,12 @@ const LOCALE_STRINGS: Record<string, Record<Locale, string>> = {
         zh: '屏蔽该账号',
         ja: 'このアカウントをブロック',
         es: 'Bloquear esta cuenta'
+    },
+    cloud_save: {
+        en: 'Cloud Save',
+        zh: '云端保存',
+        ja: 'クラウド保存',
+        es: 'Guardar en la nube'
     }
 };
 
@@ -91,6 +97,16 @@ const BLOCK_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="curren
 const BLOCK_BUTTON_HOVER_STYLES = `
   background-color: rgba(244, 67, 54, 0.1);
   color: rgb(244, 67, 54);
+`;
+
+// Cloud Save button icon (cloud with arrow)
+const CLOUD_SAVE_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+  <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+</svg>`;
+
+const CLOUD_SAVE_BUTTON_HOVER_STYLES = `
+  background-color: rgba(139, 92, 246, 0.1);
+  color: rgb(139, 92, 246);
 `;
 
 // Bookmark button icons
@@ -980,6 +996,79 @@ function createBlockButton(): HTMLButtonElement {
 }
 
 /**
+ * Create the cloud save button element
+ */
+function createCloudSaveButton(tweetUrl: string): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.className = 'tidyfeed-cloud-save-btn';
+    button.setAttribute('data-tidyfeed-btn', 'true');
+    button.setAttribute('data-tweet-url', tweetUrl);
+    button.setAttribute('aria-label', getLocaleString('cloud_save'));
+    button.setAttribute('title', getLocaleString('cloud_save'));
+    button.innerHTML = CLOUD_SAVE_ICON;
+    button.style.cssText = BUTTON_STYLES;
+
+    button.addEventListener('mouseenter', () => {
+        if (!button.disabled) {
+            button.style.cssText = BUTTON_STYLES + CLOUD_SAVE_BUTTON_HOVER_STYLES;
+        }
+    });
+    button.addEventListener('mouseleave', () => {
+        if (!button.disabled) {
+            button.style.cssText = BUTTON_STYLES;
+        }
+    });
+
+    button.addEventListener('click', async (event: MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Show loading state
+        button.disabled = true;
+        button.innerHTML = SPINNER_ICON;
+        button.style.cssText = BUTTON_LOADING_STYLES;
+
+        try {
+            const result = await browser.runtime.sendMessage({
+                type: 'CLOUD_DOWNLOAD',
+                tweetUrl: tweetUrl
+            });
+
+            if (result.success) {
+                // Success - show check icon briefly
+                button.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`;
+                button.style.cssText = BUTTON_STYLES + 'color: rgb(0, 186, 124);';
+                showToast('Video queued for download');
+
+                setTimeout(() => {
+                    button.innerHTML = CLOUD_SAVE_ICON;
+                    button.style.cssText = BUTTON_STYLES;
+                    button.disabled = false;
+                }, 2000);
+            } else {
+                // Error
+                button.innerHTML = CLOUD_SAVE_ICON;
+                button.style.cssText = BUTTON_STYLES + 'color: rgb(244, 67, 54);';
+                showToast(result.error || 'Cloud download failed');
+
+                setTimeout(() => {
+                    button.style.cssText = BUTTON_STYLES;
+                    button.disabled = false;
+                }, 2000);
+            }
+        } catch (error) {
+            console.error('[TidyFeed] Cloud save error:', error);
+            button.innerHTML = CLOUD_SAVE_ICON;
+            button.style.cssText = BUTTON_STYLES;
+            button.disabled = false;
+            showToast('Failed to queue download');
+        }
+    });
+
+    return button;
+}
+
+/**
  * Handle bookmark button click - optimistic UI
  */
 async function handleBookmarkClick(event: MouseEvent): Promise<void> {
@@ -1207,6 +1296,12 @@ async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
     // Add download button
     const downloadBtn = createDownloadButton();
     wrapper.appendChild(downloadBtn);
+
+    // Add cloud save button
+    if (tweetId && data.tweetUrl) {
+        const cloudSaveBtn = createCloudSaveButton(data.tweetUrl);
+        wrapper.appendChild(cloudSaveBtn);
+    }
 
     // Add block button
     const blockBtn = createBlockButton();

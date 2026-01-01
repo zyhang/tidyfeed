@@ -8,6 +8,7 @@ import { cors } from 'hono/cors';
 import { sign, verify } from 'hono/jwt';
 import bcrypt from 'bcryptjs';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import downloads from './routes/downloads';
 
 // Google OAuth JWKS endpoint for ID token verification
 const GOOGLE_JWKS = createRemoteJWKSet(
@@ -19,6 +20,8 @@ type Bindings = {
 	JWT_SECRET: string;
 	GOOGLE_CLIENT_ID: string;
 	GOOGLE_CLIENT_SECRET: string;
+	MEDIA_BUCKET: R2Bucket;
+	INTERNAL_SERVICE_KEY: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -1175,5 +1178,8 @@ app.get('/api/reports/all', jwtMiddleware, async (c) => {
 		return c.json({ error: 'Internal server error' }, 500);
 	}
 });
+
+// Mount downloads routes
+app.route('/api/downloads', downloads);
 
 export default app;

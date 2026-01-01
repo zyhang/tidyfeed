@@ -85,3 +85,6 @@ INSERT OR IGNORE INTO admins (email, password_hash) VALUES (
     'zyhang@gmail.com',
     '$2b$10$BJJrdwWWqO0cdPl.NrZXm.6Ix7Q337GOs.FBGaFsjwQOWVq0HzEHq'
 );
+
+-- NOTE: New tables should be added via migration files in /migrations directory
+-- See: migrations/001_add_video_downloads.sql

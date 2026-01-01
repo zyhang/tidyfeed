@@ -17,6 +17,13 @@
 			"database_id": "1960d09e-e5a0-440d-a3f4-ffd58b6c1c8a"
 		}
 	],
+	"r2_buckets": [
+		{
+			"binding": "MEDIA_BUCKET",
+			"bucket_name": "tidyfeed-media"
+		}
+	],
+	// Note: INTERNAL_SERVICE_KEY should be set via `wrangler secret put INTERNAL_SERVICE_KEY`
 	"keep_vars": true
 	/**
 	 * Smart Placement
