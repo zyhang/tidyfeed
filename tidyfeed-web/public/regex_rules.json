@@ -34,9 +34,27 @@
             "rule_id": "telegram_invite",
             "name": "Telegram Invite Link",
             "category": "crypto_scam",
-            "pattern": "t\\.me\\/[+@]",
+            "pattern": "t\\.me\\/[a-zA-Z0-9_+@]",
             "score": 55,
             "severity": "strong",
+            "enabled": true
+        },
+        {
+            "rule_id": "free_signal",
+            "name": "Free Signal Promo",
+            "category": "pump_dump",
+            "pattern": "free\\s*(btc|crypto|trading|forex)?\\s*(signal|call|tip)|trading\\s*signal|crypto\\s*signal",
+            "score": 55,
+            "severity": "strong",
+            "enabled": true
+        },
+        {
+            "rule_id": "accuracy_claims",
+            "name": "Accuracy Rate Claims",
+            "category": "pump_dump",
+            "pattern": "[89][0-9]%\\s*(accuracy|win|success)|accuracy\\s*(rate)?\\s*[:\\-]?\\s*[89][0-9]%",
+            "score": 45,
+            "severity": "medium",
             "enabled": true
         },
         {
