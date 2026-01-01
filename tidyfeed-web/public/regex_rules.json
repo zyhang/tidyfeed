@@ -1,0 +1,3 @@
+[
+    "(?i)(?=.*\\b(airdrop|whitelist|wl|allowlist|presale|ido|ico|mint|minting)\\b)(?=.*\\b(t\\.me|telegram|tg|dm|dms)\\b|link\\s+(in|on)\\s+bio|bit\\.ly|tinyurl|cutt\\.ly).+"
+]

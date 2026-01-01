@@ -596,6 +596,28 @@ async function handleDownloadClick(event: MouseEvent): Promise<void> {
         const data = extractTweetData(article as HTMLElement);
         console.log('[TidyFeed] Extracting tweet data:', data);
 
+        // Check if text appears truncated (Note Tweets or long-form content)
+        const isTextTruncated = data.text.endsWith('…') ||
+            data.text.endsWith('...') ||
+            (data.text.length >= 270 && !data.text.endsWith('.') && !data.text.endsWith('!') && !data.text.endsWith('?'));
+
+        // Fetch full text from API if truncated
+        if (isTextTruncated && data.tweetId) {
+            console.log('[TidyFeed] Text appears truncated, fetching full text from API...');
+            try {
+                const apiResult = await browser.runtime.sendMessage({
+                    type: 'FETCH_TWEET_DATA',
+                    tweetId: data.tweetId,
+                });
+                if (apiResult?.text && apiResult.text.length > data.text.length) {
+                    console.log('[TidyFeed] Got full text from API:', apiResult.text.length, 'chars (was', data.text.length, ')');
+                    data.text = apiResult.text;
+                }
+            } catch (err) {
+                console.warn('[TidyFeed] Failed to fetch full text from API:', err);
+            }
+        }
+
         // Create ZIP
         const zip = new JSZip();
 
@@ -947,6 +969,27 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
         return;
     }
 
+    // Check if text appears truncated - fetch full text from API
+    const isTextTruncated = data.text.endsWith('…') ||
+        data.text.endsWith('...') ||
+        (data.text.length >= 270 && !data.text.endsWith('.') && !data.text.endsWith('!') && !data.text.endsWith('?'));
+
+    if (isTextTruncated && xId) {
+        console.log('[TidyFeed] Bookmark: Text appears truncated, fetching full text from API...');
+        try {
+            const apiResult = await browser.runtime.sendMessage({
+                type: 'FETCH_TWEET_DATA',
+                tweetId: xId,
+            });
+            if (apiResult?.text && apiResult.text.length > data.text.length) {
+                console.log('[TidyFeed] Bookmark: Got full text from API:', apiResult.text.length, 'chars (was', data.text.length, ')');
+                data.text = apiResult.text;
+            }
+        } catch (err) {
+            console.warn('[TidyFeed] Bookmark: Failed to fetch full text from API:', err);
+        }
+    }
+
     // Check current saved state
     const storage = await browser.storage.local.get('saved_x_ids');
     const savedIds: string[] = (storage.saved_x_ids as string[]) || [];
@@ -1107,12 +1150,36 @@ async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
 }
 
 /**
+ * Check if the extension context is still valid
+ */
+function isExtensionContextValid(): boolean {
+    try {
+        // Accessing browser.runtime.id will throw if context is invalidated
+        return !!browser.runtime?.id;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Process all tweets on the page
  */
 function processAllTweetsForInjection(): void {
+    // Early exit if extension context is invalidated
+    if (!isExtensionContextValid()) {
+        console.warn('[TidyFeed] Extension context invalidated, stopping tweet processing');
+        return;
+    }
+
     const articles = document.querySelectorAll<HTMLElement>('article[data-testid="tweet"]');
     articles.forEach((article) => {
-        injectButtonIntoTweet(article);
+        injectButtonIntoTweet(article).catch((err) => {
+            // Silently ignore extension context errors
+            if (err?.message?.includes('Extension context invalidated')) {
+                return;
+            }
+            console.error('[TidyFeed] Error injecting button:', err);
+        });
     });
 }
 
@@ -1125,6 +1192,13 @@ export function initTweetInjector(): void {
     processAllTweetsForInjection();
 
     const observer = new MutationObserver((mutations) => {
+        // Check if extension context is still valid
+        if (!isExtensionContextValid()) {
+            console.warn('[TidyFeed] Extension context invalidated, disconnecting observer');
+            observer.disconnect();
+            return;
+        }
+
         let shouldProcess = false;
         for (const mutation of mutations) {
             if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
