@@ -454,6 +454,17 @@ export default defineBackground(() => {
         }),
       });
 
+      // Check content type before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        const text = await response.text();
+        console.error('[TidyFeed] Non-JSON response:', response.status, text.slice(0, 200));
+        return {
+          success: false,
+          error: `Server error: ${response.status}. Please ensure backend is deployed.`
+        };
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
