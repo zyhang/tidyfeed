@@ -31,9 +31,10 @@ interface TagInputProps {
     tweetId: string
     tweetData?: object
     onTagAdded?: (tagName: string) => void
+    trigger?: React.ReactNode
 }
 
-export function TagInput({ tweetId, tweetData, onTagAdded }: TagInputProps) {
+export function TagInput({ tweetId, tweetData, onTagAdded, trigger }: TagInputProps) {
     const [open, setOpen] = React.useState(false)
     const [tags, setTags] = React.useState<Tag[]>([])
     const [loading, setLoading] = React.useState(false)
@@ -97,20 +98,22 @@ export function TagInput({ tweetId, tweetData, onTagAdded }: TagInputProps) {
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-muted-foreground hover:text-foreground"
-                    disabled={submitting}
-                >
-                    {submitting ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                    ) : (
-                        <Hash className="h-3 w-3 mr-1" />
-                    )}
-                    Tag
-                    <ChevronsUpDown className="ml-1 h-3 w-3 opacity-50" />
-                </Button>
+                {trigger || (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                        disabled={submitting}
+                    >
+                        {submitting ? (
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                            <Hash className="h-3 w-3 mr-1" />
+                        )}
+                        Tag
+                        <ChevronsUpDown className="ml-1 h-3 w-3 opacity-50" />
+                    </Button>
+                )}
             </PopoverTrigger>
             <PopoverContent className="w-[200px] p-0" align="start">
                 <Command>

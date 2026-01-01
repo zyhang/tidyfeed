@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash, Pin, Play, Cloud, Loader2 } from 'lucide-react'
+import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash, Pin, Play, Cloud, Loader2, Plus } from 'lucide-react'
 import { TagInput } from '@/components/TagInput'
 import { cn } from '@/lib/utils'
 
@@ -126,77 +126,107 @@ export function TweetCard({
 
     return (
         <>
-            {/* ... existing Lightbox code ... */}
             {lightboxImage && (
                 <div
-                    className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-pointer"
+                    className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-pointer backdrop-blur-sm"
                     onClick={() => setLightboxImage(null)}
                 >
                     <button
                         onClick={() => setLightboxImage(null)}
-                        className="absolute top-4 right-4 text-white hover:text-gray-300"
+                        className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"
                     >
-                        <X className="h-8 w-8" />
+                        <X className="h-8 w-8 drop-shadow-md" />
                     </button>
                     <img
                         src={lightboxImage}
                         alt="Enlarged view"
-                        className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
+                        className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                     />
                 </div>
             )}
 
             <Card className={cn(
-                "overflow-hidden hover:shadow-md transition-all break-inside-avoid mb-4 relative group",
-                isPinned && "border-blue-500/50 shadow-sm bg-blue-50/10 dark:bg-blue-900/10"
+                "overflow-hidden hover:shadow-lg transition-all duration-300 break-inside-avoid mb-4 relative group border-transparent hover:border-border/50 bg-card/50 hover:bg-card",
+                isPinned && "border-blue-500/30 bg-blue-50/10 dark:bg-blue-900/10 shadow-sm"
             )}>
-                {/* ... existing Pin Indicator code ... */}
-                {isPinned && (
-                    <div className="absolute top-0 right-0 p-2">
-                        <Pin className="h-3 w-3 text-blue-500 rotate-45 fill-current" />
-                    </div>
-                )}
+                {/* Top Right Floating Actions */}
+                <div className={cn(
+                    "absolute top-3 right-3 flex items-center gap-1.5 z-20 transition-all duration-200",
+                    isPinned ? "opacity-100" : "opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0"
+                )}>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handlePin}
+                        disabled={pinning}
+                        className={cn(
+                            "h-7 w-7 rounded-full bg-background/80 backdrop-blur-md shadow-sm border border-border/10 transition-all hover:scale-105",
+                            isPinned
+                                ? "text-blue-500 hover:text-blue-600 bg-blue-50/80 dark:bg-blue-900/20 ring-1 ring-blue-500/20"
+                                : "text-muted-foreground hover:text-foreground hover:bg-background"
+                        )}
+                        title={isPinned ? "Unpin post" : "Pin post"}
+                    >
+                        <Pin className={cn("h-3.5 w-3.5", isPinned && "fill-current rotate-45")} />
+                    </Button>
 
-                <CardContent className="p-4">
-                    {/* ... existing Author code ... */}
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="h-7 w-7 rounded-full bg-background/80 backdrop-blur-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 shadow-sm border border-border/10 transition-all hover:scale-105"
+                        title="Delete post"
+                    >
+                        {deleting ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                    </Button>
+                </div>
+
+                <CardContent className="p-5">
+                    {/* Author Info */}
+                    <div className="flex items-center justify-between mb-3.5 pr-16">
+                        <div className="flex items-center gap-3">
                             {author?.avatar ? (
                                 <img
                                     src={author.avatar}
                                     alt={author.name || author.handle || 'Avatar'}
-                                    className="w-10 h-10 rounded-full object-cover"
+                                    className="w-10 h-10 rounded-full object-cover ring-2 ring-background shadow-sm"
                                     referrerPolicy="no-referrer"
                                 />
                             ) : (
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-inner ring-2 ring-background">
                                     {author?.name?.charAt(0) || author?.handle?.replace('@', '').charAt(0) || '?'}
                                 </div>
                             )}
-                            <div>
-                                <p className="font-semibold text-sm">{author?.name || 'Unknown'}</p>
-                                <p className="text-xs text-muted-foreground">{author?.handle || '@unknown'}</p>
+                            <div className="flex flex-col">
+                                <p className="font-semibold text-sm leading-tight text-foreground tracking-tight">{author?.name || 'Unknown'}</p>
+                                <p className="text-xs text-muted-foreground font-medium">{author?.handle || '@unknown'}</p>
                             </div>
                         </div>
-                        <span className="text-xs text-muted-foreground">{formattedDate}</span>
+                        <span className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wider">{formattedDate}</span>
                     </div>
 
-                    {/* ... existing Content code ... */}
+                    {/* Content */}
                     {content && (
-                        <div className="mb-3">
-                            <p className={`text-sm whitespace-pre-wrap ${!expanded && shouldTruncate ? 'line-clamp-4' : ''}`}>
+                        <div className="mb-4">
+                            <p className={`text-[15px] leading-7 text-foreground/90 whitespace-pre-wrap ${!expanded && shouldTruncate ? 'line-clamp-4' : ''}`}>
                                 {content}
                                 {url && (
-                                    <span className="inline-block ml-1">
+                                    <span className="inline-block ml-1.5 align-baseline text-muted-foreground/40 hover:text-blue-500 transition-colors cursor-pointer select-none">
                                         <a
                                             href={url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-blue-500 hover:text-blue-600 inline-flex items-baseline gap-0.5"
+                                            className="inline-flex items-center justify-center p-0.5" // Increased hit area slightly
                                             onClick={(e) => e.stopPropagation()}
+                                            title="View original tweet"
                                         >
-                                            <ExternalLink className="w-3 h-3 self-center" />
+                                            <ExternalLink className="w-3.5 h-3.5" />
                                         </a>
                                     </span>
                                 )}
@@ -204,7 +234,7 @@ export function TweetCard({
                             {shouldTruncate && (
                                 <button
                                     onClick={() => setExpanded(!expanded)}
-                                    className="text-xs text-blue-500 hover:underline mt-1 flex items-center gap-1"
+                                    className="text-xs font-medium text-muted-foreground hover:text-foreground mt-2 flex items-center gap-1 transition-colors"
                                 >
                                     {expanded ? (
                                         <>Show less <ChevronUp className="h-3 w-3" /></>
@@ -216,21 +246,22 @@ export function TweetCard({
                         </div>
                     )}
 
-                    {/* ... existing Media Grid code ... */}
+                    {/* Media Grid */}
                     {media && media.length > 0 && !videoInfo && (
-                        <div className={`grid gap-2 mb-3 ${media.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                        <div className={`grid gap-2 mb-4 ${media.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
                             {media.slice(0, 4).map((imgUrl, idx) => (
                                 <div
                                     key={idx}
-                                    className="relative rounded-lg overflow-hidden bg-muted cursor-pointer hover:opacity-90 transition-opacity"
+                                    className="relative rounded-xl overflow-hidden bg-muted cursor-zoom-in group/media shadow-sm ring-1 ring-black/5 dark:ring-white/5"
                                     onClick={() => setLightboxImage(imgUrl)}
                                 >
                                     <img
                                         src={imgUrl}
                                         alt={`Media ${idx + 1}`}
-                                        className="w-full h-auto object-cover"
+                                        className="w-full h-auto object-cover transition-transform duration-500 group-hover/media:scale-105"
                                         loading="lazy"
                                     />
+                                    <div className="absolute inset-0 bg-black/0 group-hover/media:bg-black/5 transition-colors pointer-events-none" />
                                 </div>
                             ))}
                         </div>
@@ -238,26 +269,28 @@ export function TweetCard({
 
                     {/* Cloud Video Player */}
                     {videoInfo && (
-                        <div className="mb-3 rounded-lg overflow-hidden bg-muted relative">
+                        <div className="mb-4 rounded-xl overflow-hidden bg-black/5 border border-black/5 dark:border-white/5 relative shadow-sm">
                             {videoInfo.status === 'completed' && !isPlayingVideo && (
                                 <button
                                     onClick={() => setIsPlayingVideo(true)}
-                                    className="w-full aspect-video flex items-center justify-center relative"
+                                    className="w-full aspect-video flex items-center justify-center relative group/video cursor-pointer"
                                 >
                                     {media && media[0] && (
                                         <img
                                             src={media[0]}
                                             alt="Video thumbnail"
-                                            className="absolute inset-0 w-full h-full object-cover"
+                                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover/video:scale-105"
                                         />
                                     )}
-                                    <div className="absolute inset-0 bg-black/40" />
-                                    <div className="relative w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                                        <Play className="h-6 w-6 text-purple-600 ml-1" />
+                                    <div className="absolute inset-0 bg-black/10 group-hover/video:bg-black/20 transition-colors duration-300" />
+
+                                    <div className="relative z-10 w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center shadow-lg border border-white/20 transition-all duration-300 group-hover/video:scale-110 group-hover/video:bg-white/30">
+                                        <Play className="h-6 w-6 text-white ml-1 fill-white drop-shadow-sm" />
                                     </div>
-                                    <div className="absolute bottom-2 left-2 flex items-center gap-1 text-white/80 text-xs bg-black/40 px-2 py-1 rounded">
+
+                                    <div className="absolute top-3 left-3 flex items-center gap-1.5 text-[10px] font-semibold text-white/90 bg-black/30 backdrop-blur-md px-2 py-1 rounded-full border border-white/10 shadow-sm">
                                         <Cloud className="h-3 w-3" />
-                                        Cloud Video
+                                        <span>Cloud Video</span>
                                     </div>
                                 </button>
                             )}
@@ -268,111 +301,81 @@ export function TweetCard({
                                     autoPlay
                                     preload="metadata"
                                     poster={media?.[0]}
-                                    className="w-full aspect-video"
+                                    className="w-full aspect-video bg-black"
                                 />
                             )}
-                            {videoInfo.status === 'pending' && (
-                                <div className="w-full aspect-video flex flex-col items-center justify-center text-muted-foreground relative">
+                            {(videoInfo.status === 'pending' || videoInfo.status === 'processing') && (
+                                <div className="w-full aspect-video flex flex-col items-center justify-center text-muted-foreground relative bg-muted/30">
                                     {media && media[0] && (
-                                        <img src={media[0]} alt="" className="absolute inset-0 w-full h-full object-cover opacity-50" />
+                                        <img src={media[0]} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 blur-sm scale-110" />
                                     )}
-                                    <div className="relative flex flex-col items-center">
-                                        <Cloud className="h-6 w-6 mb-2" />
-                                        <span className="text-xs">☁️ Processing Video...</span>
-                                    </div>
-                                </div>
-                            )}
-                            {videoInfo.status === 'processing' && (
-                                <div className="w-full aspect-video flex flex-col items-center justify-center text-muted-foreground relative">
-                                    {media && media[0] && (
-                                        <img src={media[0]} alt="" className="absolute inset-0 w-full h-full object-cover opacity-50" />
-                                    )}
-                                    <div className="relative flex flex-col items-center">
-                                        <Loader2 className="h-6 w-6 animate-spin mb-2" />
-                                        <span className="text-xs">☁️ Processing Video...</span>
+                                    <div className="relative flex flex-col items-center z-10 p-5 bg-background/60 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg">
+                                        {videoInfo.status === 'processing' ? (
+                                            <Loader2 className="h-6 w-6 animate-spin mb-3 text-blue-500" />
+                                        ) : (
+                                            <Cloud className="h-6 w-6 mb-3 text-muted-foreground" />
+                                        )}
+                                        <span className="text-xs font-semibold tracking-wide text-foreground/80">
+                                            {videoInfo.status === 'processing' ? 'Processing Video...' : 'Queued for Download...'}
+                                        </span>
                                     </div>
                                 </div>
                             )}
                             {videoInfo.status === 'failed' && (
-                                <div className="w-full aspect-video flex flex-col items-center justify-center text-muted-foreground">
-                                    <Cloud className="h-6 w-6 mb-2 text-destructive" />
-                                    <span className="text-xs text-destructive">Download failed</span>
+                                <div className="w-full aspect-video flex flex-col items-center justify-center text-muted-foreground bg-muted/30">
+                                    <Cloud className="h-8 w-8 mb-2 text-destructive/50" />
+                                    <span className="text-xs text-destructive font-medium">Download Failed</span>
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* Tags */}
-                    {tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-3">
-                            {tags.map((tag) => (
-                                <Badge
-                                    key={tag.id || tag.name}
-                                    variant="secondary"
-                                    className="text-xs font-normal group/tag pr-1.5 transition-colors hover:bg-secondary/80"
-                                >
-                                    <Hash className="h-3 w-3 mr-0.5 opacity-70" />
-                                    {tag.name}
-                                    {onRemoveTag && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleRemoveTag(tag.id)
-                                            }}
-                                            className="ml-1 opacity-0 group-hover/tag:opacity-100 hover:text-red-500 transition-all focus:opacity-100 -mr-0.5"
-                                            title="Remove tag"
-                                            disabled={removingTagId === tag.id}
-                                        >
-                                            {removingTagId === tag.id ? (
-                                                <span className="animate-spin h-3 w-3 block border-2 border-current border-t-transparent rounded-full" />
-                                            ) : (
-                                                <X className="h-3 w-3" />
-                                            )}
-                                        </button>
-                                    )}
-                                </Badge>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-between pt-2 border-t">
-                        <div className="flex items-center gap-1">
-
-                            <TagInput
-                                tweetId={xId}
-                                tweetData={{ content, author, media, url, platform }}
-                                onTagAdded={handleTagAdded}
-                            />
-                        </div>
-                        <div className="flex items-center gap-1">
-                            {/* Pin Button */}
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handlePin}
-                                disabled={pinning}
-                                className={cn(
-                                    "text-muted-foreground hover:text-foreground",
-                                    isPinned && "text-blue-500 hover:text-blue-600"
+                    {/* Footer Integrated Tags */}
+                    <div className="flex flex-wrap items-center gap-2 min-h-[24px]">
+                        {tags.map((tag) => (
+                            <Badge
+                                key={tag.id || tag.name}
+                                variant="outline"
+                                className="px-2 py-0.5 rounded-md text-[11px] font-normal text-muted-foreground bg-transparent hover:bg-secondary border-border/60 hover:border-border transition-all group/tag cursor-default gap-1"
+                            >
+                                <Hash className="h-2.5 w-2.5 opacity-40" />
+                                {tag.name}
+                                {onRemoveTag && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleRemoveTag(tag.id)
+                                        }}
+                                        className="opacity-0 group-hover/tag:opacity-100 hover:text-destructive transition-all focus:opacity-100 w-0 group-hover/tag:w-3 overflow-hidden"
+                                        title="Remove tag"
+                                        disabled={removingTagId === tag.id}
+                                    >
+                                        {removingTagId === tag.id ? (
+                                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                        ) : (
+                                            <X className="h-2.5 w-2.5" />
+                                        )}
+                                    </button>
                                 )}
-                                title={isPinned ? "Unpin post" : "Pin post"}
-                            >
-                                <Pin className={cn("h-3 w-3 mr-1", isPinned && "fill-current rotate-45")} />
-                                {pinning ? '...' : (isPinned ? 'Unpin' : 'Pin')}
-                            </Button>
+                            </Badge>
+                        ))}
 
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleDelete}
-                                disabled={deleting}
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                {deleting ? 'Deleting...' : 'Delete'}
-                            </Button>
-                        </div>
+                        <TagInput
+                            tweetId={xId}
+                            tweetData={{ content, author, media, url, platform }}
+                            onTagAdded={handleTagAdded}
+                            trigger={
+                                <button className={cn(
+                                    "inline-flex items-center justify-center h-5 px-2 rounded-md text-[10px] font-medium border border-dashed transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring gap-1",
+                                    tags.length === 0
+                                        ? "text-muted-foreground border-border hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/10"
+                                        : "text-muted-foreground/40 border-transparent hover:border-border hover:text-muted-foreground bg-transparent hover:bg-secondary/50"
+                                )}>
+                                    <Plus className="h-2.5 w-2.5" />
+                                    {tags.length === 0 ? "Add Tag" : ""}
+                                </button>
+                            }
+                        />
                     </div>
                 </CardContent>
             </Card>
