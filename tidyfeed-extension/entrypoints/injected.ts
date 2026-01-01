@@ -290,7 +290,7 @@ export default defineUnlistedScript(() => {
             tweets,
         }, '*');
 
-        console.log(LOG_PREFIX, `Sent ${tweets.length} tweets to content script`);
+        // Silently send to content script
     }
 
     /**
@@ -303,8 +303,8 @@ export default defineUnlistedScript(() => {
     (window as any).__tidyfeedTweetCache = mainWorldCache;
     (window as any).__tidyfeedGetTweet = (id: string) => mainWorldCache.get(id);
 
-    // Debug mode - log all API requests
-    let debugMode = true;
+    // Debug mode - set to false for production
+    const debugMode = false;
 
     window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
         const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -325,11 +325,7 @@ export default defineUnlistedScript(() => {
 
                 // Process in background to not block the main thread
                 clonedResponse.json().then((data: any) => {
-                    const endpoint = url.split('?')[0].split('/').pop();
-                    console.log(LOG_PREFIX, '✅ Intercepted:', endpoint);
-
                     const tweets = processApiResponse(data);
-                    console.log(LOG_PREFIX, `Extracted ${tweets.length} tweets from ${endpoint}`);
 
                     // Store in Main World cache for debugging
                     for (const tweet of tweets) {
@@ -347,7 +343,6 @@ export default defineUnlistedScript(() => {
 
                     if (tweets.length > 0) {
                         sendToContentScript(tweets);
-                        console.log(LOG_PREFIX, `Cache size: ${mainWorldCache.size}`);
                     }
                 }).catch((error: any) => {
                     // Silently ignore JSON parse errors (some responses might not be JSON)
@@ -381,12 +376,8 @@ export default defineUnlistedScript(() => {
         if (shouldIntercept(url)) {
             this.addEventListener('load', function () {
                 try {
-                    const endpoint = url.split('?')[0].split('/').pop();
-                    console.log(LOG_PREFIX, '✅ XHR Intercepted:', endpoint);
-
                     const data = JSON.parse(this.responseText);
                     const tweets = processApiResponse(data);
-                    console.log(LOG_PREFIX, `Extracted ${tweets.length} tweets from XHR ${endpoint}`);
 
                     for (const tweet of tweets) {
                         mainWorldCache.set(tweet.id, {
@@ -403,7 +394,6 @@ export default defineUnlistedScript(() => {
 
                     if (tweets.length > 0) {
                         sendToContentScript(tweets);
-                        console.log(LOG_PREFIX, `Cache size: ${mainWorldCache.size}`);
                     }
                 } catch (e) {
                     // Ignore errors
@@ -414,8 +404,6 @@ export default defineUnlistedScript(() => {
         return originalXHRSend.call(this, body);
     };
 
-    console.log(LOG_PREFIX, '✅ Fetch interceptor installed');
-    console.log(LOG_PREFIX, '✅ XHR interceptor installed');
-    console.log(LOG_PREFIX, 'Watching for:', INTERCEPT_PATTERNS.join(', '));
+    // Interceptors installed silently
 });
 

@@ -11,8 +11,6 @@ export default defineContentScript({
     runAt: 'document_start',
 
     async main() {
-        console.log('[TidyFeed] Content script loaded (headless mode)');
-
         // Initialize the network interceptor FIRST (captures full tweet text from GraphQL)
         // Must run before other initialization to intercept API calls
         await initNetworkInterceptor();

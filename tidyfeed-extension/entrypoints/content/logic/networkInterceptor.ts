@@ -106,8 +106,6 @@ function handleTweetData(event: MessageEvent): void {
         });
     }
 
-    console.log(LOG_PREFIX, `Cached ${newCount} new, ${updateCount} updated tweets (total: ${tweetCache.size})`);
-
     // Periodic cleanup
     if (tweetCache.size > MAX_CACHE_SIZE * 0.9) {
         cleanupCache();
@@ -176,20 +174,29 @@ export function getCacheStats(): { size: number; oldestMs: number; newestMs: num
 
 /**
  * Inject the Main World script
- * Uses manual script tag injection for Main World access
+ * Uses synchronous injection to ensure it runs before page makes API calls
  */
 async function injectMainWorldScript(): Promise<void> {
     try {
+        // Method 1: Try inline script injection for immediate execution
+        // Fetch the script content and inject it directly (synchronous execution)
+        const scriptUrl = chrome.runtime.getURL('injected.js');
+
         // Create script element and inject into page
         const script = document.createElement('script');
-        script.src = chrome.runtime.getURL('injected.js');
-        script.onload = () => {
-            console.log(LOG_PREFIX, '✅ Main World script injected');
-        };
-        script.onerror = (error) => {
-            console.error(LOG_PREFIX, 'Failed to load Main World script:', error);
-        };
-        (document.head || document.documentElement).appendChild(script);
+        script.src = scriptUrl;
+        script.async = false; // Ensure synchronous loading
+
+        // Insert at document_start (before any page scripts)
+        const insertTarget = document.documentElement || document.head || document.body;
+        if (insertTarget) {
+            insertTarget.insertBefore(script, insertTarget.firstChild);
+        } else {
+            // Fallback: wait for document to be available
+            document.addEventListener('DOMContentLoaded', () => {
+                (document.head || document.documentElement).appendChild(script);
+            }, { once: true });
+        }
     } catch (error) {
         console.error(LOG_PREFIX, 'Failed to inject Main World script:', error);
     }
@@ -201,8 +208,6 @@ async function injectMainWorldScript(): Promise<void> {
  * - Injects the fetch interceptor script into Main World
  */
 export async function initNetworkInterceptor(): Promise<void> {
-    console.log(LOG_PREFIX, 'Initializing...');
-
     // Set up message listener
     window.addEventListener('message', handleTweetData);
 
@@ -212,8 +217,6 @@ export async function initNetworkInterceptor(): Promise<void> {
     // Expose cache for debugging (accessible via console)
     (window as any).__tidyfeedTweetCache = tweetCache;
     (window as any).__tidyfeedGetTweet = getTweetFullText;
-
-    console.log(LOG_PREFIX, '✅ Initialized');
 }
 
 /**
