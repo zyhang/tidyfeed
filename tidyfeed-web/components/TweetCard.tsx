@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash, Pin } from 'lucide-react'
+import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash, Pin, Play, Cloud, Loader2 } from 'lucide-react'
 import { TagInput } from '@/components/TagInput'
 import { cn } from '@/lib/utils'
 
@@ -17,6 +17,13 @@ interface Tag {
     name: string
 }
 
+interface VideoInfo {
+    id: number
+    status: 'pending' | 'processing' | 'completed' | 'failed'
+    r2_key?: string | null
+    metadata?: any
+}
+
 interface TweetCardProps {
     id: number
     xId: string
@@ -28,12 +35,14 @@ interface TweetCardProps {
     createdAt: string
     tags?: Tag[]
     pinnedAt?: string | null
+    videoInfo?: VideoInfo | null
     onDelete: (xId: string) => void
     onPin?: (xId: string, pinned: boolean) => void
     onRemoveTag?: (xId: string, tagId: number) => void
 }
 
 export function TweetCard({
+    id,
     xId,
     content,
     author,
@@ -43,6 +52,7 @@ export function TweetCard({
     createdAt,
     tags: initialTags = [],
     pinnedAt,
+    videoInfo,
     onDelete,
     onPin,
     onRemoveTag,
@@ -53,6 +63,7 @@ export function TweetCard({
     const [lightboxImage, setLightboxImage] = useState<string | null>(null)
     const [tags, setTags] = useState<Tag[]>(initialTags)
     const [removingTagId, setRemovingTagId] = useState<number | null>(null)
+    const [isPlayingVideo, setIsPlayingVideo] = useState(false)
 
     const isPinned = !!pinnedAt
 
@@ -209,6 +220,72 @@ export function TweetCard({
                                     />
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {/* Cloud Video Player */}
+                    {videoInfo && (
+                        <div className="mb-3 rounded-lg overflow-hidden bg-muted relative">
+                            {videoInfo.status === 'completed' && !isPlayingVideo && (
+                                <button
+                                    onClick={() => setIsPlayingVideo(true)}
+                                    className="w-full aspect-video flex items-center justify-center relative"
+                                >
+                                    {media && media[0] && (
+                                        <img
+                                            src={media[0]}
+                                            alt="Video thumbnail"
+                                            className="absolute inset-0 w-full h-full object-cover"
+                                        />
+                                    )}
+                                    <div className="absolute inset-0 bg-black/40" />
+                                    <div className="relative w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                                        <Play className="h-6 w-6 text-purple-600 ml-1" />
+                                    </div>
+                                    <div className="absolute bottom-2 left-2 flex items-center gap-1 text-white/80 text-xs bg-black/40 px-2 py-1 rounded">
+                                        <Cloud className="h-3 w-3" />
+                                        Cloud Video
+                                    </div>
+                                </button>
+                            )}
+                            {videoInfo.status === 'completed' && isPlayingVideo && (
+                                <video
+                                    src={`${process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'}/api/downloads/media/${videoInfo.id}`}
+                                    controls
+                                    autoPlay
+                                    preload="metadata"
+                                    poster={media?.[0]}
+                                    className="w-full aspect-video"
+                                />
+                            )}
+                            {videoInfo.status === 'pending' && (
+                                <div className="w-full aspect-video flex flex-col items-center justify-center text-muted-foreground relative">
+                                    {media && media[0] && (
+                                        <img src={media[0]} alt="" className="absolute inset-0 w-full h-full object-cover opacity-50" />
+                                    )}
+                                    <div className="relative flex flex-col items-center">
+                                        <Cloud className="h-6 w-6 mb-2" />
+                                        <span className="text-xs">☁️ Processing Video...</span>
+                                    </div>
+                                </div>
+                            )}
+                            {videoInfo.status === 'processing' && (
+                                <div className="w-full aspect-video flex flex-col items-center justify-center text-muted-foreground relative">
+                                    {media && media[0] && (
+                                        <img src={media[0]} alt="" className="absolute inset-0 w-full h-full object-cover opacity-50" />
+                                    )}
+                                    <div className="relative flex flex-col items-center">
+                                        <Loader2 className="h-6 w-6 animate-spin mb-2" />
+                                        <span className="text-xs">☁️ Processing Video...</span>
+                                    </div>
+                                </div>
+                            )}
+                            {videoInfo.status === 'failed' && (
+                                <div className="w-full aspect-video flex flex-col items-center justify-center text-muted-foreground">
+                                    <Cloud className="h-6 w-6 mb-2 text-destructive" />
+                                    <span className="text-xs text-destructive">Download failed</span>
+                                </div>
+                            )}
                         </div>
                     )}
 

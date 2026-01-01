@@ -81,7 +81,7 @@ downloads.post('/queue', cookieAuthMiddleware, async (c) => {
         const payload = c.get('jwtPayload') as { sub: string };
         const userId = payload.sub;
 
-        const { tweet_url, cookies } = await c.req.json();
+        const { tweet_url, cookies, saved_post_id } = await c.req.json();
 
         // Validate URL
         if (!tweet_url) {
@@ -98,11 +98,11 @@ downloads.post('/queue', cookieAuthMiddleware, async (c) => {
             return c.json({ error: 'cookies are required for video download' }, 400);
         }
 
-        // Insert task with pending status
+        // Insert task with pending status (optionally linked to saved_post)
         const result = await c.env.DB.prepare(
-            `INSERT INTO video_downloads (user_id, tweet_url, twitter_cookies, status)
-			 VALUES (?, ?, ?, 'pending')`
-        ).bind(userId, tweet_url, cookies).run();
+            `INSERT INTO video_downloads (user_id, tweet_url, twitter_cookies, status, saved_post_id)
+			 VALUES (?, ?, ?, 'pending', ?)`
+        ).bind(userId, tweet_url, cookies, saved_post_id || null).run();
 
         const taskId = result.meta.last_row_id;
 

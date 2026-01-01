@@ -766,7 +766,7 @@ export default defineBackground(() => {
       return true;
     }
 
-    if (message.type === 'CLOUD_DOWNLOAD') {
+    if (message.type === 'QUEUE_DOWNLOAD') {
       handleCloudDownload(message.tweetUrl)
         .then((result) => sendResponse(result))
         .catch((error) => sendResponse({ success: false, error: error.message }));

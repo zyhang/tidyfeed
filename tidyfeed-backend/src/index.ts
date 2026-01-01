@@ -801,6 +801,44 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 			}
 		}
 
+		// Fetch video download status for posts with URLs
+		const urlsForVideoLookup = formattedPosts
+			.filter(p => p.url)
+			.map(p => p.url);
+
+		if (urlsForVideoLookup.length > 0) {
+			const placeholders = urlsForVideoLookup.map(() => '?').join(',');
+			const videoQuery = `
+				SELECT tweet_url, id, status, r2_key, metadata
+				FROM video_downloads
+				WHERE user_id = ? AND tweet_url IN (${placeholders})
+			`;
+
+			const videoResult = await c.env.DB.prepare(videoQuery)
+				.bind(userId, ...urlsForVideoLookup)
+				.all<{ tweet_url: string; id: number; status: string; r2_key: string | null; metadata: string | null }>();
+
+			// Map video info to posts
+			if (videoResult.results && videoResult.results.length > 0) {
+				const videoMap = new Map<string, { id: number; status: string; r2_key: string | null; metadata: any }>();
+
+				videoResult.results.forEach(row => {
+					videoMap.set(row.tweet_url, {
+						id: row.id,
+						status: row.status,
+						r2_key: row.r2_key,
+						metadata: row.metadata ? JSON.parse(row.metadata) : null
+					});
+				});
+
+				formattedPosts.forEach(post => {
+					if (post.url && videoMap.has(post.url)) {
+						(post as any).videoInfo = videoMap.get(post.url);
+					}
+				});
+			}
+		}
+
 		return c.json({
 			count: formattedPosts.length,
 			posts: formattedPosts,

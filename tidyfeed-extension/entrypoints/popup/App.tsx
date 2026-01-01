@@ -17,6 +17,7 @@ function App() {
   const blockedKeywords = useStorageValue<string[]>('user_blocked_keywords', []);
   const enableRegex = useStorageValue<boolean>('enable_regex_filter', false);
   const cloudRegexList = useStorageValue<string[]>('cloud_regex_list', []);
+  const autoDownloadVideos = useStorageValue<boolean>('settings_auto_download_video', false);
 
   const [inputValue, setInputValue] = useState('');
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
@@ -91,6 +92,10 @@ function App() {
 
   const handleToggleRegex = () => {
     browser.storage.local.set({ enable_regex_filter: !enableRegex });
+  };
+
+  const handleToggleAutoDownload = () => {
+    browser.storage.local.set({ settings_auto_download_video: !autoDownloadVideos });
   };
 
   const handleAddKeyword = () => {
@@ -271,6 +276,27 @@ function App() {
               className={`w-11 h-6 rounded-full relative transition-colors ${enableRegex ? 'bg-purple-600' : 'bg-zinc-700'}`}
             >
               <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${enableRegex ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Auto-download Videos Toggle */}
+        <div className="bg-zinc-800/60 rounded-lg p-4 border border-zinc-700/50">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                <span>☁️</span>
+                <span>Auto-download Videos</span>
+              </div>
+              <div className="text-[10px] text-zinc-500 mt-1">
+                Save videos to cloud when bookmarking
+              </div>
+            </div>
+            <button
+              onClick={handleToggleAutoDownload}
+              className={`w-11 h-6 rounded-full relative transition-colors ${autoDownloadVideos ? 'bg-purple-600' : 'bg-zinc-700'}`}
+            >
+              <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${autoDownloadVideos ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>

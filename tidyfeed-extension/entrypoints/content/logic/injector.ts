@@ -1030,7 +1030,7 @@ function createCloudSaveButton(tweetUrl: string): HTMLButtonElement {
 
         try {
             const result = await browser.runtime.sendMessage({
-                type: 'CLOUD_DOWNLOAD',
+                type: 'QUEUE_DOWNLOAD',
                 tweetUrl: tweetUrl
             });
 
@@ -1167,6 +1167,33 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
             showToast('Failed to sync bookmark');
         } else {
             console.log('[TidyFeed] Bookmark toggled successfully:', xId, newSavedState ? 'saved' : 'removed');
+
+            // Auto-download video if enabled and this is a save action (not unsave)
+            if (newSavedState && data.tweetUrl) {
+                const hasVideo = data.mediaItems.some(m => m.type === 'video');
+                if (hasVideo) {
+                    const settings = await browser.storage.local.get('settings_auto_download_video');
+                    const autoDownloadEnabled = settings.settings_auto_download_video === true;
+
+                    if (autoDownloadEnabled) {
+                        console.log('[TidyFeed] Auto-downloading video for:', xId);
+                        try {
+                            const downloadResult = await browser.runtime.sendMessage({
+                                type: 'QUEUE_DOWNLOAD',
+                                tweetUrl: data.tweetUrl,
+                                savedPostId: result.postId // Link to saved post if returned
+                            });
+                            if (downloadResult.success) {
+                                showToast('Saved & Queued for Download');
+                            } else {
+                                console.warn('[TidyFeed] Auto-download failed:', downloadResult.error);
+                            }
+                        } catch (downloadError) {
+                            console.warn('[TidyFeed] Auto-download error:', downloadError);
+                        }
+                    }
+                }
+            }
         }
     } catch (error) {
         console.error('[TidyFeed] Toggle save error:', error);

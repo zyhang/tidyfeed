@@ -18,6 +18,13 @@ import logging
 import requests
 from pathlib import Path
 
+# Load .env file for local development
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not installed, use environment variables directly
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -150,23 +157,31 @@ def download_video(tweet_url: str, cookies_string: str, output_dir: str) -> tupl
             '--merge-output-format', 'mp4',
             '-o', output_template,
             '--no-playlist',
-            '--print', 'after_move:filepath',
-            '--print', 'title',
-            '--print', 'duration',
+            '--print', 'after_move:filepath',  # Line 1: filepath
+            '--print', 'title',                 # Line 2: title
+            '--print', 'duration',              # Line 3: duration
             tweet_url
         ]
         
         logger.info(f'Running yt-dlp for: {tweet_url}')
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         
+        # Debug: log full output
+        logger.info(f'yt-dlp stdout: {result.stdout[:500] if result.stdout else "empty"}')
+        if result.stderr:
+            logger.warning(f'yt-dlp stderr: {result.stderr[:500]}')
+        
         if result.returncode != 0:
             error_msg = result.stderr or 'Unknown yt-dlp error'
-            logger.error(f'yt-dlp failed: {error_msg}')
+            logger.error(f'yt-dlp failed with code {result.returncode}: {error_msg}')
             return False, None, None, error_msg[:500]
         
         # Parse output (filepath, title, duration are printed on separate lines)
-        output_lines = result.stdout.strip().split('\n')
-        if len(output_lines) >= 1:
+        output_lines = result.stdout.strip().split('\n') if result.stdout else []
+        logger.info(f'Output lines: {output_lines}')
+        
+        # Find the downloaded file - look for .mp4 file in temp directory
+        if len(output_lines) >= 1 and output_lines[0]:
             downloaded_file = output_lines[0]
             
             # Build metadata
@@ -179,8 +194,17 @@ def download_video(tweet_url: str, cookies_string: str, output_dir: str) -> tupl
             if os.path.exists(downloaded_file):
                 logger.info(f'Downloaded: {downloaded_file}')
                 return True, downloaded_file, metadata, None
+            else:
+                logger.error(f'File not found at: {downloaded_file}')
         
-        return False, None, None, 'No file downloaded'
+        # Fallback: scan directory for mp4 files
+        for f in os.listdir(output_dir):
+            if f.endswith('.mp4'):
+                found_file = os.path.join(output_dir, f)
+                logger.info(f'Found file via directory scan: {found_file}')
+                return True, found_file, {'source_url': tweet_url}, None
+        
+        return False, None, None, f'No file downloaded. stdout: {result.stdout[:200] if result.stdout else "empty"}'
         
     except subprocess.TimeoutExpired:
         return False, None, None, 'Download timed out (5 min limit)'
@@ -217,10 +241,16 @@ def process_task(task: dict):
     """Process a single download task."""
     task_id = task['id']
     tweet_url = task['tweet_url']
-    cookies_string = task['cookies']
+    cookies_string = task.get('cookies')
     user_id = task['user_id']
     
     logger.info(f'Processing task {task_id}: {tweet_url}')
+    
+    # Check if cookies exist (they might have been wiped if task was retried)
+    if not cookies_string:
+        logger.error(f'Task {task_id}: No cookies available (already wiped?)')
+        complete_task(task_id, 'failed', error_message='Cookies not available')
+        return
     
     with tempfile.TemporaryDirectory() as temp_dir:
         # Step 1: Download video
