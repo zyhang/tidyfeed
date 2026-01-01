@@ -9,6 +9,39 @@ import { saveAs } from 'file-saver';
 import { getTweetFullText } from './networkInterceptor';
 
 // SVG icons
+type Locale = 'zh' | 'ja' | 'es' | 'en';
+
+const LOCALE_STRINGS: Record<string, Record<Locale, string>> = {
+    bookmark: {
+        en: 'Bookmark to TidyFeed',
+        zh: '收藏到 TidyFeed',
+        ja: 'TidyFeedに保存',
+        es: 'Guardar en TidyFeed'
+    },
+    download: {
+        en: 'Download ZIP',
+        zh: '打包下载',
+        ja: '一括ダウンロード',
+        es: 'Descargar ZIP'
+    },
+    block: {
+        en: 'Block this account',
+        zh: '屏蔽该账号',
+        ja: 'このアカウントをブロック',
+        es: 'Bloquear esta cuenta'
+    }
+};
+
+function getLocaleString(key: string): string {
+    const lang = navigator.language.slice(0, 2).toLowerCase();
+    let locale: Locale = 'en';
+    if (lang === 'zh') locale = 'zh';
+    else if (lang === 'ja') locale = 'ja';
+    else if (lang === 'es') locale = 'es';
+
+    return LOCALE_STRINGS[key]?.[locale] || LOCALE_STRINGS[key]?.['en'] || key;
+}
+
 const DOWNLOAD_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-5H7l5-6 5 6h-4v5h-2z" transform="rotate(180 12 12)"/>
 </svg>`;
@@ -778,8 +811,8 @@ function createDownloadButton(): HTMLButtonElement {
     const button = document.createElement('button');
     button.className = 'tidyfeed-download-btn';
     button.setAttribute('data-tidyfeed-btn', 'true');
-    button.setAttribute('aria-label', 'Download tweet as ZIP');
-    button.setAttribute('title', 'TidyFeed: Download tweet');
+    button.setAttribute('aria-label', getLocaleString('download'));
+    button.setAttribute('title', getLocaleString('download'));
     button.innerHTML = DOWNLOAD_ICON;
     button.style.cssText = BUTTON_STYLES;
 
@@ -925,8 +958,8 @@ function createBlockButton(): HTMLButtonElement {
     const button = document.createElement('button');
     button.className = 'tidyfeed-block-btn';
     button.setAttribute('data-tidyfeed-block-btn', 'true');
-    button.setAttribute('aria-label', 'Block this content');
-    button.setAttribute('title', '屏蔽此内容');
+    button.setAttribute('aria-label', getLocaleString('block'));
+    button.setAttribute('title', getLocaleString('block'));
     button.innerHTML = BLOCK_ICON;
     button.style.cssText = BUTTON_STYLES;
 
@@ -1074,8 +1107,9 @@ async function createBookmarkButton(tweetId: string): Promise<HTMLButtonElement>
     button.className = 'tidyfeed-bookmark-btn';
     button.setAttribute('data-tidyfeed-btn', 'true');
     button.setAttribute('data-tweet-id', tweetId);
-    button.setAttribute('aria-label', 'Bookmark tweet');
-    button.setAttribute('title', 'TidyFeed: Bookmark tweet');
+    button.setAttribute('data-tweet-id', tweetId);
+    button.setAttribute('aria-label', getLocaleString('bookmark'));
+    button.setAttribute('title', getLocaleString('bookmark'));
 
     // Check initial saved state
     const storage = await browser.storage.local.get('saved_x_ids');
@@ -1112,7 +1146,41 @@ async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
     // Mark as injected BEFORE any async work
     article.dataset.tidyfeedInjected = 'true';
 
-    const actionBar = article.querySelector('div[role="group"]');
+    // Find the action bar - use multiple strategies for timeline vs detail page
+    let actionBar: Element | null = null;
+
+    // Strategy 1: Find group containing typical action buttons (reply, retweet, like)
+    const allGroups = article.querySelectorAll('div[role="group"]');
+    for (const group of allGroups) {
+        // Check if this group contains action buttons by looking for various button testids
+        // Detail page main tweet may use different testids like 'bookmark' or 'share'
+        const hasActionButtons = group.querySelector(
+            '[data-testid="reply"], [data-testid="retweet"], [data-testid="like"], ' +
+            '[data-testid="bookmark"], [data-testid="views"]'
+        );
+        if (hasActionButtons) {
+            actionBar = group;
+            break;
+        }
+    }
+
+    // Strategy 2: Find group with aria-label containing action-related text (localized support)
+    if (!actionBar) {
+        for (const group of allGroups) {
+            const ariaLabel = group.getAttribute('aria-label') || '';
+            // Action bar aria-label typically contains counts like "回复" "喜欢" "Replies" "Likes"
+            if (ariaLabel.match(/回复|喜欢|转帖|书签|观看|replies?|likes?|retweets?|bookmarks?|views?/i)) {
+                actionBar = group;
+                break;
+            }
+        }
+    }
+
+    // Strategy 3: Fallback to last group (works on detail page where action bar is often last)
+    if (!actionBar && allGroups.length > 0) {
+        actionBar = allGroups[allGroups.length - 1];
+    }
+
     if (!actionBar) {
         return false;
     }
@@ -1167,7 +1235,7 @@ function isExtensionContextValid(): boolean {
 function processAllTweetsForInjection(): void {
     // Early exit if extension context is invalidated
     if (!isExtensionContextValid()) {
-        console.warn('[TidyFeed] Extension context invalidated, stopping tweet processing');
+        // silently disconnect
         return;
     }
 
@@ -1187,14 +1255,12 @@ function processAllTweetsForInjection(): void {
  * Initialize the Tweet Button Injector
  */
 export function initTweetInjector(): void {
-    console.log('[TidyFeed] 🔧 Tweet Injector initialized');
-
     processAllTweetsForInjection();
 
     const observer = new MutationObserver((mutations) => {
         // Check if extension context is still valid
         if (!isExtensionContextValid()) {
-            console.warn('[TidyFeed] Extension context invalidated, disconnecting observer');
+            // silently disconnect
             observer.disconnect();
             return;
         }
@@ -1218,6 +1284,4 @@ export function initTweetInjector(): void {
         childList: true,
         subtree: true,
     });
-
-    console.log('[TidyFeed] Tweet Injector MutationObserver active');
 }

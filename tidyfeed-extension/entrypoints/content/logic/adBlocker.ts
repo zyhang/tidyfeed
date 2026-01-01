@@ -61,15 +61,10 @@ function loadSettings(): void {
 
         if (scoringConfig && scoringConfig.version === 2) {
             initScoringEngine(scoringConfig);
-            console.log(`[TidyFeed] Scoring engine initialized with v2 config`);
         } else if (cloudRegexList && cloudRegexList.length > 0) {
-            // Fallback to legacy config
             initScoringEngine(cloudRegexList);
-            console.log(`[TidyFeed] Scoring engine initialized with legacy config (${cloudRegexList.length} patterns)`);
         }
 
-        const engine = getScoringEngine();
-        console.log(`[TidyFeed] Settings loaded. Keywords: ${blockedKeywords.length}, Scoring enabled: ${enableRegexFilter}, Rules: ${engine?.getRuleCount() || 0}`);
         processAllTweets();
     });
 }
@@ -102,7 +97,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
         const newConfig = changes.scoring_config.newValue as ScoringConfig | null;
         if (newConfig && newConfig.version === 2) {
             initScoringEngine(newConfig);
-            console.log('[TidyFeed] Scoring engine updated with v2 config');
         }
         shouldReprocess = true;
     }
@@ -111,13 +105,11 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
         const newList = (changes.cloud_regex_list.newValue as string[]) || [];
         if (newList.length > 0 && !getScoringEngine()) {
             initScoringEngine(newList);
-            console.log('[TidyFeed] Scoring engine updated with legacy config');
         }
         shouldReprocess = true;
     }
 
     if (shouldReprocess) {
-        console.log('[TidyFeed] Settings updated, reprocessing tweets...');
         // Reset processed flags for visible tweets to allow re-checking
         const containers = document.querySelectorAll<HTMLElement>('[data-testid="cellInnerDiv"]');
         containers.forEach(container => {
@@ -250,7 +242,6 @@ function processTweetContainer(container: HTMLElement): boolean {
     if (isAdTweet(container)) {
         container.dataset.tidyfeedProcessed = 'true';
         collapseTweet(container, 'Ad', null);
-        console.log('[TidyFeed] 🚫 Collapsed ad tweet');
         return true;
     }
 
@@ -259,7 +250,6 @@ function processTweetContainer(container: HTMLElement): boolean {
     if (matchedKeyword) {
         container.dataset.tidyfeedProcessed = 'true';
         collapseTweet(container, `Keyword: ${matchedKeyword}`, null);
-        console.log(`[TidyFeed] 🚫 Collapsed keyword tweet: ${matchedKeyword}`);
         return true;
     }
 
@@ -280,7 +270,6 @@ function processTweetContainer(container: HTMLElement): boolean {
         }
 
         collapseTweet(container, reason, scoreResult);
-        console.log(`[TidyFeed] 🚫 Collapsed by scoring: ${scoreResult.debugSummary}`);
         return true;
     }
 
@@ -492,8 +481,6 @@ function processAllTweets(): void {
  * Sets up MutationObserver to watch for new tweets
  */
 export function initAdBlocker(): void {
-    console.log('[TidyFeed] 🚀 Ad Blocker initialized (with Scoring Engine)');
-
     loadSettings();
 
     processAllTweets();
@@ -501,7 +488,7 @@ export function initAdBlocker(): void {
     const observer = new MutationObserver((mutations) => {
         // Check if extension context is still valid
         if (!isExtensionContextValid()) {
-            console.warn('[TidyFeed AdBlocker] Extension context invalidated, disconnecting observer');
+            // silently disconnect
             observer.disconnect();
             return;
         }
@@ -526,6 +513,4 @@ export function initAdBlocker(): void {
         childList: true,
         subtree: true,
     });
-
-    console.log('[TidyFeed] MutationObserver active');
 }

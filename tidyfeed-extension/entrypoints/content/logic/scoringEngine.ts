@@ -154,8 +154,6 @@ export class ScoringEngine {
 
         // Pre-compile redirect signal pattern (used by negative rules)
         this.redirectSignalPattern = /t\.me|telegram|dm\s*me|link\s*(in|on)\s*bio|bit\.ly|tinyurl|cutt\.ly|discord\.gg/i;
-
-        console.log(`[TidyFeed Scoring] Compiled ${this.compiledRules.length} rules, ${this.compiledNegativeRules.length} negative rules, ${this.whitelistSet.size} whitelisted authors`);
     }
 
     /**
