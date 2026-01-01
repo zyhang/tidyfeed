@@ -1170,8 +1170,8 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
 
             // Auto-download video if enabled and this is a save action (not unsave)
             if (newSavedState && data.tweetUrl) {
-                const hasVideo = data.mediaItems.some(m => m.type === 'video');
-                if (hasVideo) {
+                // Use data.hasVideo which correctly detects video elements
+                if (data.hasVideo) {
                     const settings = await browser.storage.local.get('settings_auto_download_video');
                     const autoDownloadEnabled = settings.settings_auto_download_video === true;
 

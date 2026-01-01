@@ -98,11 +98,35 @@ downloads.post('/queue', cookieAuthMiddleware, async (c) => {
             return c.json({ error: 'cookies are required for video download' }, 400);
         }
 
-        // Insert task with pending status (optionally linked to saved_post)
-        const result = await c.env.DB.prepare(
-            `INSERT INTO video_downloads (user_id, tweet_url, twitter_cookies, status, saved_post_id)
-			 VALUES (?, ?, ?, 'pending', ?)`
-        ).bind(userId, tweet_url, cookies, saved_post_id || null).run();
+        // Check if this video has already been downloaded (completed)
+        const existingDownload = await c.env.DB.prepare(
+            `SELECT r2_key, metadata FROM video_downloads 
+             WHERE tweet_url = ? AND status = 'completed' 
+             ORDER BY id DESC LIMIT 1`
+        ).bind(tweet_url).first<{ r2_key: string; metadata: string }>();
+
+        let result;
+
+        if (existingDownload && existingDownload.r2_key) {
+            // Reuse existing download
+            result = await c.env.DB.prepare(
+                `INSERT INTO video_downloads (user_id, tweet_url, twitter_cookies, status, saved_post_id, r2_key, metadata)
+                 VALUES (?, ?, ?, 'completed', ?, ?, ?)`
+            ).bind(
+                userId,
+                tweet_url,
+                cookies, // Still keeping cookies for record, or could be null if schema allows
+                saved_post_id || null,
+                existingDownload.r2_key,
+                existingDownload.metadata
+            ).run();
+        } else {
+            // New download task
+            result = await c.env.DB.prepare(
+                `INSERT INTO video_downloads (user_id, tweet_url, twitter_cookies, status, saved_post_id)
+                 VALUES (?, ?, ?, 'pending', ?)`
+            ).bind(userId, tweet_url, cookies, saved_post_id || null).run();
+        }
 
         const taskId = result.meta.last_row_id;
 

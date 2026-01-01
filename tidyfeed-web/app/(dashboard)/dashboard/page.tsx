@@ -25,6 +25,12 @@ interface Post {
     createdAt: string
     pinnedAt?: string | null
     tags?: { id: number; name: string }[]
+    videoInfo?: {
+        id: number
+        status: 'pending' | 'processing' | 'completed' | 'failed'
+        r2_key?: string | null
+        metadata?: any
+    } | null
 }
 
 import { toast } from 'sonner'
@@ -235,6 +241,7 @@ function DashboardContent() {
                 </div>
             )}
 
+
             {/* Posts Masonry Grid */}
             {!loading && !error && posts.length > 0 && (
                 <div className="columns-1 md:columns-2 lg:columns-3 gap-4">
@@ -251,6 +258,7 @@ function DashboardContent() {
                             createdAt={post.createdAt}
                             tags={post.tags}
                             pinnedAt={post.pinnedAt}
+                            videoInfo={post.videoInfo}
                             onDelete={handleDelete}
                             onPin={handlePin}
                             onRemoveTag={handleRemoveTag}
