@@ -469,6 +469,15 @@ export default defineBackground(() => {
 
       if (!response.ok) {
         console.error('[TidyFeed] Cloud download API error:', data);
+
+        // Handle Storage Quota (403)
+        if (response.status === 403) {
+          return {
+            success: false,
+            error: 'Storage full. Please delete items to free up space.'
+          };
+        }
+
         return {
           success: false,
           error: data.error || `API error: ${response.status}`

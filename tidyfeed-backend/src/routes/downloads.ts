@@ -98,6 +98,13 @@ downloads.post('/queue', cookieAuthMiddleware, async (c) => {
             return c.json({ error: 'cookies are required for video download' }, 400);
         }
 
+        // Check Storage Quota (1GB)
+        const user = await c.env.DB.prepare('SELECT storage_usage FROM users WHERE id = ?').bind(userId).first<{ storage_usage: number }>();
+        const STORAGE_LIMIT = 1073741824; // 1 GB
+        if ((user?.storage_usage || 0) >= STORAGE_LIMIT) {
+            return c.json({ error: 'Storage quota exceeded (1GB limit). Please delete some videos to free up space.' }, 403);
+        }
+
         // Check if this video has already been downloaded (completed)
         const existingDownload = await c.env.DB.prepare(
             `SELECT r2_key, metadata FROM video_downloads 
@@ -258,6 +265,29 @@ downloads.get('/media/:id', cookieAuthMiddleware, async (c) => {
     }
 });
 
+/**
+ * GET /api/downloads/usage
+ * Get user storage usage info
+ * Auth: User (Cookie/Bearer)
+ */
+downloads.get('/usage', cookieAuthMiddleware, async (c) => {
+    try {
+        const payload = c.get('jwtPayload') as { sub: string };
+        const userId = payload.sub;
+
+        const user = await c.env.DB.prepare('SELECT storage_usage FROM users WHERE id = ?').bind(userId).first<{ storage_usage: number }>();
+        const STORAGE_LIMIT = 1073741824; // 1 GB
+
+        return c.json({
+            usage: user?.storage_usage || 0,
+            limit: STORAGE_LIMIT
+        });
+    } catch (error) {
+        console.error('Get usage error:', error);
+        return c.json({ error: 'Internal server error' }, 500);
+    }
+});
+
 // ============================================
 // Internal Service Endpoints (Python Worker)
 // ============================================
@@ -351,7 +381,7 @@ downloads.put('/internal/upload-url', internalServiceAuth, async (c) => {
  */
 downloads.post('/internal/complete', internalServiceAuth, async (c) => {
     try {
-        const { task_id, status, r2_key, metadata, error_message } = await c.req.json();
+        const { task_id, status, r2_key, metadata, error_message, file_size } = await c.req.json();
 
         if (!task_id) {
             return c.json({ error: 'task_id is required' }, 400);
@@ -362,26 +392,47 @@ downloads.post('/internal/complete', internalServiceAuth, async (c) => {
         }
 
         // SECURITY: Always wipe cookies, regardless of success or failure
-        const result = await c.env.DB.prepare(
-            `UPDATE video_downloads 
-			 SET status = ?,
-			     r2_key = ?,
-			     metadata = ?,
-			     error_message = ?,
-			     twitter_cookies = NULL,
-			     completed_at = strftime('%s', 'now')
-			 WHERE id = ?`
-        ).bind(
-            status,
-            r2_key || null,
-            metadata ? JSON.stringify(metadata) : null,
-            error_message || null,
-            task_id
-        ).run();
+        // Transaction to update task and increment user storage usage if completed
+        const statements = [
+            c.env.DB.prepare(
+                `UPDATE video_downloads 
+                 SET status = ?,
+                     r2_key = ?,
+                     metadata = ?,
+                     error_message = ?,
+                     file_size = ?,
+                     twitter_cookies = NULL,
+                     completed_at = strftime('%s', 'now')
+                 WHERE id = ?`
+            ).bind(
+                status,
+                r2_key || null,
+                metadata ? JSON.stringify(metadata) : null,
+                error_message || null,
+                file_size || 0,
+                task_id
+            )
+        ];
 
-        if (result.meta.changes === 0) {
+        // If completed successfully and file size is provided, increment user storage
+        if (status === 'completed' && file_size && file_size > 0) {
+            statements.push(
+                c.env.DB.prepare(
+                    `UPDATE users 
+                     SET storage_usage = storage_usage + ? 
+                     WHERE id = (SELECT user_id FROM video_downloads WHERE id = ?)`
+                ).bind(file_size, task_id)
+            );
+        }
+
+        const results = await c.env.DB.batch(statements);
+
+        // batch returns array of results. the first one is the update to video_downloads
+        if (results[0].meta.changes === 0) {
             return c.json({ error: 'Task not found' }, 404);
         }
+
+
 
         console.log(`[SECURITY] Task ${task_id} completed. Cookies wiped.`);
 

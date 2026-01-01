@@ -432,8 +432,8 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 
 		// Fetch fresh user data from DB
 		const dbUser = await c.env.DB.prepare(
-			'SELECT id, email, name, avatar_url, created_at FROM users WHERE id = ?'
-		).bind(payload.sub).first<{ id: string; email: string; name: string; avatar_url: string; created_at: string }>();
+			'SELECT id, email, name, avatar_url, created_at, storage_usage FROM users WHERE id = ?'
+		).bind(payload.sub).first<{ id: string; email: string; name: string; avatar_url: string; created_at: string; storage_usage: number }>();
 
 		if (!dbUser) {
 			return c.json({ error: 'User not found' }, 404);
@@ -446,6 +446,7 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 				name: dbUser.name,
 				avatarUrl: dbUser.avatar_url,
 				createdAt: dbUser.created_at,
+				storageUsage: dbUser.storage_usage || 0,
 			},
 		});
 	} catch (error) {
@@ -684,6 +685,35 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 		const payload = c.get('jwtPayload') as { sub: string };
 		const userId = payload.sub;
 		const xId = c.req.param('x_id');
+
+		// Check if there are associated video downloads to clean up
+		const savedPost = await c.env.DB.prepare('SELECT id FROM saved_posts WHERE user_id = ? AND x_post_id = ?').bind(userId, xId).first<{ id: number }>();
+
+		if (savedPost) {
+			// Find completed download associated with this post
+			const download = await c.env.DB.prepare(
+				'SELECT r2_key, file_size FROM video_downloads WHERE saved_post_id = ? AND status = "completed"'
+			).bind(savedPost.id).first<{ r2_key: string; file_size: number }>();
+
+			if (download) {
+				// Delete from R2
+				if (download.r2_key) {
+					try {
+						await c.env.MEDIA_BUCKET.delete(download.r2_key);
+						console.log(`Deleted R2 object: ${download.r2_key}`);
+					} catch (e) {
+						console.error(`Failed to delete R2 object ${download.r2_key}:`, e);
+					}
+				}
+
+				// Decrement Usage
+				if (download.file_size && download.file_size > 0) {
+					await c.env.DB.prepare(
+						'UPDATE users SET storage_usage = MAX(0, storage_usage - ?) WHERE id = ?'
+					).bind(download.file_size, userId).run();
+				}
+			}
+		}
 
 		const result = await c.env.DB.prepare(
 			'DELETE FROM saved_posts WHERE user_id = ? AND x_post_id = ?'

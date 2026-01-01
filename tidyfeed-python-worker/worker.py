@@ -87,7 +87,7 @@ def get_upload_info(task_id: int, filename: str):
 
 
 def complete_task(task_id: int, status: str, r2_key: str = None, 
-                  metadata: dict = None, error_message: str = None):
+                  metadata: dict = None, error_message: str = None, **kwargs):
     """Mark task as completed and trigger cookie deletion."""
     try:
         payload = {
@@ -95,7 +95,8 @@ def complete_task(task_id: int, status: str, r2_key: str = None,
             'status': status,
             'r2_key': r2_key,
             'metadata': metadata,
-            'error_message': error_message
+            'error_message': error_message,
+            'file_size': kwargs.get('file_size')
         }
         response = requests.post(
             f'{API_BASE_URL}/api/downloads/internal/complete',
@@ -265,6 +266,7 @@ def process_task(task: dict):
         
         # Step 2: Get upload destination
         filename = os.path.basename(file_path)
+        file_size = os.path.getsize(file_path)
         upload_info = get_upload_info(task_id, filename)
         
         if not upload_info:
@@ -279,7 +281,7 @@ def process_task(task: dict):
             return
         
         # Step 4: Mark as completed (THIS WIPES THE COOKIES!)
-        complete_task(task_id, 'completed', r2_key=r2_key, metadata=metadata)
+        complete_task(task_id, 'completed', r2_key=r2_key, metadata=metadata, file_size=file_size)
         logger.info(f'Task {task_id} completed successfully')
 
 

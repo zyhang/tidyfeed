@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { Home, Tag, Settings, ChevronLeft, Menu, Hash, ChevronDown, ChevronRight, Loader2, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { StorageIndicator } from "./StorageIndicator"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -147,18 +148,21 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                 ))}
             </nav>
 
-            {/* Logout Button */}
-            <div className="p-2 border-t">
-                <a
-                    href={`${API_URL}/auth/logout`}
-                    className={cn(
-                        "flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground",
-                        isCollapsed && "justify-center px-2"
-                    )}
-                >
-                    <LogOut className="h-5 w-5" />
-                    {!isCollapsed && <span>Sign Out</span>}
-                </a>
+            <div className="border-t bg-background z-10">
+                <StorageIndicator isCollapsed={isCollapsed} />
+
+                <div className="p-2">
+                    <a
+                        href={`${API_URL}/auth/logout`}
+                        className={cn(
+                            "flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground",
+                            isCollapsed && "justify-center px-2"
+                        )}
+                    >
+                        <LogOut className="h-5 w-5" />
+                        {!isCollapsed && <span>Sign Out</span>}
+                    </a>
+                </div>
             </div>
         </aside>
     )
