@@ -187,6 +187,19 @@ export function TweetCard({
                         <div className="mb-3">
                             <p className={`text-sm whitespace-pre-wrap ${!expanded && shouldTruncate ? 'line-clamp-4' : ''}`}>
                                 {content}
+                                {url && (
+                                    <span className="inline-block ml-1">
+                                        <a
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-500 hover:text-blue-600 inline-flex items-baseline gap-0.5"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <ExternalLink className="w-3 h-3 self-center" />
+                                        </a>
+                                    </span>
+                                )}
                             </p>
                             {shouldTruncate && (
                                 <button
@@ -325,14 +338,7 @@ export function TweetCard({
                     {/* Actions */}
                     <div className="flex items-center justify-between pt-2 border-t">
                         <div className="flex items-center gap-1">
-                            {url && (
-                                <Button variant="ghost" size="sm" asChild>
-                                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs">
-                                        <ExternalLink className="h-3 w-3 mr-1" />
-                                        View on {platformLabel}
-                                    </a>
-                                </Button>
-                            )}
+
                             <TagInput
                                 tweetId={xId}
                                 tweetData={{ content, author, media, url, platform }}
