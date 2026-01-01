@@ -193,33 +193,54 @@ export default defineBackground(() => {
 
       let identity = results?.[0]?.result;
 
+      console.log('[TidyFeed] Initial extraction result:', JSON.stringify(identity));
+
       if (!identity) {
         return { success: false, skipped: true, reason: 'No identity found (not logged in to X?)' };
       }
 
-      // If we only have partial data (missing username), fetch full profile from X API
-      if (!identity.platform_username && identity.platform_user_id) {
-        console.log('[TidyFeed] Partial identity found, fetching full profile from X API...');
+      // Always try to fetch full profile if username, display_name, or avatar_url is missing
+      // This ensures we get complete data even if __INITIAL_STATE__ extraction was partial
+      const needsFullProfile = !identity.platform_username || !identity.display_name || !identity.avatar_url;
+
+      if (needsFullProfile && identity.platform_user_id) {
+        console.log('[TidyFeed] Partial identity found (missing:',
+          !identity.platform_username ? 'username' : '',
+          !identity.display_name ? 'display_name' : '',
+          !identity.avatar_url ? 'avatar_url' : '',
+          '), fetching full profile from X API...');
+
         const fullProfile = await fetchXUserProfile();
+
         if (fullProfile) {
+          console.log('[TidyFeed] X API profile response:', JSON.stringify({
+            screen_name: fullProfile.screen_name,
+            name: fullProfile.name,
+            profile_image_url_https: fullProfile.profile_image_url_https
+          }));
+
           identity = {
             ...identity,
-            platform_username: fullProfile.screen_name,
-            display_name: fullProfile.name,
-            avatar_url: fullProfile.profile_image_url_https?.replace('_normal', '_bigger')
+            platform_username: fullProfile.screen_name || identity.platform_username,
+            display_name: fullProfile.name || identity.display_name,
+            avatar_url: (fullProfile.profile_image_url_https?.replace('_normal', '_bigger')) || identity.avatar_url
           };
-          console.log('[TidyFeed] Full profile fetched:', identity.platform_username);
+          console.log('[TidyFeed] Full profile fetched successfully:', identity.platform_username);
+        } else {
+          console.warn('[TidyFeed] Failed to fetch full profile from X API - will use partial data');
         }
       }
 
-      console.log('[TidyFeed] Extracted identity:', identity.platform_username);
+      console.log('[TidyFeed] Final identity to link:', JSON.stringify(identity));
 
       // Now link it via API
       const linkResult = await handleLinkSocialIdentity(identity);
 
       if (linkResult.success) {
+        console.log('[TidyFeed] Identity linked successfully:', identity.platform_username);
         return { success: true, username: identity.platform_username };
       } else {
+        console.error('[TidyFeed] Identity link failed:', linkResult.error);
         return linkResult;
       }
     } catch (error) {
@@ -227,6 +248,7 @@ export default defineBackground(() => {
       return { success: false, error: String(error) };
     }
   }
+
 
   /**
    * Fetch the current user's X profile using verify_credentials API

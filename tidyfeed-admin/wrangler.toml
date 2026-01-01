@@ -4,3 +4,7 @@ compatibility_flags = ["nodejs_compat"]
 
 # 👇 这一行就是用来替代界面上那个“Build output directory”选项的
 pages_build_output_dir = ".vercel/output/static"
+
+# Environment Variables
+[vars]
+NEXT_PUBLIC_API_URL = "https://api.tidyfeed.app"
