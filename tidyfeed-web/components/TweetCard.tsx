@@ -204,7 +204,7 @@ export function TweetCard({
                     )}
 
                     {/* ... existing Media Grid code ... */}
-                    {media && media.length > 0 && (
+                    {media && media.length > 0 && !videoInfo && (
                         <div className={`grid gap-2 mb-3 ${media.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
                             {media.slice(0, 4).map((imgUrl, idx) => (
                                 <div
