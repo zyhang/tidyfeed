@@ -7,6 +7,7 @@
         "crypto_scam": 1.0,
         "phishing": 1.2,
         "promo_spam": 1.0,
+        "pump_dump": 1.1,
         "legitimate": 1.0
     },
     "max_score": 200,
@@ -24,9 +25,48 @@
             "rule_id": "promo_signals",
             "name": "Promo Signals",
             "category": "promo_spam",
-            "pattern": "buy\\s*now|call|\\bsignal\\b|dm\\s*(for|me)|join\\s*(now|us)",
+            "pattern": "buy\\s*now|\\bcall\\b|\\bsignal\\b|dm\\s*(for|me)|join\\s*(now|us)|join\\s*us\\s*now",
             "score": 0,
             "severity": "weak",
+            "enabled": true
+        },
+        {
+            "rule_id": "telegram_invite",
+            "name": "Telegram Invite Link",
+            "category": "crypto_scam",
+            "pattern": "t\\.me\\/[+@]",
+            "score": 55,
+            "severity": "strong",
+            "enabled": true
+        },
+        {
+            "rule_id": "join_call_telegram",
+            "name": "Join CTA + Telegram",
+            "category": "pump_dump",
+            "pattern": "join\\s*(us|now)|join\\s*us\\s*now",
+            "score": 50,
+            "severity": "strong",
+            "requires_any": [
+                "redirect_signals"
+            ],
+            "enabled": true
+        },
+        {
+            "rule_id": "tp_signal",
+            "name": "Take Profit Signal",
+            "category": "pump_dump",
+            "pattern": "\\b(TP[1-9]|take\\s*profit|target\\s*[1-9]|entry|exit)\\s*[:\\-]?\\s*[0-9\\.]+\\s*[✅✓☑️]?",
+            "score": 45,
+            "severity": "medium",
+            "enabled": true
+        },
+        {
+            "rule_id": "multiple_cashtags",
+            "name": "Cashtag Spam",
+            "category": "pump_dump",
+            "pattern": "(\\$[A-Z]{2,6}\\s*){3,}",
+            "score": 40,
+            "severity": "medium",
             "enabled": true
         },
         {
@@ -89,6 +129,24 @@
             "pattern": "(last\\s*chance|don'?t\\s*miss|hurry|limited\\s*spots?|act\\s*now|ending\\s*soon)",
             "score": 20,
             "severity": "weak",
+            "enabled": true
+        },
+        {
+            "rule_id": "emoji_spam",
+            "name": "Crypto Emoji Spam",
+            "category": "pump_dump",
+            "pattern": "([🚀💰💎🔥📈]{2,})",
+            "score": 15,
+            "severity": "weak",
+            "enabled": true
+        },
+        {
+            "rule_id": "crypto_signal_group",
+            "name": "Crypto Signal Group",
+            "category": "pump_dump",
+            "pattern": "\\b(signal\\s*group|trading\\s*group|vip\\s*group|premium\\s*group|free\\s*signal)\\b",
+            "score": 50,
+            "severity": "strong",
             "enabled": true
         }
     ],

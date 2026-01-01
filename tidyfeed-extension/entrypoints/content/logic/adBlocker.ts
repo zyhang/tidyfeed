@@ -24,6 +24,17 @@ let enableRegexFilter = false;
 let debugScoring = false;
 let showCollapseReason = true;
 
+/**
+ * Check if the extension context is still valid
+ */
+function isExtensionContextValid(): boolean {
+    try {
+        return !!chrome.runtime?.id;
+    } catch {
+        return false;
+    }
+}
+
 // Load settings from storage
 function loadSettings(): void {
     chrome.storage.local.get([
@@ -450,17 +461,23 @@ function extractUserHandle(container: HTMLElement): string {
 
 // Update the blocked ads counter in storage
 async function incrementBlockedCount(): Promise<void> {
+    if (!isExtensionContextValid()) return;
+
     try {
         const result = await chrome.storage.local.get('stats_ads_blocked');
         const currentCount = (result.stats_ads_blocked as number) || 0;
         await chrome.storage.local.set({ stats_ads_blocked: currentCount + 1 });
     } catch (error) {
+        // Silently ignore extension context errors
+        if (String(error).includes('Extension context invalidated')) return;
         console.error('[TidyFeed] Error updating blocked count:', error);
     }
 }
 
 // Process all visible tweet containers
 function processAllTweets(): void {
+    if (!isExtensionContextValid()) return;
+
     const containers = document.querySelectorAll<HTMLElement>('[data-testid="cellInnerDiv"]');
 
     containers.forEach((container) => {
@@ -482,6 +499,13 @@ export function initAdBlocker(): void {
     processAllTweets();
 
     const observer = new MutationObserver((mutations) => {
+        // Check if extension context is still valid
+        if (!isExtensionContextValid()) {
+            console.warn('[TidyFeed AdBlocker] Extension context invalidated, disconnecting observer');
+            observer.disconnect();
+            return;
+        }
+
         let shouldProcess = false;
 
         for (const mutation of mutations) {
@@ -505,4 +529,3 @@ export function initAdBlocker(): void {
 
     console.log('[TidyFeed] MutationObserver active');
 }
-
