@@ -460,7 +460,7 @@ export default defineBackground(() => {
         console.error('[TidyFeed] CSRF token (ct0) not found - user may not be logged in');
         return {
           success: false,
-          error: '请确保已在浏览器登录 X',
+          error: 'Please log in to X.com first',
           errorCode: 'CSRF_MISSING'
         };
       }
@@ -499,7 +499,7 @@ export default defineBackground(() => {
         console.error('[TidyFeed] Auth failed:', response.status);
         return {
           success: false,
-          error: '请确保已在浏览器登录 X',
+          error: 'Session expired, please refresh X.com',
           errorCode: 'AUTH_FAILED'
         };
       }
@@ -508,7 +508,7 @@ export default defineBackground(() => {
         console.error('[TidyFeed] Rate limited');
         return {
           success: false,
-          error: '操作太快，请稍后再试',
+          error: 'Too many requests, please wait a moment',
           errorCode: 'RATE_LIMITED'
         };
       }
@@ -516,9 +516,15 @@ export default defineBackground(() => {
       // Other errors
       const errorText = await response.text();
       console.error('[TidyFeed] Block API error:', response.status, errorText);
+
+      let friendlyError = `Block failed: ${response.status}`;
+      if (response.status === 404) friendlyError = 'User not found or suspended';
+      else if (response.status >= 500) friendlyError = 'X Server Error, please try again';
+
       return {
         success: false,
-        error: `Block failed: ${response.status}`
+        error: friendlyError,
+        errorCode: 'NETWORK_ERROR'
       };
 
     } catch (error) {

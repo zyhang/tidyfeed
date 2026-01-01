@@ -337,6 +337,12 @@ export default defineUnlistedScript(() => {
                             fullText: tweet.fullText,
                             authorHandle: tweet.authorHandle,
                         });
+
+                        // Limit cache size
+                        if (mainWorldCache.size > 500) {
+                            const firstKey = mainWorldCache.keys().next().value;
+                            if (firstKey) mainWorldCache.delete(firstKey);
+                        }
                     }
 
                     if (tweets.length > 0) {
@@ -387,6 +393,12 @@ export default defineUnlistedScript(() => {
                             fullText: tweet.fullText,
                             authorHandle: tweet.authorHandle,
                         });
+
+                        // Simple LRU-like eviction if cache grows too large
+                        if (mainWorldCache.size > 500) {
+                            const firstKey = mainWorldCache.keys().next().value;
+                            if (firstKey) mainWorldCache.delete(firstKey);
+                        }
                     }
 
                     if (tweets.length > 0) {
@@ -396,7 +408,7 @@ export default defineUnlistedScript(() => {
                 } catch (e) {
                     // Ignore errors
                 }
-            });
+            }, { once: true }); // Important: auto-remove listener to prevent memory leaks
         }
 
         return originalXHRSend.call(this, body);

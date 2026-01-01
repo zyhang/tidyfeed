@@ -178,6 +178,26 @@ app.post('/auth/google', async (c) => {
 
 // Redirect to Google OAuth consent screen
 app.get('/auth/login/google', (c) => {
+	// Verify state parameter against cookie to prevent CSRF
+	const callbackState = c.req.query('state');
+	const cookieHeader = c.req.header('Cookie');
+	let savedState = null;
+
+	if (cookieHeader) {
+		const cookies = Object.fromEntries(
+			cookieHeader.split(';').map((c) => {
+				const [key, ...val] = c.trim().split('=');
+				return [key, val.join('=')];
+			})
+		);
+		savedState = cookies['oauth_state'];
+	}
+
+	if (!callbackState || !savedState || callbackState !== savedState) {
+		console.error('State mismatch or missing:', { callbackState, savedState });
+		return c.redirect('https://a.tidyfeed.app/?error=invalid_state');
+	}
+
 	const isDev = c.req.url.includes('localhost') || c.req.url.includes('127.0.0.1');
 	const redirectUri = isDev
 		? 'http://localhost:8787/auth/callback/google'
@@ -196,7 +216,27 @@ app.get('/auth/login/google', (c) => {
 	});
 
 	const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-	return c.redirect(googleAuthUrl);
+
+	// Store state in HttpOnly cookie to prevent CSRF
+	const cookieOptions = [
+		`oauth_state=${state}`,
+		'Path=/',
+		'HttpOnly',
+		'Max-Age=600', // 10 minutes
+		'SameSite=Lax', // Allow top-level navigation
+	];
+
+	if (!isDev) {
+		cookieOptions.push('Secure');
+	}
+
+	return new Response(null, {
+		status: 302,
+		headers: {
+			'Location': googleAuthUrl,
+			'Set-Cookie': cookieOptions.join('; '),
+		},
+	});
 });
 
 // Handle OAuth callback
@@ -308,6 +348,15 @@ app.get('/auth/callback/google', async (c) => {
 			`Max-Age=${30 * 24 * 60 * 60}`, // 30 days
 		];
 
+		// Clear the state cookie
+		const clearStateCookie = [
+			'oauth_state=',
+			'Path=/',
+			'HttpOnly',
+			'Max-Age=0',
+			isDev ? 'SameSite=Lax' : 'SameSite=Lax; Secure'
+		].join('; ');
+
 		if (!isDev) {
 			cookieOptions.push('Secure');
 			cookieOptions.push('Domain=.tidyfeed.app');
@@ -317,13 +366,18 @@ app.get('/auth/callback/google', async (c) => {
 			cookieOptions.push('Secure');
 		}
 
-		return new Response(null, {
+		const response = new Response(null, {
 			status: 302,
 			headers: {
 				'Location': dashboardUrl,
 				'Set-Cookie': cookieOptions.join('; '),
 			},
 		});
+
+		// Add the clear state cookie header
+		response.headers.append('Set-Cookie', clearStateCookie);
+
+		return response;
 	} catch (error: any) {
 		console.error('Google OAuth callback error:', error?.message || error);
 		console.error('Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
@@ -507,8 +561,45 @@ app.get('/auth/logout', (c) => {
 
 app.post('/api/report', async (c) => {
 	try {
-		const reporterId = c.req.header('X-User-Id');
+		let reporterId = c.req.header('X-User-Id');
 		const reporterType = c.req.header('X-User-Type') || 'guest';
+		const authHeader = c.req.header('Authorization');
+
+		// 1. If user claims to be logged in (google type), verify JWT
+		if (reporterType === 'google' || (authHeader && authHeader.startsWith('Bearer '))) {
+			let token = authHeader ? authHeader.substring(7) : null;
+
+			// If no header, check cookie
+			if (!token) {
+				const cookieHeader = c.req.header('Cookie');
+				if (cookieHeader) {
+					const cookies = Object.fromEntries(
+						cookieHeader.split(';').map((c) => {
+							const [key, ...val] = c.trim().split('=');
+							return [key, val.join('=')];
+						})
+					);
+					token = cookies['auth_token'];
+				}
+			}
+
+			if (token) {
+				try {
+					const payload = await verify(token, c.env.JWT_SECRET);
+					// Trust the ID from the validated token over the header
+					reporterId = payload.sub as string;
+					// console.log('Verified reporter ID from JWT:', reporterId);
+				} catch (e) {
+					console.warn('Invalid JWT for report:', e);
+					// Fallback to guest if token invalid? Or fail?
+					// For security, if they claim to be google/auth but fail, we should probably fail or treat as guest
+					return c.json({ error: 'Invalid authentication' }, 401);
+				}
+			} else if (reporterType === 'google') {
+				// Claimed google but no token
+				return c.json({ error: 'Authentication required for this user type' }, 401);
+			}
+		}
 
 		if (!reporterId) {
 			return c.json({ error: 'X-User-Id header is required' }, 400);
@@ -795,15 +886,36 @@ app.post('/api/tags', cookieAuthMiddleware, async (c) => {
 
 		const tagName = name.trim();
 
-		// Use INSERT OR IGNORE to prevent duplicates for this user
-		await c.env.DB.prepare(
-			'INSERT OR IGNORE INTO tags (name, user_id) VALUES (?, ?)'
-		).bind(tagName, userId).run();
 
-		// Fetch the tag
-		const tag = await c.env.DB.prepare(
+		// Check if tag already exists for this user
+		let tag = await c.env.DB.prepare(
 			'SELECT id, name FROM tags WHERE name = ? AND user_id = ?'
 		).bind(tagName, userId).first<{ id: number; name: string }>();
+
+		if (!tag) {
+			// Create new tag if not exists
+			try {
+				const result = await c.env.DB.prepare(
+					'INSERT INTO tags (name, user_id) VALUES (?, ?)'
+				).bind(tagName, userId).run();
+
+				// Get the created tag
+				if (result.success) {
+					tag = await c.env.DB.prepare(
+						'SELECT id, name FROM tags WHERE id = ?'
+					).bind(result.meta.last_row_id).first<{ id: number; name: string }>();
+				}
+			} catch (e: any) {
+				// Handle race condition where insert fails due to unique constraint
+				if (e.message?.includes('UNIQUE constraint failed')) {
+					tag = await c.env.DB.prepare(
+						'SELECT id, name FROM tags WHERE name = ? AND user_id = ?'
+					).bind(tagName, userId).first<{ id: number; name: string }>();
+				} else {
+					throw e;
+				}
+			}
+		}
 
 		return c.json({
 			success: true,
