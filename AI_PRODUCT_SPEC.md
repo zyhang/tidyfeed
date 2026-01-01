@@ -1,7 +1,7 @@
 # Project Context: TidyFeed
 
 > **SYSTEM ROLE:** You are a Senior Full-Stack Engineer and Product Architect. This document is the **SINGLE SOURCE OF TRUTH** for the TidyFeed project. Refer to this whenever you plan, write, or refactor code.
-> **Last Updated:** 2025-12-30
+> **Last Updated:** 2026-01-01
 
 ---
 
@@ -67,11 +67,12 @@ The primary interface for users to interact with X.com. It handles ad blocking, 
 | Target      | Chrome, Firefox (Manifest V3) |
 
 #### Features & Highlights
-- **Ad Blocker**: DOM-based ad detection/hiding with multi-language support.
-- **Media Downloader**: Extracts highest quality video (via Syndication API) and images, zips them with organized metadata.
-- **Quote Tweet Support**: Captures context from quoted tweets.
-- **AI Smart Filter**: Cloud-synced regex firewall to block unwanted content pattern-matchings.
-- **X Internal Block**: Uses user's cookies to invoke native X block API.
+- **Hybrid Ad/Spam Blocker**: Combines traditional DOM hiding with a sophisticated **Scoring Engine** to detect crypto spam and low-quality content.
+- **AI Scoring Firewall**: JSON-based rule system (v2) with weighted scoring, thresholds, and cloud-synced pattern updates (`regex_rules.json`).
+- **Native UI Integration**: Injects **"Keep" (Bookmark)**, **"Download"**, and **"Block"** buttons directly into Tweet action bars (Timeline & Detail pages).
+- **Media Downloader**: Extracts highest quality video/images (including from Quote Tweets), packages them in ZIP with structured metadata.
+- **X Internal Block**: Uses user's cookies to invoke native X block API + TidyFeed reporting.
+- **Global Ready**: Multi-language tooltip support (EN, ZH, JA, ES).
 - **Login Sync**: Integrates with Google OAuth via web dashboard flow.
 
 ---
@@ -162,7 +163,7 @@ A restricted-access dashboard for TidyFeed administrators to monitor reports and
 8. Extension detects cookie availability for API calls.
 
 ### 4.2 Save & Tag Post
-1. User clicks "Save" (future feature) or "Download" in Extension.
+1. User clicks **"Keep" (Bookmark)** or "Download" in Extension.
 2. Extension sends tweet data to Backend (`POST /api/posts`).
 3. User views post in **tidyfeed-web Dashboard**.
 4. User adds tag "Tech".
@@ -197,7 +198,10 @@ Shared across projects (configured via `.env` or Wrangler secrets):
 ### Completed ✅
 - [x] Extension: Ad Blocker & Media Downloader
 - [x] Extension: Quote Tweet & Video Support
-- [x] Extension: AI Regex Filter
+- [x] Extension: AI Scoring Engine & v2 Config
+- [x] Extension: Native Action Bar Injection (Timeline + Detail Page)
+- [x] Extension: "Save to TidyFeed" (Keep) Button
+- [x] Extension: Multi-language Support (i18n)
 - [x] Backend: Hono + D1 Infrastructure
 - [x] Backend: Google OAuth Implementation
 - [x] Backend: Tagging System (Schema + APIs)
@@ -206,7 +210,6 @@ Shared across projects (configured via `.env` or Wrangler secrets):
 - [x] Admin: Internal Reporting Dashboard
 
 ### In Progress 🔄
-- [ ] Extension: "Save to TidyFeed" button direct integration
 - [ ] Web: Advanced Filtering & Search
 - [ ] Web: Settings Page
 
