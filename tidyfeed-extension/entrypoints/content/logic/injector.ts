@@ -6,6 +6,7 @@
 
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { getTweetFullText } from './networkInterceptor';
 
 // SVG icons
 const DOWNLOAD_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
@@ -284,15 +285,41 @@ function extractTweetData(article: HTMLElement): TweetData {
         break;
     }
 
-    // Tweet text - get the first tweetText not in quote
+    // Tweet text - first try to get full text from network interceptor cache
+    // This contains the complete text for "Show more" tweets
     let text = '';
-    const allTweetTexts = article.querySelectorAll('[data-testid="tweetText"]');
-    for (const textEl of allTweetTexts) {
-        if (isInsideQuote(textEl)) {
-            continue;
+
+    // We'll get the tweet ID first to lookup cached full text
+    let tempTweetId = '';
+    const tempStatusLinks = article.querySelectorAll('a[href*="/status/"]');
+    for (const link of tempStatusLinks) {
+        if (isInsideQuote(link)) continue;
+        const href = link.getAttribute('href');
+        if (href) {
+            tempTweetId = extractTweetId(href) || '';
+            break;
         }
-        text = textEl.textContent?.trim() || '';
-        break;
+    }
+
+    // Try to get full text from cache
+    if (tempTweetId) {
+        const cachedFullText = getTweetFullText(tempTweetId);
+        if (cachedFullText) {
+            text = cachedFullText;
+            console.log('[TidyFeed] Using cached full text for tweet:', tempTweetId);
+        }
+    }
+
+    // Fallback to DOM extraction if cache miss
+    if (!text) {
+        const allTweetTexts = article.querySelectorAll('[data-testid="tweetText"]');
+        for (const textEl of allTweetTexts) {
+            if (isInsideQuote(textEl)) {
+                continue;
+            }
+            text = textEl.textContent?.trim() || '';
+            break;
+        }
     }
 
     // Tweet URL and ID - get from the main tweet link (with timestamp)

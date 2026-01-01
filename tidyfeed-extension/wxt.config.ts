@@ -21,6 +21,12 @@ export default defineConfig({
     content_security_policy: {
       extension_pages: "script-src 'self'; object-src 'self'; img-src 'self' https://*.googleusercontent.com",
     },
+    web_accessible_resources: [
+      {
+        resources: ['injected.js'],
+        matches: ['*://*.x.com/*', '*://*.twitter.com/*'],
+      },
+    ],
     action: {
       default_title: 'TidyFeed',
     },

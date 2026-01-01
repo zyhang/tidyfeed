@@ -27,7 +27,7 @@ const app = new Hono<{ Bindings: Bindings }>();
 // CORS middleware - allow specific origins for credentials
 app.use('*', cors({
 	origin: (origin) => {
-		const allowed = ['https://a.tidyfeed.app', 'https://tidyfeed.app', 'http://localhost:3000'];
+		const allowed = ['https://a.tidyfeed.app', 'https://tidyfeed.app', 'https://admin.tidyfeed.app', 'http://localhost:3000'];
 		if (!origin) return allowed[0];
 		if (allowed.includes(origin) || origin.startsWith('chrome-extension://')) {
 			return origin;
