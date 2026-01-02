@@ -31,6 +31,10 @@ interface Post {
         r2_key?: string | null
         metadata?: any
     } | null
+    cacheInfo?: {
+        cached: boolean
+        snapshotUrl?: string
+    } | null
 }
 
 import { toast } from 'sonner'
@@ -259,6 +263,10 @@ function DashboardContent() {
                             tags={post.tags}
                             pinnedAt={post.pinnedAt}
                             videoInfo={post.videoInfo}
+                            cacheInfo={post.cacheInfo ? {
+                                ...post.cacheInfo,
+                                snapshotUrl: post.cacheInfo.snapshotUrl ? `${API_URL}${post.cacheInfo.snapshotUrl}` : undefined
+                            } : null}
                             onDelete={handleDelete}
                             onPin={handlePin}
                             onRemoveTag={handleRemoveTag}

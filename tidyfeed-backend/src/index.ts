@@ -1067,6 +1067,40 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 			}
 		}
 
+		// Fetch cache status for these posts
+		if (xIds.length > 0) {
+			const placeholders = xIds.map(() => '?').join(',');
+			const cacheQuery = `
+				SELECT tweet_id, snapshot_r2_key 
+				FROM cached_tweets 
+				WHERE tweet_id IN (${placeholders})
+			`;
+
+			const cacheResult = await c.env.DB.prepare(cacheQuery)
+				.bind(...xIds)
+				.all<{ tweet_id: string; snapshot_r2_key: string | null }>();
+
+			if (cacheResult.results && cacheResult.results.length > 0) {
+				const cacheMap = new Map<string, { cached: boolean; snapshotUrl?: string }>();
+
+				cacheResult.results.forEach(row => {
+					if (row.snapshot_r2_key) {
+						cacheMap.set(row.tweet_id, {
+							cached: true,
+							snapshotUrl: `/api/tweets/${row.tweet_id}/snapshot`
+						});
+					}
+				});
+
+				formattedPosts.forEach(post => {
+					if (cacheMap.has(post.xId)) {
+						// @ts-ignore
+						post.cacheInfo = cacheMap.get(post.xId);
+					}
+				});
+			}
+		}
+
 		// Fetch video download status for posts with URLs
 		const urlsForVideoLookup = formattedPosts
 			.filter(p => p.url)
