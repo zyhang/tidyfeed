@@ -54,6 +54,47 @@ app.get('/', (c) => {
 });
 
 // ============================================
+// Image Serving Routes (for cached tweet images)
+// ============================================
+
+/**
+ * GET /api/images/:tweetId/:type/:filename
+ * Serve cached images from R2 bucket
+ * Type: 'media' or 'avatar'
+ */
+app.get('/api/images/:tweetId/:type/:filename', async (c) => {
+	const { tweetId, type, filename } = c.req.param();
+
+	// Validate type
+	if (type !== 'media' && type !== 'avatar') {
+		return c.json({ error: 'Invalid image type' }, 400);
+	}
+
+	const r2Key = `images/${tweetId}/${type}/${filename}`;
+
+	try {
+		const object = await c.env.MEDIA_BUCKET.get(r2Key);
+
+		if (!object) {
+			return c.json({ error: 'Image not found' }, 404);
+		}
+
+		const headers = new Headers();
+		headers.set('Content-Type', object.httpMetadata?.contentType || 'image/jpeg');
+		headers.set('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year cache
+		headers.set('ETag', object.etag);
+
+		return new Response(object.body, {
+			status: 200,
+			headers,
+		});
+	} catch (error) {
+		console.error(`[Images] Error serving ${r2Key}:`, error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// ============================================
 // Auth Routes
 // ============================================
 
@@ -669,9 +710,10 @@ async function triggerCacheInBackground(
 			return;
 		}
 
-		// Import and use TikHub service
+		// Import services
 		const { TikHubService } = await import('./services/tikhub');
 		const { generateTweetSnapshot } = await import('./services/snapshot');
+		const { cacheMediaToR2, replaceMediaUrls } = await import('./services/imageCache');
 
 		const tikhub = new TikHubService(env.TIKHUB_API_KEY);
 		const tweetData = await tikhub.fetchTweetDetail(tweetId);
@@ -681,13 +723,38 @@ async function triggerCacheInBackground(
 			return;
 		}
 
-		// Generate HTML snapshot
-		const snapshotHtml = generateTweetSnapshot(tweetData, [], {
+		// Collect all media items and avatar URLs
+		const allMedia = [...(tweetData.media || [])];
+		const avatarUrls: string[] = [];
+
+		// Add main author avatar
+		if (tweetData.author?.profile_image_url) {
+			avatarUrls.push(tweetData.author.profile_image_url.replace('_normal', '_bigger'));
+		}
+
+		// Add quoted tweet media and avatar
+		if (tweetData.quoted_tweet) {
+			if (tweetData.quoted_tweet.media) {
+				allMedia.push(...tweetData.quoted_tweet.media);
+			}
+			if (tweetData.quoted_tweet.author?.profile_image_url) {
+				avatarUrls.push(tweetData.quoted_tweet.author.profile_image_url.replace('_normal', '_bigger'));
+			}
+		}
+
+		// Cache all images to R2
+		const urlMap = await cacheMediaToR2(env.MEDIA_BUCKET, tweetId, allMedia, avatarUrls);
+
+		// Replace URLs in tweet data with cached URLs
+		const cachedTweetData = replaceMediaUrls(tweetData, urlMap);
+
+		// Generate HTML snapshot with cached URLs
+		const snapshotHtml = generateTweetSnapshot(cachedTweetData, [], {
 			includeComments: false,
 			theme: 'auto',
 		});
 
-		// Upload to R2
+		// Upload snapshot to R2
 		const r2Key = `snapshots/${tweetId}.html`;
 		await env.MEDIA_BUCKET.put(r2Key, snapshotHtml, {
 			httpMetadata: {
@@ -715,7 +782,7 @@ async function triggerCacheInBackground(
 				updated_at = CURRENT_TIMESTAMP
 		`).bind(
 			tweetId,
-			JSON.stringify(tweetData),
+			JSON.stringify(tweetData), // Store original data, not cached URLs
 			r2Key,
 			null,
 			0,
@@ -724,7 +791,7 @@ async function triggerCacheInBackground(
 			hasQuotedTweet ? 1 : 0,
 		).run();
 
-		console.log(`[AutoCache] Successfully cached tweet ${tweetId}`);
+		console.log(`[AutoCache] Successfully cached tweet ${tweetId} with ${urlMap.size} images`);
 	} catch (error) {
 		console.error(`[AutoCache] Error caching tweet ${tweetId}:`, error);
 	}

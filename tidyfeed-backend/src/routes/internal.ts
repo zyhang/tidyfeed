@@ -171,6 +171,7 @@ internal.post('/bot-save', async (c) => {
 
                     const { TikHubService } = await import('../services/tikhub');
                     const { generateTweetSnapshot } = await import('../services/snapshot');
+                    const { cacheMediaToR2, replaceMediaUrls } = await import('../services/imageCache');
 
                     const tikhub = new TikHubService(c.env.TIKHUB_API_KEY!);
                     const tweetData = await tikhub.fetchTweetDetail(xPostId);
@@ -180,7 +181,30 @@ internal.post('/bot-save', async (c) => {
                         return;
                     }
 
-                    const snapshotHtml = generateTweetSnapshot(tweetData, [], {
+                    // Collect all media items and avatar URLs
+                    const allMedia = [...(tweetData.media || [])];
+                    const avatarUrls: string[] = [];
+
+                    if (tweetData.author?.profile_image_url) {
+                        avatarUrls.push(tweetData.author.profile_image_url.replace('_normal', '_bigger'));
+                    }
+
+                    if (tweetData.quoted_tweet) {
+                        if (tweetData.quoted_tweet.media) {
+                            allMedia.push(...tweetData.quoted_tweet.media);
+                        }
+                        if (tweetData.quoted_tweet.author?.profile_image_url) {
+                            avatarUrls.push(tweetData.quoted_tweet.author.profile_image_url.replace('_normal', '_bigger'));
+                        }
+                    }
+
+                    // Cache all images to R2
+                    const urlMap = await cacheMediaToR2(c.env.MEDIA_BUCKET!, xPostId, allMedia, avatarUrls);
+
+                    // Replace URLs in tweet data with cached URLs
+                    const cachedTweetData = replaceMediaUrls(tweetData, urlMap);
+
+                    const snapshotHtml = generateTweetSnapshot(cachedTweetData, [], {
                         includeComments: false,
                         theme: 'auto',
                     });
@@ -200,7 +224,7 @@ internal.post('/bot-save', async (c) => {
                         ON CONFLICT(tweet_id) DO UPDATE SET cached_data = excluded.cached_data, snapshot_r2_key = excluded.snapshot_r2_key, updated_at = CURRENT_TIMESTAMP
                     `).bind(xPostId, JSON.stringify(tweetData), r2Key, null, 0, hasMedia ? 1 : 0, hasVideo ? 1 : 0, hasQuotedTweet ? 1 : 0).run();
 
-                    console.log(`[Bot/AutoCache] Successfully cached tweet ${xPostId}`);
+                    console.log(`[Bot/AutoCache] Successfully cached tweet ${xPostId} with ${urlMap.size} images`);
                 } catch (err) {
                     console.error(`[Bot/AutoCache] Error caching ${xPostId}:`, err);
                 }
