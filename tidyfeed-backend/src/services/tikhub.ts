@@ -190,6 +190,27 @@ export class TikHubService {
         const user = tweet.user || tweet.author || {};
         const legacy = tweet.legacy || tweet;
 
+        // Create media array from possible locations
+        let mediaArray: any[] = [];
+        if (Array.isArray(legacy.extended_entities?.media)) {
+            mediaArray = legacy.extended_entities.media;
+        } else if (Array.isArray(legacy.entities?.media)) {
+            mediaArray = legacy.entities.media;
+        } else if (tweet.media) {
+            // Handle new structure where media is an object with type keys
+            if (Array.isArray(tweet.media.video)) {
+                mediaArray.push(...tweet.media.video.map((m: any) => ({ ...m, type: 'video' })));
+            }
+            if (Array.isArray(tweet.media.photo)) {
+                mediaArray.push(...tweet.media.photo.map((m: any) => ({ ...m, type: 'photo' })));
+            }
+            if (Array.isArray(tweet.media.animated_gif)) {
+                mediaArray.push(...tweet.media.animated_gif.map((m: any) => ({ ...m, type: 'animated_gif' })));
+            }
+            // Or if it's just an array
+            if (Array.isArray(tweet.media)) mediaArray = tweet.media;
+        }
+
         return {
             id: tweet.rest_id || tweet.id_str || tweet.id || '',
             text: legacy.full_text || legacy.text || tweet.text || '',
@@ -198,19 +219,19 @@ export class TikHubService {
                 id: user.rest_id || user.id_str || user.id || '',
                 name: user.name || user.legacy?.name || '',
                 screen_name: user.screen_name || user.legacy?.screen_name || '',
-                profile_image_url: user.profile_image_url_https || user.legacy?.profile_image_url_https || '',
-                verified: user.verified || user.legacy?.verified || user.is_blue_verified,
+                profile_image_url: user.profile_image_url_https || user.legacy?.profile_image_url_https || user.image || user.avatar || '',
+                verified: user.verified || user.legacy?.verified || user.is_blue_verified || !!user.blue_verified,
                 description: user.description || user.legacy?.description || '',
-                followers_count: user.followers_count || user.legacy?.followers_count || 0,
+                followers_count: user.followers_count || user.legacy?.followers_count || user.sub_count || 0,
             },
-            media: this.parseMedia(legacy.extended_entities?.media || legacy.entities?.media || []),
+            media: this.parseMedia(mediaArray),
             // Check multiple locations for quoted tweet
             quoted_tweet: this.parseQuotedTweet(tweet, legacy),
             metrics: {
-                like_count: legacy.favorite_count || 0,
-                retweet_count: legacy.retweet_count || 0,
-                reply_count: legacy.reply_count || 0,
-                view_count: tweet.views?.count ? parseInt(tweet.views.count) : undefined,
+                like_count: legacy.favorite_count || legacy.likes || 0,
+                retweet_count: legacy.retweet_count || legacy.retweets || 0,
+                reply_count: legacy.reply_count || legacy.replies || 0,
+                view_count: tweet.views?.count ? parseInt(tweet.views.count) : (typeof tweet.views === 'string' ? parseInt(tweet.views) : (tweet.views || 0)),
             },
             source: legacy.source || '',
         };
@@ -227,7 +248,8 @@ export class TikHubService {
             tweet.quoted_status_result?.result ||
             tweet.quoted_status ||
             tweet.quoted_tweet ||
-            legacy.quoted_tweet;
+            legacy.quoted_tweet ||
+            tweet.quoted; // Check for strict "quoted" field as in new API response
 
         if (quotedData) {
             console.log('[TikHub] Found quoted tweet data');
