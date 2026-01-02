@@ -1199,9 +1199,10 @@ app.get('/api/tags', cookieAuthMiddleware, async (c) => {
 			`SELECT 
 				t.id, 
 				t.name, 
-				COUNT(ttr.tweet_id) as tweet_count
+				COUNT(sp.x_post_id) as tweet_count
 			 FROM tags t
 			 LEFT JOIN tweet_tag_refs ttr ON t.id = ttr.tag_id
+             LEFT JOIN saved_posts sp ON ttr.tweet_id = sp.x_post_id AND sp.user_id = t.user_id
 			 WHERE t.user_id = ?
 			 GROUP BY t.id, t.name
 			 ORDER BY t.name ASC`

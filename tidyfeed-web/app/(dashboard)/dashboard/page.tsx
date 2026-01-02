@@ -270,6 +270,28 @@ function DashboardContent() {
                             onDelete={handleDelete}
                             onPin={handlePin}
                             onRemoveTag={handleRemoveTag}
+                            onCache={async (xId) => {
+                                try {
+                                    const response = await fetch(`${API_URL}/api/posts/cache/${xId}`, {
+                                        method: 'POST',
+                                        credentials: 'include'
+                                    })
+                                    if (response.ok) {
+                                        const data = await response.json()
+                                        if (data.snapshotUrl) {
+                                            // Update local state to show snapshot immediately
+                                            setPosts(prev => prev.map(p => p.xId === xId ? {
+                                                ...p,
+                                                cacheInfo: { cached: true, snapshotUrl: data.snapshotUrl }
+                                            } : p))
+                                            return { snapshotUrl: `${API_URL}${data.snapshotUrl}` }
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.error(e)
+                                    toast.error('Failed to cache snapshot')
+                                }
+                            }}
                         />
                     ))}
                 </div>
