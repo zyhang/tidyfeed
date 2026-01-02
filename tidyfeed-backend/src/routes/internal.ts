@@ -10,6 +10,8 @@ import { Hono } from 'hono';
 type Bindings = {
     DB: D1Database;
     INTERNAL_SERVICE_KEY: string;
+    TIKHUB_API_KEY?: string;
+    MEDIA_BUCKET?: R2Bucket;
 };
 
 const internal = new Hono<{ Bindings: Bindings }>();
@@ -152,6 +154,58 @@ internal.post('/bot-save', async (c) => {
         ).run();
 
         console.log(`[Bot] Saved tweet ${xPostId} for user ${userId}`);
+
+        // Trigger auto-caching in background (non-blocking)
+        if (c.env.TIKHUB_API_KEY && c.env.MEDIA_BUCKET) {
+            c.executionCtx.waitUntil((async () => {
+                try {
+                    // Check if already cached
+                    const existing = await c.env.DB.prepare(
+                        `SELECT snapshot_r2_key FROM cached_tweets WHERE tweet_id = ?`
+                    ).bind(xPostId).first<{ snapshot_r2_key: string | null }>();
+
+                    if (existing?.snapshot_r2_key) {
+                        console.log(`[Bot/AutoCache] Tweet ${xPostId} already cached, skipping`);
+                        return;
+                    }
+
+                    const { TikHubService } = await import('../services/tikhub');
+                    const { generateTweetSnapshot } = await import('../services/snapshot');
+
+                    const tikhub = new TikHubService(c.env.TIKHUB_API_KEY!);
+                    const tweetData = await tikhub.fetchTweetDetail(xPostId);
+
+                    if (!tweetData) {
+                        console.log(`[Bot/AutoCache] Failed to fetch tweet ${xPostId}`);
+                        return;
+                    }
+
+                    const snapshotHtml = generateTweetSnapshot(tweetData, [], {
+                        includeComments: false,
+                        theme: 'auto',
+                    });
+
+                    const r2Key = `snapshots/${xPostId}.html`;
+                    await c.env.MEDIA_BUCKET!.put(r2Key, snapshotHtml, {
+                        httpMetadata: { contentType: 'text/html; charset=utf-8' },
+                    });
+
+                    const hasMedia = !!(tweetData.media && tweetData.media.length > 0);
+                    const hasVideo = tweetData.media?.some(m => m.type === 'video' || m.type === 'animated_gif') || false;
+                    const hasQuotedTweet = !!tweetData.quoted_tweet;
+
+                    await c.env.DB.prepare(`
+                        INSERT INTO cached_tweets (tweet_id, cached_data, snapshot_r2_key, comments_data, comments_count, has_media, has_video, has_quoted_tweet)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(tweet_id) DO UPDATE SET cached_data = excluded.cached_data, snapshot_r2_key = excluded.snapshot_r2_key, updated_at = CURRENT_TIMESTAMP
+                    `).bind(xPostId, JSON.stringify(tweetData), r2Key, null, 0, hasMedia ? 1 : 0, hasVideo ? 1 : 0, hasQuotedTweet ? 1 : 0).run();
+
+                    console.log(`[Bot/AutoCache] Successfully cached tweet ${xPostId}`);
+                } catch (err) {
+                    console.error(`[Bot/AutoCache] Error caching ${xPostId}:`, err);
+                }
+            })());
+        }
 
         return c.json({
             success: true,

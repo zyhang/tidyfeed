@@ -647,6 +647,89 @@ app.post('/api/report', async (c) => {
 // Posts API Routes (Authenticated via Cookie)
 // ============================================
 
+// Helper: Trigger caching in background (non-blocking)
+async function triggerCacheInBackground(
+	env: Bindings,
+	tweetId: string
+): Promise<void> {
+	try {
+		// Check if already cached
+		const existing = await env.DB.prepare(
+			`SELECT snapshot_r2_key FROM cached_tweets WHERE tweet_id = ?`
+		).bind(tweetId).first<{ snapshot_r2_key: string | null }>();
+
+		if (existing?.snapshot_r2_key) {
+			console.log(`[AutoCache] Tweet ${tweetId} already cached, skipping`);
+			return;
+		}
+
+		// Check if TIKHUB_API_KEY is configured
+		if (!env.TIKHUB_API_KEY) {
+			console.log('[AutoCache] TIKHUB_API_KEY not configured, skipping cache');
+			return;
+		}
+
+		// Import and use TikHub service
+		const { TikHubService } = await import('./services/tikhub');
+		const { generateTweetSnapshot } = await import('./services/snapshot');
+
+		const tikhub = new TikHubService(env.TIKHUB_API_KEY);
+		const tweetData = await tikhub.fetchTweetDetail(tweetId);
+
+		if (!tweetData) {
+			console.log(`[AutoCache] Failed to fetch tweet ${tweetId} from TikHub`);
+			return;
+		}
+
+		// Generate HTML snapshot
+		const snapshotHtml = generateTweetSnapshot(tweetData, [], {
+			includeComments: false,
+			theme: 'auto',
+		});
+
+		// Upload to R2
+		const r2Key = `snapshots/${tweetId}.html`;
+		await env.MEDIA_BUCKET.put(r2Key, snapshotHtml, {
+			httpMetadata: {
+				contentType: 'text/html; charset=utf-8',
+			},
+		});
+
+		// Determine metadata flags
+		const hasMedia = !!(tweetData.media && tweetData.media.length > 0);
+		const hasVideo = tweetData.media?.some(m => m.type === 'video' || m.type === 'animated_gif') || false;
+		const hasQuotedTweet = !!tweetData.quoted_tweet;
+
+		// Upsert into database
+		await env.DB.prepare(`
+			INSERT INTO cached_tweets (
+				tweet_id, cached_data, snapshot_r2_key, comments_data, 
+				comments_count, has_media, has_video, has_quoted_tweet
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(tweet_id) DO UPDATE SET
+				cached_data = excluded.cached_data,
+				snapshot_r2_key = excluded.snapshot_r2_key,
+				has_media = excluded.has_media,
+				has_video = excluded.has_video,
+				has_quoted_tweet = excluded.has_quoted_tweet,
+				updated_at = CURRENT_TIMESTAMP
+		`).bind(
+			tweetId,
+			JSON.stringify(tweetData),
+			r2Key,
+			null,
+			0,
+			hasMedia ? 1 : 0,
+			hasVideo ? 1 : 0,
+			hasQuotedTweet ? 1 : 0,
+		).run();
+
+		console.log(`[AutoCache] Successfully cached tweet ${tweetId}`);
+	} catch (error) {
+		console.error(`[AutoCache] Error caching tweet ${tweetId}:`, error);
+	}
+}
+
 // Create a saved post
 app.post('/api/posts', cookieAuthMiddleware, async (c) => {
 	try {
@@ -668,6 +751,9 @@ app.post('/api/posts', cookieAuthMiddleware, async (c) => {
 				`INSERT INTO saved_posts (user_id, x_post_id, content, author_info, media_urls, url, platform)
 				 VALUES (?, ?, ?, ?, ?, ?, ?)`
 			).bind(userId, x_id, content || null, authorInfo, mediaUrls, url || null, platform || 'x').run();
+
+			// Trigger caching in background (non-blocking)
+			c.executionCtx.waitUntil(triggerCacheInBackground(c.env, x_id));
 
 			return c.json({ success: true, message: 'Post saved' });
 		} catch (dbError: any) {
