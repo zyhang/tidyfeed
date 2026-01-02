@@ -124,6 +124,12 @@ export default defineBackground(() => {
         });
 
         if (!response.ok) {
+          // Treat 404 as success - if post doesn't exist on server, 
+          // the unsave intent is fulfilled (sync local state)
+          if (response.status === 404) {
+            console.log('[TidyFeed] Post not found on server, treating as unsaved');
+            return { success: true };
+          }
           const err = await response.json();
           return { success: false, error: err.error || 'Failed to unsave post' };
         }

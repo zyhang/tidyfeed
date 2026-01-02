@@ -51,6 +51,16 @@ export default function SnapshotPage() {
         fetchSnapshot()
     }, [tweetId])
 
+    // Auto-redirect to dashboard when snapshot not found
+    useEffect(() => {
+        if (error && error.includes('not found')) {
+            const timer = setTimeout(() => {
+                router.push('/dashboard')
+            }, 5000)
+            return () => clearTimeout(timer)
+        }
+    }, [error, router])
+
     // Loading state
     if (loading) {
         return (
@@ -68,19 +78,25 @@ export default function SnapshotPage() {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center p-4">
                 <div className="max-w-md w-full text-center space-y-6">
-                    <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
-                        <AlertCircle className="h-8 w-8 text-destructive" />
+                    <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto">
+                        <AlertCircle className="h-8 w-8 text-amber-500" />
                     </div>
                     <div className="space-y-2">
-                        <h1 className="text-2xl font-bold">Snapshot Unavailable</h1>
-                        <p className="text-muted-foreground">{error}</p>
+                        <h1 className="text-2xl font-bold">Snapshot Not Available</h1>
+                        <p className="text-muted-foreground">
+                            {error.includes('not found')
+                                ? 'This post has been unsaved and its cached content has been deleted.'
+                                : error}
+                        </p>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        <Button variant="outline" onClick={() => router.back()}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Go Back
+                        <Button asChild variant="default">
+                            <Link href="/dashboard">
+                                <ArrowLeft className="h-4 w-4 mr-2" />
+                                Go to Dashboard
+                            </Link>
                         </Button>
-                        <Button asChild>
+                        <Button asChild variant="outline">
                             <Link
                                 href={`https://x.com/i/status/${tweetId}`}
                                 target="_blank"
@@ -91,6 +107,9 @@ export default function SnapshotPage() {
                             </Link>
                         </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground/60">
+                        Redirecting to dashboard in 5 seconds...
+                    </p>
                 </div>
             </div>
         )
