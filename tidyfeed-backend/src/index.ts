@@ -944,6 +944,9 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 				// Delete cached_tweets entry
 				await c.env.DB.prepare('DELETE FROM cached_tweets WHERE tweet_id = ?').bind(xId).run();
 
+				// Delete tag references
+				await c.env.DB.prepare('DELETE FROM tweet_tag_refs WHERE tweet_id = ?').bind(xId).run();
+
 				// Delete all R2 images for this tweet
 				const imagesList = await c.env.MEDIA_BUCKET.list({ prefix: `images/${xId}/` });
 				for (const obj of imagesList.objects) {
@@ -1396,28 +1399,35 @@ app.get('/api/tweets/by-tag/:tagId', cookieAuthMiddleware, async (c) => {
 		}
 
 		// Verify tag ownership & fetch tweets
+		// Using cached_tweets as the source of truth for tweet data
 		const tweets = await c.env.DB.prepare(
-			`SELECT tc.tweet_id, tc.data_json, tc.updated_at
-			 FROM tweet_cache tc
+			`SELECT tc.tweet_id, tc.cached_data as data_json, tc.updated_at, tc.snapshot_r2_key
+			 FROM cached_tweets tc
 			 INNER JOIN tweet_tag_refs ttr ON tc.tweet_id = ttr.tweet_id
 			 INNER JOIN tags t ON ttr.tag_id = t.id
 			 WHERE ttr.tag_id = ? AND t.user_id = ?
 			 ORDER BY tc.updated_at DESC`
-		).bind(tagId, userId).all<{ tweet_id: string; data_json: string; updated_at: string }>();
+		).bind(tagId, userId).all<{ tweet_id: string; data_json: string; updated_at: string; snapshot_r2_key: string | null }>();
 
 		// Parse data_json for each tweet
-		const formattedTweets = (tweets.results || []).map((tweet) => ({
-			tweetId: tweet.tweet_id,
-			data: JSON.parse(tweet.data_json || '{}'),
-			updatedAt: tweet.updated_at,
-		}));
+		const formattedTweets = (tweets.results || []).map((tweet) => {
+			const parsedData = JSON.parse(tweet.data_json);
+			return {
+				tweetId: tweet.tweet_id,
+				data: parsedData,
+				updatedAt: tweet.updated_at,
+				cacheInfo: tweet.snapshot_r2_key ? {
+					cached: true,
+					snapshotUrl: `/api/tweets/${tweet.tweet_id}/snapshot`
+				} : null
+			};
+		});
 
 		return c.json({
 			success: true,
 			tweets: formattedTweets,
 		});
 	} catch (error) {
-		console.error('Get tweets by tag error:', error);
 		return c.json({ error: 'Internal server error' }, 500);
 	}
 });

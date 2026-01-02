@@ -4,6 +4,7 @@ export const runtime = 'edge'
 
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
+import { TweetCard } from '@/components/TweetCard'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +29,10 @@ interface Tweet {
     tweetId: string
     data: TweetData
     updatedAt: string
+    cacheInfo?: {
+        cached: boolean
+        snapshotUrl?: string
+    }
 }
 
 interface Tag {
@@ -136,70 +141,37 @@ export default function TagDetailPage({ params }: { params: Promise<{ id: string
                 {tweets.length > 0 && (
                     <div className="columns-1 md:columns-2 lg:columns-3 gap-4">
                         {tweets.map((tweet) => (
-                            <Card key={tweet.tweetId} className="overflow-hidden hover:shadow-md transition-shadow break-inside-avoid mb-4">
-                                <CardContent className="p-4">
-                                    {/* Author */}
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-2">
-                                            {tweet.data.author?.avatar ? (
-                                                <img
-                                                    src={tweet.data.author.avatar}
-                                                    alt={tweet.data.author.name || 'Avatar'}
-                                                    className="w-10 h-10 rounded-full object-cover"
-                                                    referrerPolicy="no-referrer"
-                                                />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
-                                                    {tweet.data.author?.name?.charAt(0) || '?'}
-                                                </div>
-                                            )}
-                                            <div>
-                                                <p className="font-semibold text-sm">{tweet.data.author?.name || 'Unknown'}</p>
-                                                <p className="text-xs text-muted-foreground">{tweet.data.author?.handle || '@unknown'}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Content */}
-                                    {tweet.data.content && (
-                                        <p className="text-sm whitespace-pre-wrap mb-3 line-clamp-4">
-                                            {tweet.data.content}
-                                        </p>
-                                    )}
-
-                                    {/* Media */}
-                                    {tweet.data.media && tweet.data.media.length > 0 && (
-                                        <div className={`grid gap-2 mb-3 ${tweet.data.media.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                                            {tweet.data.media.slice(0, 4).map((imgUrl, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    className="relative rounded-lg overflow-hidden bg-muted cursor-pointer hover:opacity-90 transition-opacity"
-                                                    onClick={() => setLightboxImage(imgUrl)}
-                                                >
-                                                    <img
-                                                        src={imgUrl}
-                                                        alt={`Media ${idx + 1}`}
-                                                        className="w-full h-auto object-cover"
-                                                        loading="lazy"
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {/* Actions */}
-                                    {tweet.data.url && (
-                                        <div className="pt-2 border-t">
-                                            <Button variant="ghost" size="sm" asChild>
-                                                <a href={tweet.data.url} target="_blank" rel="noopener noreferrer" className="text-xs">
-                                                    <ExternalLink className="h-3 w-3 mr-1" />
-                                                    View on {tweet.data.platform === 'x' ? 'X' : tweet.data.platform || 'X'}
-                                                </a>
-                                            </Button>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                            <TweetCard
+                                key={tweet.tweetId}
+                                id={0} // Not used for actions
+                                xId={tweet.tweetId}
+                                content={tweet.data.content || null}
+                                author={tweet.data.author ? {
+                                    name: tweet.data.author.name,
+                                    handle: tweet.data.author.handle,
+                                    avatar: tweet.data.author.avatar
+                                } : null}
+                                media={tweet.data.media || null}
+                                url={tweet.data.url || null}
+                                platform={tweet.data.platform || 'x'}
+                                createdAt={tweet.updatedAt} // Using updatedAt as we sort by it
+                                tags={[]} // Tag page doesn't need to show tags inside card necessarily, or we can pass the current tag
+                                cacheInfo={tweet.cacheInfo ? {
+                                    ...tweet.cacheInfo,
+                                    snapshotUrl: tweet.cacheInfo.snapshotUrl ? `${API_URL}${tweet.cacheInfo.snapshotUrl}` : undefined
+                                } : null}
+                                onDelete={async (xId: string) => {
+                                    if (confirm('Are you sure you want to delete this post?')) {
+                                        try {
+                                            await fetch(`${API_URL}/api/posts/x/${xId}`, { method: 'DELETE', credentials: 'include' })
+                                            setTweets(prev => prev.filter(t => t.tweetId !== xId))
+                                        } catch (e) { console.error(e) }
+                                    }
+                                }}
+                                // Optional props
+                                onPin={undefined}
+                                onRemoveTag={undefined}
+                            />
                         ))}
                     </div>
                 )}

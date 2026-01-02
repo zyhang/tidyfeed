@@ -190,21 +190,49 @@ export function TweetCard({
             )}
 
             <Card className={cn(
-                "overflow-hidden hover:shadow-lg transition-all duration-300 break-inside-avoid mb-4 relative group border-transparent hover:border-border/50 bg-card/50 hover:bg-card",
-                isPinned && "border-blue-500/30 bg-blue-50/10 dark:bg-blue-900/10 shadow-sm"
+                "overflow-hidden transition-all duration-300 break-inside-avoid mb-4 relative group border-border/40 hover:border-border/80 bg-card/80 hover:bg-card hover:shadow-xl dark:shadow-none dark:hover:bg-slate-900/50",
+                isPinned && "border-blue-500/30 bg-blue-50/30 dark:bg-blue-900/10"
             )}>
                 {/* Top Right Floating Actions */}
                 <div className={cn(
                     "absolute top-3 right-3 flex items-center gap-1.5 z-20 transition-all duration-200",
-                    isPinned ? "opacity-100" : "opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0"
+                    isPinned || isCached ? "opacity-100" : "opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0"
                 )}>
+                    {onCache && (
+                        <div className="relative group/cache">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={isCached && cachedSnapshotUrl ? () => window.open(cachedSnapshotUrl, '_blank') : handleCache}
+                                disabled={isCaching}
+                                className={cn(
+                                    "h-8 px-2.5 rounded-full backdrop-blur-md shadow-sm border transition-all hover:scale-105 flex items-center gap-1.5",
+                                    isCached
+                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+                                        : "bg-background/80 text-muted-foreground hover:text-foreground hover:bg-background border-border/10"
+                                )}
+                            >
+                                {isCaching ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : isCached ? (
+                                    <>
+                                        <FileText className="h-3.5 w-3.5" />
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider">Snapshot</span>
+                                    </>
+                                ) : (
+                                    <Archive className="h-3.5 w-3.5" />
+                                )}
+                            </Button>
+                        </div>
+                    )}
+
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={handlePin}
                         disabled={pinning}
                         className={cn(
-                            "h-7 w-7 rounded-full bg-background/80 backdrop-blur-md shadow-sm border border-border/10 transition-all hover:scale-105",
+                            "h-8 w-8 rounded-full bg-background/80 backdrop-blur-md shadow-sm border border-border/10 transition-all hover:scale-105",
                             isPinned
                                 ? "text-blue-500 hover:text-blue-600 bg-blue-50/80 dark:bg-blue-900/20 ring-1 ring-blue-500/20"
                                 : "text-muted-foreground hover:text-foreground hover:bg-background"
@@ -214,37 +242,12 @@ export function TweetCard({
                         <Pin className={cn("h-3.5 w-3.5", isPinned && "fill-current rotate-45")} />
                     </Button>
 
-                    {/* Cache Button */}
-                    {onCache && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={isCached && cachedSnapshotUrl ? () => window.open(cachedSnapshotUrl, '_blank') : handleCache}
-                            disabled={isCaching}
-                            className={cn(
-                                "h-7 w-7 rounded-full bg-background/80 backdrop-blur-md shadow-sm border border-border/10 transition-all hover:scale-105",
-                                isCached
-                                    ? "text-emerald-500 hover:text-emerald-600 bg-emerald-50/80 dark:bg-emerald-900/20 ring-1 ring-emerald-500/20"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-background"
-                            )}
-                            title={isCached ? "View cached snapshot" : "Cache this tweet"}
-                        >
-                            {isCaching ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : isCached ? (
-                                <FileText className="h-3.5 w-3.5" />
-                            ) : (
-                                <Archive className="h-3.5 w-3.5" />
-                            )}
-                        </Button>
-                    )}
-
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={handleDeleteClick}
                         disabled={deleting}
-                        className="h-7 w-7 rounded-full bg-background/80 backdrop-blur-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 shadow-sm border border-border/10 transition-all hover:scale-105"
+                        className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 shadow-sm border border-border/10 transition-all hover:scale-105 opacity-0 group-hover:opacity-100"
                         title="Delete post"
                     >
                         {deleting ? (
@@ -276,23 +279,9 @@ export function TweetCard({
                                 <p className="text-xs text-muted-foreground font-medium">{author?.handle || '@unknown'}</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            {isCached && cachedSnapshotUrl && (
-                                <a
-                                    href={cachedSnapshotUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors"
-                                    onClick={(e) => e.stopPropagation()}
-                                    title="View saved snapshot"
-                                >
-                                    <FileText className="w-3 h-3" />
-                                    Snapshot
-                                </a>
-                            )}
-                            <span className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wider">{formattedDate}</span>
-                        </div>
                     </div>
+                    <span className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wider">{formattedDate}</span>
+
 
                     {/* Content */}
                     {content && (
@@ -466,10 +455,10 @@ export function TweetCard({
                         />
                     </div>
                 </CardContent>
-            </Card>
+            </Card >
 
             {/* Delete Confirmation Dialog */}
-            <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+            < AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm} >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle className="flex items-center gap-2">
@@ -498,7 +487,7 @@ export function TweetCard({
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-            </AlertDialog>
+            </AlertDialog >
         </>
     )
 }
