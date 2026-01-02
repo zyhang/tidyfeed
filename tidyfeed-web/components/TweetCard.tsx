@@ -2,9 +2,19 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash, Pin, Play, Cloud, Loader2, Plus, Archive, CheckCircle2 } from 'lucide-react'
+import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash, Pin, Play, Cloud, Loader2, Plus, Archive, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { TagInput } from '@/components/TagInput'
 import { cn } from '@/lib/utils'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface Author {
     name?: string
@@ -75,6 +85,7 @@ export function TweetCard({
     const [isPlayingVideo, setIsPlayingVideo] = useState(false)
     const [isCaching, setIsCaching] = useState(false)
     const [cachedSnapshotUrl, setCachedSnapshotUrl] = useState<string | null>(cacheInfo?.snapshotUrl || null)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
     const isPinned = !!pinnedAt
     const isCached = !!cacheInfo?.cached || !!cachedSnapshotUrl
@@ -83,8 +94,15 @@ export function TweetCard({
         setTags(initialTags)
     }, [initialTags])
 
-    const handleDelete = async () => {
+    // Show confirmation dialog before deleting
+    const handleDeleteClick = () => {
+        setShowDeleteConfirm(true)
+    }
+
+    // Actually perform the deletion after confirmation
+    const confirmDelete = async () => {
         if (deleting) return
+        setShowDeleteConfirm(false)
         setDeleting(true)
         try {
             await onDelete(xId)
@@ -224,7 +242,7 @@ export function TweetCard({
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={handleDelete}
+                        onClick={handleDeleteClick}
                         disabled={deleting}
                         className="h-7 w-7 rounded-full bg-background/80 backdrop-blur-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 shadow-sm border border-border/10 transition-all hover:scale-105"
                         title="Delete post"
@@ -429,6 +447,38 @@ export function TweetCard({
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-amber-500" />
+                            Delete this post?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-left">
+                            This action cannot be undone. All cached content including:
+                            <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground">
+                                <li>Saved images and media</li>
+                                <li>Downloaded videos</li>
+                                <li>HTML snapshot</li>
+                            </ul>
+                            <span className="block mt-2 font-medium text-foreground/80">
+                                will be permanently deleted.
+                            </span>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="bg-red-500 hover:bg-red-600 text-white"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     )
 }

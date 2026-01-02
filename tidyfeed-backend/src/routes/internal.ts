@@ -198,14 +198,28 @@ internal.post('/bot-save', async (c) => {
                         }
                     }
 
+                    // Fetch comments/replies (top 20)
+                    let comments: any[] = [];
+                    try {
+                        const commentsResult = await tikhub.fetchTweetComments(xPostId, undefined, 20);
+                        comments = commentsResult.comments || [];
+                        for (const comment of comments) {
+                            if (comment.author?.profile_image_url) {
+                                avatarUrls.push(comment.author.profile_image_url.replace('_normal', '_bigger'));
+                            }
+                        }
+                    } catch (e) {
+                        console.log(`[Bot/AutoCache] Failed to fetch comments for ${xPostId}`);
+                    }
+
                     // Cache all images to R2
                     const urlMap = await cacheMediaToR2(c.env.MEDIA_BUCKET!, xPostId, allMedia, avatarUrls);
 
                     // Replace URLs in tweet data with cached URLs
                     const cachedTweetData = replaceMediaUrls(tweetData, urlMap);
 
-                    const snapshotHtml = generateTweetSnapshot(cachedTweetData, [], {
-                        includeComments: false,
+                    const snapshotHtml = generateTweetSnapshot(cachedTweetData, comments, {
+                        includeComments: comments.length > 0,
                         theme: 'auto',
                     });
 
@@ -221,10 +235,10 @@ internal.post('/bot-save', async (c) => {
                     await c.env.DB.prepare(`
                         INSERT INTO cached_tweets (tweet_id, cached_data, snapshot_r2_key, comments_data, comments_count, has_media, has_video, has_quoted_tweet)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(tweet_id) DO UPDATE SET cached_data = excluded.cached_data, snapshot_r2_key = excluded.snapshot_r2_key, updated_at = CURRENT_TIMESTAMP
-                    `).bind(xPostId, JSON.stringify(tweetData), r2Key, null, 0, hasMedia ? 1 : 0, hasVideo ? 1 : 0, hasQuotedTweet ? 1 : 0).run();
+                        ON CONFLICT(tweet_id) DO UPDATE SET cached_data = excluded.cached_data, snapshot_r2_key = excluded.snapshot_r2_key, comments_data = excluded.comments_data, comments_count = excluded.comments_count, updated_at = CURRENT_TIMESTAMP
+                    `).bind(xPostId, JSON.stringify(tweetData), r2Key, comments.length > 0 ? JSON.stringify(comments) : null, comments.length, hasMedia ? 1 : 0, hasVideo ? 1 : 0, hasQuotedTweet ? 1 : 0).run();
 
-                    console.log(`[Bot/AutoCache] Successfully cached tweet ${xPostId} with ${urlMap.size} images`);
+                    console.log(`[Bot/AutoCache] Successfully cached tweet ${xPostId} with ${urlMap.size} images and ${comments.length} comments`);
                 } catch (err) {
                     console.error(`[Bot/AutoCache] Error caching ${xPostId}:`, err);
                 }

@@ -85,7 +85,7 @@ async function cacheImageToR2(
         if (existing) {
             return {
                 originalUrl: imageUrl,
-                cachedUrl: `/api/images/${tweetId}/${type}/${filename}`,
+                cachedUrl: `https://api.tidyfeed.app/api/images/${tweetId}/${type}/${filename}`,
                 r2Key,
             };
         }
@@ -115,7 +115,7 @@ async function cacheImageToR2(
 
         return {
             originalUrl: imageUrl,
-            cachedUrl: `/api/images/${tweetId}/${type}/${filename}`,
+            cachedUrl: `https://api.tidyfeed.app/api/images/${tweetId}/${type}/${filename}`,
             r2Key,
         };
     } catch (error) {

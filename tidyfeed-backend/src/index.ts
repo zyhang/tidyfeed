@@ -742,15 +742,30 @@ async function triggerCacheInBackground(
 			}
 		}
 
+		// Fetch comments/replies (top 20)
+		let comments: any[] = [];
+		try {
+			const commentsResult = await tikhub.fetchTweetComments(tweetId, undefined, 20);
+			comments = commentsResult.comments || [];
+			// Add comment author avatars for caching
+			for (const comment of comments) {
+				if (comment.author?.profile_image_url) {
+					avatarUrls.push(comment.author.profile_image_url.replace('_normal', '_bigger'));
+				}
+			}
+		} catch (err) {
+			console.log(`[AutoCache] Failed to fetch comments for ${tweetId}:`, err);
+		}
+
 		// Cache all images to R2
 		const urlMap = await cacheMediaToR2(env.MEDIA_BUCKET, tweetId, allMedia, avatarUrls);
 
 		// Replace URLs in tweet data with cached URLs
 		const cachedTweetData = replaceMediaUrls(tweetData, urlMap);
 
-		// Generate HTML snapshot with cached URLs
-		const snapshotHtml = generateTweetSnapshot(cachedTweetData, [], {
-			includeComments: false,
+		// Generate HTML snapshot with cached URLs and comments
+		const snapshotHtml = generateTweetSnapshot(cachedTweetData, comments, {
+			includeComments: comments.length > 0,
 			theme: 'auto',
 		});
 
@@ -776,6 +791,8 @@ async function triggerCacheInBackground(
 			ON CONFLICT(tweet_id) DO UPDATE SET
 				cached_data = excluded.cached_data,
 				snapshot_r2_key = excluded.snapshot_r2_key,
+				comments_data = excluded.comments_data,
+				comments_count = excluded.comments_count,
 				has_media = excluded.has_media,
 				has_video = excluded.has_video,
 				has_quoted_tweet = excluded.has_quoted_tweet,
@@ -784,14 +801,14 @@ async function triggerCacheInBackground(
 			tweetId,
 			JSON.stringify(tweetData), // Store original data, not cached URLs
 			r2Key,
-			null,
-			0,
+			comments.length > 0 ? JSON.stringify(comments) : null,
+			comments.length,
 			hasMedia ? 1 : 0,
 			hasVideo ? 1 : 0,
 			hasQuotedTweet ? 1 : 0,
 		).run();
 
-		console.log(`[AutoCache] Successfully cached tweet ${tweetId} with ${urlMap.size} images`);
+		console.log(`[AutoCache] Successfully cached tweet ${tweetId} with ${urlMap.size} images and ${comments.length} comments`);
 	} catch (error) {
 		console.error(`[AutoCache] Error caching tweet ${tweetId}:`, error);
 	}
@@ -871,6 +888,7 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 			}
 		}
 
+		// Delete the saved post
 		const result = await c.env.DB.prepare(
 			'DELETE FROM saved_posts WHERE user_id = ? AND x_post_id = ?'
 		).bind(userId, xId).run();
@@ -878,6 +896,27 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 		if (result.meta.changes === 0) {
 			return c.json({ error: 'Post not found' }, 404);
 		}
+
+		// Clean up cached content (background, non-blocking)
+		c.executionCtx.waitUntil((async () => {
+			try {
+				// Delete cached_tweets entry
+				await c.env.DB.prepare('DELETE FROM cached_tweets WHERE tweet_id = ?').bind(xId).run();
+
+				// Delete all R2 images for this tweet
+				const imagesList = await c.env.MEDIA_BUCKET.list({ prefix: `images/${xId}/` });
+				for (const obj of imagesList.objects) {
+					await c.env.MEDIA_BUCKET.delete(obj.key);
+				}
+				console.log(`[Cleanup] Deleted ${imagesList.objects.length} cached images for tweet ${xId}`);
+
+				// Delete R2 snapshot
+				await c.env.MEDIA_BUCKET.delete(`snapshots/${xId}.html`);
+				console.log(`[Cleanup] Deleted snapshot for tweet ${xId}`);
+			} catch (err) {
+				console.error(`[Cleanup] Error cleaning cached content for ${xId}:`, err);
+			}
+		})());
 
 		return c.json({ success: true, message: 'Post deleted' });
 	} catch (error) {
