@@ -104,6 +104,27 @@ export class TikHubService {
                 return null;
             }
 
+            // DEBUG: Log raw response to understand structure
+            console.log(`[TikHub] Raw API response keys:`, Object.keys(result.data));
+            if (result.data.tweet) {
+                console.log(`[TikHub] tweet keys:`, Object.keys(result.data.tweet));
+            }
+            if (result.data.data) {
+                console.log(`[TikHub] data.data keys:`, Object.keys(result.data.data));
+            }
+            // Check for quoted tweet indicators
+            const raw = result.data;
+            const tweet = raw.tweet || raw.data || raw;
+            const legacy = tweet.legacy || tweet;
+            console.log(`[TikHub] Checking for quoted_tweet:`);
+            console.log(`[TikHub]   legacy.quoted_status_result:`, !!legacy.quoted_status_result);
+            console.log(`[TikHub]   legacy.quoted_status:`, !!legacy.quoted_status);
+            console.log(`[TikHub]   tweet.quoted_status_result:`, !!tweet.quoted_status_result);
+            console.log(`[TikHub]   tweet.quoted_status:`, !!tweet.quoted_status);
+            console.log(`[TikHub]   tweet.quotedRefResult:`, !!tweet.quotedRefResult);
+            console.log(`[TikHub]   legacy.is_quote_status:`, legacy.is_quote_status);
+            console.log(`[TikHub]   legacy.quoted_status_id_str:`, legacy.quoted_status_id_str);
+
             return this.parseTweetData(result.data);
         } catch (error) {
             console.error('[TikHub] Error fetching tweet:', error);

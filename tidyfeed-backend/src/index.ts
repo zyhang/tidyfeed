@@ -723,6 +723,23 @@ async function triggerCacheInBackground(
 			return;
 		}
 
+		// If no quoted_tweet but text contains t.co URL, try to fetch quoted tweet
+		if (!tweetData.quoted_tweet && tweetData.text) {
+			const quotedTweetId = await extractQuotedTweetId(tweetData.text);
+			if (quotedTweetId) {
+				console.log(`[AutoCache] Found quoted tweet ID in text: ${quotedTweetId}`);
+				try {
+					const quotedTweet = await tikhub.fetchTweetDetail(quotedTweetId);
+					if (quotedTweet) {
+						console.log(`[AutoCache] Successfully fetched quoted tweet: ${quotedTweetId}`);
+						tweetData.quoted_tweet = quotedTweet;
+					}
+				} catch (err) {
+					console.log(`[AutoCache] Failed to fetch quoted tweet ${quotedTweetId}:`, err);
+				}
+			}
+		}
+
 		// Collect all media items and avatar URLs
 		const allMedia = [...(tweetData.media || [])];
 		const avatarUrls: string[] = [];
