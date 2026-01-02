@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash, Pin, Play, Cloud, Loader2, Plus, Archive, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash, Pin, Play, Cloud, Loader2, Plus, Archive, CheckCircle2, AlertTriangle, FileText } from 'lucide-react'
 import { TagInput } from '@/components/TagInput'
 import { cn } from '@/lib/utils'
 import {
@@ -232,7 +232,7 @@ export function TweetCard({
                             {isCaching ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : isCached ? (
-                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                <FileText className="h-3.5 w-3.5" />
                             ) : (
                                 <Archive className="h-3.5 w-3.5" />
                             )}
@@ -276,7 +276,22 @@ export function TweetCard({
                                 <p className="text-xs text-muted-foreground font-medium">{author?.handle || '@unknown'}</p>
                             </div>
                         </div>
-                        <span className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wider">{formattedDate}</span>
+                        <div className="flex items-center gap-2">
+                            {isCached && cachedSnapshotUrl && (
+                                <a
+                                    href={cachedSnapshotUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title="View saved snapshot"
+                                >
+                                    <FileText className="w-3 h-3" />
+                                    Snapshot
+                                </a>
+                            )}
+                            <span className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wider">{formattedDate}</span>
+                        </div>
                     </div>
 
                     {/* Content */}
