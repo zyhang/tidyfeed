@@ -1,0 +1,32 @@
+# flyctl launch added from .gitignore
+# Environment variables (contains secrets)
+**/.env
+
+# Cookies file (contains auth tokens - NEVER commit!)
+**/cookies.json
+**/*.cookies
+
+# Python
+**/__pycache__
+**/*.py[cod]
+**/*$py.class
+**/*.so
+**/.Python
+**/venv
+**/.venv
+**/env
+**/.eggs
+**/*.egg-info
+**/dist
+**/build
+
+# IDE
+**/.vscode
+**/.idea
+**/*.swp
+**/*.swo
+
+# OS
+**/.DS_Store
+**/Thumbs.db
+fly.toml

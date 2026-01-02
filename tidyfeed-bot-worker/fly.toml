@@ -1,0 +1,27 @@
+# fly.toml app configuration file generated for tidyfeed-bot-worker on 2026-01-02
+#
+# This is a background worker that polls for Twitter mentions.
+# No HTTP service needed.
+#
+
+app = 'tidyfeed-bot-worker'
+primary_region = 'lax'
+
+[build]
+
+[env]
+  API_BASE_URL = 'https://api.tidyfeed.app'
+  BOT_COOKIES_PATH = '/data/cookies.json'
+  LOG_LEVEL = 'INFO'
+  POLL_MAX_SECONDS = '90'
+  POLL_MIN_SECONDS = '45'
+  PROCESSED_IDS_PATH = '/data/processed_ids.json'
+
+[[mounts]]
+  source = 'data'
+  destination = '/data'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '256mb'
+  cpus = 1

@@ -1,0 +1,47 @@
+# TidyFeed Bot Worker - Docker Compose
+# 
+# Usage:
+#   1. Create ./bot-data directory
+#   2. Copy cookies.json to ./bot-data/cookies.json
+#   3. Set environment variables in .env or directly below
+#   4. Run: docker-compose up -d
+
+version: '3.8'
+
+services:
+  bot-worker:
+    build: .
+    container_name: tidyfeed-bot-worker
+    restart: always
+    
+    # Environment variables
+    environment:
+      - API_BASE_URL=${API_BASE_URL:-https://api.tidyfeed.app}
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - BOT_COOKIES_PATH=/data/cookies.json
+      - PROCESSED_IDS_PATH=/data/processed_ids.json
+      - POLL_MIN_SECONDS=${POLL_MIN_SECONDS:-45}
+      - POLL_MAX_SECONDS=${POLL_MAX_SECONDS:-90}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    
+    # Persistent volume for cookies and state
+    # IMPORTANT: Copy cookies.json here before first run!
+    volumes:
+      - ./bot-data:/data
+    
+    # Resource limits (lightweight service)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    
+    # Logging
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

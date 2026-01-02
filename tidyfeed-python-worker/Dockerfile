@@ -15,20 +15,29 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy worker script
+# Copy worker scripts
 COPY worker.py .
+COPY bot_poller.py .
+COPY main.py .
 
 # Create temp directory for downloads
 RUN mkdir -p /tmp/downloads
 
 # Environment variables (to be overridden at runtime)
 ENV API_BASE_URL=https://api.tidyfeed.app
-ENV INTERNAL_SERVICE_KEY=
+ENV INTERNAL_SERVICE_KEY=your-internal-service-key-here
 ENV POLL_INTERVAL=5
 ENV R2_ACCOUNT_ID=
 ENV R2_ACCESS_KEY_ID=
 ENV R2_SECRET_ACCESS_KEY=
 ENV R2_BUCKET_NAME=tidyfeed-media
 
-# Run the worker
-CMD ["python", "-u", "worker.py"]
+# Bot configuration (optional)
+ENV BOT_USERNAME=
+ENV BOT_EMAIL=
+ENV BOT_PASSWORD=
+ENV BOT_COOKIES_JSON=
+ENV BOT_POLL_INTERVAL=60
+
+# Run the unified worker (video downloader + bot poller)
+CMD ["python", "-u", "main.py"]

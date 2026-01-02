@@ -9,6 +9,7 @@ import { sign, verify } from 'hono/jwt';
 import bcrypt from 'bcryptjs';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import downloads from './routes/downloads';
+import internal from './routes/internal';
 
 // Google OAuth JWKS endpoint for ID token verification
 const GOOGLE_JWKS = createRemoteJWKSet(
@@ -1249,5 +1250,8 @@ app.get('/api/reports/all', jwtMiddleware, async (c) => {
 
 // Mount downloads routes
 app.route('/api/downloads', downloads);
+
+// Mount internal service routes (bot worker, etc.)
+app.route('/api/internal', internal);
 
 export default app;

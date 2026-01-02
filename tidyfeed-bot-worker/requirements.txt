@@ -1,0 +1,11 @@
+# TidyFeed Bot Worker Dependencies
+# Lightweight service for Twitter mention monitoring
+
+# Twitter API client (async)
+twikit>=2.1.0
+
+# HTTP requests to backend API
+requests>=2.31.0
+
+# Environment variable loading
+python-dotenv>=1.0.0
