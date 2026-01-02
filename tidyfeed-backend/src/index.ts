@@ -691,7 +691,8 @@ app.post('/api/report', async (c) => {
 // Helper: Trigger caching in background (non-blocking)
 async function triggerCacheInBackground(
 	env: Bindings,
-	tweetId: string
+	tweetId: string,
+	userId?: string
 ): Promise<void> {
 	try {
 		// Check if already cached
@@ -775,7 +776,7 @@ async function triggerCacheInBackground(
 		}
 
 		// Cache all images to R2
-		const urlMap = await cacheMediaToR2(env.MEDIA_BUCKET, tweetId, allMedia, avatarUrls);
+		const { urlMap, totalSize } = await cacheMediaToR2(env.MEDIA_BUCKET, tweetId, allMedia, avatarUrls);
 
 		// Replace URLs in tweet data with cached URLs
 		const cachedTweetData = replaceMediaUrls(tweetData, urlMap);
@@ -803,8 +804,9 @@ async function triggerCacheInBackground(
 		await env.DB.prepare(`
 			INSERT INTO cached_tweets (
 				tweet_id, cached_data, snapshot_r2_key, comments_data, 
-				comments_count, has_media, has_video, has_quoted_tweet
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+				comments_count, has_media, has_video, has_quoted_tweet,
+				media_size
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(tweet_id) DO UPDATE SET
 				cached_data = excluded.cached_data,
 				snapshot_r2_key = excluded.snapshot_r2_key,
@@ -813,6 +815,7 @@ async function triggerCacheInBackground(
 				has_media = excluded.has_media,
 				has_video = excluded.has_video,
 				has_quoted_tweet = excluded.has_quoted_tweet,
+				media_size = excluded.media_size,
 				updated_at = CURRENT_TIMESTAMP
 		`).bind(
 			tweetId,
@@ -823,7 +826,16 @@ async function triggerCacheInBackground(
 			hasMedia ? 1 : 0,
 			hasVideo ? 1 : 0,
 			hasQuotedTweet ? 1 : 0,
+			totalSize
 		).run();
+
+		// Increment user storage usage if userId provided
+		if (userId && totalSize > 0) {
+			await env.DB.prepare(
+				'UPDATE users SET storage_usage = storage_usage + ? WHERE id = ?'
+			).bind(totalSize, userId).run();
+			console.log(`[AutoCache] Incremented storage usage for user ${userId} by ${totalSize} bytes`);
+		}
 
 		console.log(`[AutoCache] Successfully cached tweet ${tweetId} with ${urlMap.size} images and ${comments.length} comments`);
 	} catch (error) {
@@ -854,7 +866,7 @@ app.post('/api/posts', cookieAuthMiddleware, async (c) => {
 			).bind(userId, x_id, content || null, authorInfo, mediaUrls, url || null, platform || 'x').run();
 
 			// Trigger caching in background (non-blocking)
-			c.executionCtx.waitUntil(triggerCacheInBackground(c.env, x_id));
+			c.executionCtx.waitUntil(triggerCacheInBackground(c.env, x_id, userId));
 
 			return c.json({ success: true, message: 'Post saved' });
 		} catch (dbError: any) {
@@ -903,6 +915,18 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 					).bind(download.file_size, userId).run();
 				}
 			}
+		}
+
+		// Decrement usage from cached tweet media
+		const cachedTweet = await c.env.DB.prepare(
+			'SELECT media_size FROM cached_tweets WHERE tweet_id = ?'
+		).bind(xId).first<{ media_size: number }>();
+
+		if (cachedTweet && cachedTweet.media_size && cachedTweet.media_size > 0) {
+			await c.env.DB.prepare(
+				'UPDATE users SET storage_usage = MAX(0, storage_usage - ?) WHERE id = ?'
+			).bind(cachedTweet.media_size, userId).run();
+			console.log(`[Delete] Decremented storage usage for user ${userId} by ${cachedTweet.media_size} bytes (cached media)`);
 		}
 
 		// Delete the saved post
@@ -1469,3 +1493,56 @@ app.route('/api/internal', internal);
 app.route('/api/tweets', caching);
 
 export default app;
+
+// Helper: Extract quoted tweet ID from t.co URLs in text
+async function extractQuotedTweetId(text: string): Promise<string | null> {
+	try {
+		// Find all t.co links
+		const tcoMatches = text.match(/https:\/\/t\.co\/[a-zA-Z0-9]+/g);
+		if (!tcoMatches) return null;
+
+		for (const tcoUrl of tcoMatches) {
+			try {
+				// Resolve URL (HEAD request not always supported by t.co, use GET with redirect: manual or follow)
+				const response = await fetch(tcoUrl, {
+					method: 'GET',
+					redirect: 'manual',
+					headers: {
+						'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+					}
+				});
+
+				const locationHeader = response.headers.get('location');
+				let targetUrl = locationHeader;
+
+				if (!targetUrl) {
+					const text = await response.text();
+					// Try to find URL in meta refresh or script
+					const metaMatch = text.match(/URL=([^"]+)"/i);
+					if (metaMatch) targetUrl = metaMatch[1];
+
+					if (!targetUrl) {
+						const scriptMatch = text.match(/location\.replace\("([^"]+)"\)/);
+						if (scriptMatch) targetUrl = scriptMatch[1].replace(/\\/g, '');
+					}
+				}
+
+				if (targetUrl) {
+					// Check if it matches a tweet URL
+					// https://twitter.com/username/status/1234567890
+					// https://x.com/username/status/1234567890
+					const tweetMatch = targetUrl.match(/(?:twitter\.com|x\.com)\/(?:\w+)\/status\/(\d+)/);
+					if (tweetMatch && tweetMatch[1]) {
+						return tweetMatch[1];
+					}
+				}
+			} catch (e) {
+				console.log(`[AutoCache] Error resolving ${tcoUrl}: `, e);
+			}
+		}
+		return null;
+	} catch (e) {
+		console.error('[AutoCache] Error extracting quoted tweet ID:', e);
+		return null;
+	}
+}

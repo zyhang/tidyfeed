@@ -213,7 +213,7 @@ internal.post('/bot-save', async (c) => {
                     }
 
                     // Cache all images to R2
-                    const urlMap = await cacheMediaToR2(c.env.MEDIA_BUCKET!, xPostId, allMedia, avatarUrls);
+                    const { urlMap } = await cacheMediaToR2(c.env.MEDIA_BUCKET!, xPostId, allMedia, avatarUrls);
 
                     // Replace URLs in tweet data with cached URLs
                     const cachedTweetData = replaceMediaUrls(tweetData, urlMap);

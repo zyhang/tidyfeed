@@ -11,19 +11,21 @@ export interface CachedMediaResult {
     originalUrl: string;
     cachedUrl: string;
     r2Key: string;
+    fileSize: number;
 }
 
 /**
  * Cache media items to R2 storage
- * Returns a Map of original URL -> cached API URL
+ * Returns a Map of original URL -> cached API URL, and total size in bytes
  */
 export async function cacheMediaToR2(
     mediaBucket: R2Bucket,
     tweetId: string,
     media: TikHubMedia[],
     avatarUrls: string[] = []
-): Promise<Map<string, string>> {
+): Promise<{ urlMap: Map<string, string>; totalSize: number }> {
     const urlMap = new Map<string, string>();
+    let totalSize = 0;
 
     // Collect all URLs to cache
     const urlsToCache: { url: string; type: 'media' | 'avatar' }[] = [];
@@ -52,6 +54,7 @@ export async function cacheMediaToR2(
             const result = await cacheImageToR2(mediaBucket, tweetId, url, type);
             if (result) {
                 urlMap.set(result.originalUrl, result.cachedUrl);
+                totalSize += result.fileSize || 0;
             }
         } catch (error) {
             console.error(`[ImageCache] Failed to cache ${url}:`, error);
@@ -60,8 +63,8 @@ export async function cacheMediaToR2(
 
     await Promise.all(cachePromises);
 
-    console.log(`[ImageCache] Cached ${urlMap.size} images for tweet ${tweetId}`);
-    return urlMap;
+    console.log(`[ImageCache] Cached ${urlMap.size} images for tweet ${tweetId}, total size: ${totalSize} bytes`);
+    return { urlMap, totalSize };
 }
 
 /**
@@ -87,6 +90,7 @@ async function cacheImageToR2(
                 originalUrl: imageUrl,
                 cachedUrl: `https://api.tidyfeed.app/api/images/${tweetId}/${type}/${filename}`,
                 r2Key,
+                fileSize: existing.size,
             };
         }
 
@@ -104,6 +108,7 @@ async function cacheImageToR2(
 
         const contentType = response.headers.get('content-type') || 'image/jpeg';
         const imageData = await response.arrayBuffer();
+        const fileSize = imageData.byteLength;
 
         // Upload to R2
         await mediaBucket.put(r2Key, imageData, {
@@ -117,6 +122,7 @@ async function cacheImageToR2(
             originalUrl: imageUrl,
             cachedUrl: `https://api.tidyfeed.app/api/images/${tweetId}/${type}/${filename}`,
             r2Key,
+            fileSize,
         };
     } catch (error) {
         console.error(`[ImageCache] Error caching ${imageUrl}:`, error);
