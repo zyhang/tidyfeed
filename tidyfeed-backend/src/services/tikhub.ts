@@ -183,9 +183,8 @@ export class TikHubService {
                 followers_count: user.followers_count || user.legacy?.followers_count || 0,
             },
             media: this.parseMedia(legacy.extended_entities?.media || legacy.entities?.media || []),
-            quoted_tweet: legacy.quoted_status_result?.result
-                ? this.parseTweetData(legacy.quoted_status_result.result)
-                : undefined,
+            // Check multiple locations for quoted tweet
+            quoted_tweet: this.parseQuotedTweet(tweet, legacy),
             metrics: {
                 like_count: legacy.favorite_count || 0,
                 retweet_count: legacy.retweet_count || 0,
@@ -194,6 +193,33 @@ export class TikHubService {
             },
             source: legacy.source || '',
         };
+    }
+
+    /**
+     * Parse quoted tweet from various possible locations in the data
+     */
+    private parseQuotedTweet(tweet: any, legacy: any): TikHubTweetData | undefined {
+        // Try various locations where quoted tweet data might be
+        const quotedData =
+            legacy.quoted_status_result?.result ||
+            legacy.quoted_status ||
+            tweet.quoted_status_result?.result ||
+            tweet.quoted_status ||
+            tweet.quoted_tweet ||
+            legacy.quoted_tweet;
+
+        if (quotedData) {
+            console.log('[TikHub] Found quoted tweet data');
+            return this.parseTweetData(quotedData);
+        }
+
+        // Sometimes the quoted tweet is in a different wrapper
+        if (tweet.quotedRefResult?.result?.tweet) {
+            console.log('[TikHub] Found quoted tweet in quotedRefResult');
+            return this.parseTweetData(tweet.quotedRefResult.result.tweet);
+        }
+
+        return undefined;
     }
 
     /**
