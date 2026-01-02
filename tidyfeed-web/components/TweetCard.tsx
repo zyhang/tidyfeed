@@ -328,6 +328,11 @@ export function TweetCard({
                                         alt={`Media ${idx + 1}`}
                                         className="w-full h-auto object-cover transition-transform duration-500 group-hover/media:scale-105"
                                         loading="lazy"
+                                        onError={(e) => {
+                                            // Hide container if image fails to load
+                                            const parent = e.currentTarget.parentElement
+                                            if (parent) parent.style.display = 'none'
+                                        }}
                                     />
                                     <div className="absolute inset-0 bg-black/0 group-hover/media:bg-black/5 transition-colors pointer-events-none" />
                                 </div>

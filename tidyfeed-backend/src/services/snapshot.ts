@@ -15,22 +15,22 @@ import type { TikHubTweetData, TikHubComment, TikHubMedia } from './tikhub';
 import { TikHubService } from './tikhub';
 
 interface SnapshotOptions {
-    includeComments?: boolean;
-    maxComments?: number;
-    theme?: 'light' | 'dark' | 'auto';
+	includeComments?: boolean;
+	maxComments?: number;
+	theme?: 'light' | 'dark' | 'auto';
 }
 
 /**
  * Generate a complete HTML snapshot for a tweet
  */
 export function generateTweetSnapshot(
-    tweet: TikHubTweetData,
-    comments: TikHubComment[] = [],
-    options: SnapshotOptions = {}
+	tweet: TikHubTweetData,
+	comments: TikHubComment[] = [],
+	options: SnapshotOptions = {}
 ): string {
-    const { theme = 'auto' } = options;
+	const { theme = 'auto' } = options;
 
-    return `<!DOCTYPE html>
+	return `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
@@ -68,17 +68,17 @@ ${getStyles(theme)}
  * Render the main tweet content
  */
 function renderTweetContent(tweet: TikHubTweetData, isQuote: boolean = false): string {
-    const hasVideo = tweet.media?.some(m => m.type === 'video' || m.type === 'animated_gif');
-    const images = tweet.media?.filter(m => m.type === 'photo') || [];
-    const video = tweet.media?.find(m => m.type === 'video' || m.type === 'animated_gif');
+	const hasVideo = tweet.media?.some(m => m.type === 'video' || m.type === 'animated_gif');
+	const images = tweet.media?.filter(m => m.type === 'photo') || [];
+	const video = tweet.media?.find(m => m.type === 'video' || m.type === 'animated_gif');
 
-    return `
+	return `
 		<div class="tweet-header">
 			<div class="author-avatar">
 				${tweet.author.profile_image_url
-            ? `<img src="${tweet.author.profile_image_url.replace('_normal', '_bigger')}" alt="${escapeHtml(tweet.author.name)}" loading="lazy">`
-            : `<div class="avatar-placeholder">${tweet.author.name.charAt(0).toUpperCase()}</div>`
-        }
+			? `<img src="${tweet.author.profile_image_url.replace('_normal', '_bigger')}" alt="${escapeHtml(tweet.author.name)}" loading="lazy" onerror="this.onerror=null; this.outerHTML='<div class=\\'avatar-placeholder\\'>${tweet.author.name.charAt(0).toUpperCase()}</div>';">`
+			: `<div class="avatar-placeholder">${tweet.author.name.charAt(0).toUpperCase()}</div>`
+		}
 			</div>
 			<div class="author-info">
 				<div class="author-name">
@@ -110,14 +110,15 @@ function renderTweetContent(tweet: TikHubTweetData, isQuote: boolean = false): s
  * Render media gallery
  */
 function renderMediaGallery(images: TikHubMedia[]): string {
-    const count = Math.min(images.length, 4);
-    const gridClass = count === 1 ? 'single' : count === 2 ? 'double' : count === 3 ? 'triple' : 'quad';
+	const count = Math.min(images.length, 4);
+	const gridClass = count === 1 ? 'single' : count === 2 ? 'double' : count === 3 ? 'triple' : 'quad';
 
-    return `
+	return `
 		<div class="media-gallery ${gridClass}">
 			${images.slice(0, 4).map((img, i) => `
 				<a href="${img.url}" target="_blank" class="media-item" rel="noopener">
-					<img src="${img.url}" alt="Image ${i + 1}" loading="lazy">
+					<img src="${img.url}" alt="Image ${i + 1}" loading="lazy" 
+						onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<div class=\\'placeholder-img\\'><svg width=\\'24\\' height=\\'24\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'currentColor\\' stroke-width=\\'2\\'><rect x=\\'3\\' y=\\'3\\' width=\\'18\\' height=\\'18\\' rx=\\'2\\'/><circle cx=\\'8.5\\' cy=\\'8.5\\' r=\\'1.5\\'/><path d=\\'M21 15l-5-5L5 21\\'/></svg><span>Image loading... Refresh to view</span></div>';">
 				</a>
 			`).join('')}
 		</div>
@@ -128,10 +129,10 @@ function renderMediaGallery(images: TikHubMedia[]): string {
  * Render video with poster
  */
 function renderVideo(video: TikHubMedia): string {
-    const videoUrl = TikHubService.getBestVideoUrl(video);
-    const posterUrl = video.preview_url || video.url;
+	const videoUrl = TikHubService.getBestVideoUrl(video);
+	const posterUrl = video.preview_url || video.url;
 
-    return `
+	return `
 		<div class="video-container">
 			<video 
 				controls 
@@ -150,7 +151,7 @@ function renderVideo(video: TikHubMedia): string {
  * Render quoted tweet
  */
 function renderQuotedTweet(quoted: TikHubTweetData): string {
-    return `
+	return `
 		<div class="quoted-tweet">
 			<div class="quoted-header">
 				<img src="${quoted.author.profile_image_url?.replace('_normal', '_bigger')}" alt="" class="quoted-avatar">
@@ -167,10 +168,10 @@ function renderQuotedTweet(quoted: TikHubTweetData): string {
  * Render tweet metrics (likes, retweets, views)
  */
 function renderMetrics(tweet: TikHubTweetData): string {
-    const { metrics } = tweet;
-    if (!metrics) return '';
+	const { metrics } = tweet;
+	if (!metrics) return '';
 
-    return `
+	return `
 		<div class="tweet-metrics">
 			${metrics.reply_count ? `<span class="metric"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z"/></svg>${formatNumber(metrics.reply_count)}</span>` : ''}
 			${metrics.retweet_count ? `<span class="metric"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"/></svg>${formatNumber(metrics.retweet_count)}</span>` : ''}
@@ -184,7 +185,7 @@ function renderMetrics(tweet: TikHubTweetData): string {
  * Render comments section
  */
 function renderCommentsSection(comments: TikHubComment[]): string {
-    return `
+	return `
 		<div class="comments-section">
 			<h3 class="comments-title">Replies</h3>
 			<div class="comments-list">
@@ -212,11 +213,11 @@ function renderCommentsSection(comments: TikHubComment[]): string {
  * Get CSS styles
  */
 function getStyles(theme: 'light' | 'dark' | 'auto'): string {
-    const themeSelector = theme === 'auto'
-        ? '@media (prefers-color-scheme: dark)'
-        : theme === 'dark' ? ':root' : '';
+	const themeSelector = theme === 'auto'
+		? '@media (prefers-color-scheme: dark)'
+		: theme === 'dark' ? ':root' : '';
 
-    return `
+	return `
 		:root {
 			--bg: #ffffff;
 			--text: #0f1419;
@@ -408,6 +409,26 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 			transform: scale(1.02);
 		}
 
+		.placeholder-img {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+			background: linear-gradient(135deg, rgba(29, 155, 240, 0.1) 0%, rgba(29, 155, 240, 0.05) 100%);
+			color: var(--text-secondary);
+			font-size: 13px;
+			padding: 32px 16px;
+			border-radius: 12px;
+			min-height: 120px;
+			height: 100%;
+			text-align: center;
+		}
+
+		.placeholder-img svg {
+			opacity: 0.5;
+		}
+
 		.video-container {
 			border-radius: 16px;
 			overflow: hidden;
@@ -592,85 +613,85 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 // Helper functions
 
 function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+	return text
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#039;');
 }
 
 function truncateText(text: string, maxLength: number): string {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength).trim() + '...';
+	if (text.length <= maxLength) return text;
+	return text.substring(0, maxLength).trim() + '...';
 }
 
 function formatTweetText(text: string): string {
-    let formatted = escapeHtml(text);
+	let formatted = escapeHtml(text);
 
-    // Convert URLs to links
-    formatted = formatted.replace(
-        /(https?:\/\/[^\s]+)/g,
-        '<a href="$1" target="_blank" rel="noopener">$1</a>'
-    );
+	// Convert URLs to links
+	formatted = formatted.replace(
+		/(https?:\/\/[^\s]+)/g,
+		'<a href="$1" target="_blank" rel="noopener">$1</a>'
+	);
 
-    // Convert @mentions to links
-    formatted = formatted.replace(
-        /@(\w+)/g,
-        '<a href="https://x.com/$1" target="_blank" rel="noopener">@$1</a>'
-    );
+	// Convert @mentions to links
+	formatted = formatted.replace(
+		/@(\w+)/g,
+		'<a href="https://x.com/$1" target="_blank" rel="noopener">@$1</a>'
+	);
 
-    // Convert #hashtags to links
-    formatted = formatted.replace(
-        /#(\w+)/g,
-        '<a href="https://x.com/hashtag/$1" target="_blank" rel="noopener">#$1</a>'
-    );
+	// Convert #hashtags to links
+	formatted = formatted.replace(
+		/#(\w+)/g,
+		'<a href="https://x.com/hashtag/$1" target="_blank" rel="noopener">#$1</a>'
+	);
 
-    return formatted;
+	return formatted;
 }
 
 function formatDate(dateStr: string): string {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-    });
+	const date = new Date(dateStr);
+	return date.toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
 }
 
 function formatFullDate(dateStr: string): string {
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-    });
+	const date = new Date(dateStr);
+	return date.toLocaleString('en-US', {
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
 }
 
 function formatRelativeTime(dateStr: string): string {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+	const date = new Date(dateStr);
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffMins = Math.floor(diffMs / 60000);
+	const diffHours = Math.floor(diffMs / 3600000);
+	const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'now';
-    if (diffMins < 60) return `${diffMins}m`;
-    if (diffHours < 24) return `${diffHours}h`;
-    if (diffDays < 7) return `${diffDays}d`;
-    return formatDate(dateStr);
+	if (diffMins < 1) return 'now';
+	if (diffMins < 60) return `${diffMins}m`;
+	if (diffHours < 24) return `${diffHours}h`;
+	if (diffDays < 7) return `${diffDays}d`;
+	return formatDate(dateStr);
 }
 
 function formatNumber(num: number): string {
-    if (num >= 1000000) {
-        return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-    }
-    if (num >= 1000) {
-        return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-    }
-    return num.toString();
+	if (num >= 1000000) {
+		return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+	}
+	if (num >= 1000) {
+		return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+	}
+	return num.toString();
 }
