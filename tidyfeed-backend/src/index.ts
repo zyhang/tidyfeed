@@ -10,6 +10,7 @@ import bcrypt from 'bcryptjs';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import downloads from './routes/downloads';
 import internal from './routes/internal';
+import caching from './routes/caching';
 
 // Google OAuth JWKS endpoint for ID token verification
 const GOOGLE_JWKS = createRemoteJWKSet(
@@ -23,6 +24,7 @@ type Bindings = {
 	GOOGLE_CLIENT_SECRET: string;
 	MEDIA_BUCKET: R2Bucket;
 	INTERNAL_SERVICE_KEY: string;
+	TIKHUB_API_KEY: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -1253,5 +1255,8 @@ app.route('/api/downloads', downloads);
 
 // Mount internal service routes (bot worker, etc.)
 app.route('/api/internal', internal);
+
+// Mount tweet caching routes
+app.route('/api/tweets', caching);
 
 export default app;

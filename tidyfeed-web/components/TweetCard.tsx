@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash, Pin, Play, Cloud, Loader2, Plus } from 'lucide-react'
+import { Trash2, ExternalLink, ChevronDown, ChevronUp, X, Hash, Pin, Play, Cloud, Loader2, Plus, Archive, CheckCircle2 } from 'lucide-react'
 import { TagInput } from '@/components/TagInput'
 import { cn } from '@/lib/utils'
 
@@ -24,6 +24,11 @@ interface VideoInfo {
     metadata?: any
 }
 
+interface CacheInfo {
+    cached: boolean
+    snapshotUrl?: string
+}
+
 interface TweetCardProps {
     id: number
     xId: string
@@ -36,9 +41,11 @@ interface TweetCardProps {
     tags?: Tag[]
     pinnedAt?: string | null
     videoInfo?: VideoInfo | null
+    cacheInfo?: CacheInfo | null
     onDelete: (xId: string) => void
     onPin?: (xId: string, pinned: boolean) => void
     onRemoveTag?: (xId: string, tagId: number) => void
+    onCache?: (xId: string) => Promise<{ snapshotUrl?: string } | void>
 }
 
 export function TweetCard({
@@ -53,9 +60,11 @@ export function TweetCard({
     tags: initialTags = [],
     pinnedAt,
     videoInfo,
+    cacheInfo,
     onDelete,
     onPin,
     onRemoveTag,
+    onCache,
 }: TweetCardProps) {
     const [expanded, setExpanded] = useState(false)
     const [deleting, setDeleting] = useState(false)
@@ -64,8 +73,11 @@ export function TweetCard({
     const [tags, setTags] = useState<Tag[]>(initialTags)
     const [removingTagId, setRemovingTagId] = useState<number | null>(null)
     const [isPlayingVideo, setIsPlayingVideo] = useState(false)
+    const [isCaching, setIsCaching] = useState(false)
+    const [cachedSnapshotUrl, setCachedSnapshotUrl] = useState<string | null>(cacheInfo?.snapshotUrl || null)
 
     const isPinned = !!pinnedAt
+    const isCached = !!cacheInfo?.cached || !!cachedSnapshotUrl
 
     useEffect(() => {
         setTags(initialTags)
@@ -108,6 +120,19 @@ export function TweetCard({
             // Ideally we should refetch or the API should return the tag object.
             // For now, use a temporary ID or just ignore ID for key
             setTags([...tags, { id: Date.now(), name: tagName }])
+        }
+    }
+
+    const handleCache = async () => {
+        if (isCaching || isCached || !onCache) return
+        setIsCaching(true)
+        try {
+            const result = await onCache(xId)
+            if (result?.snapshotUrl) {
+                setCachedSnapshotUrl(result.snapshotUrl)
+            }
+        } finally {
+            setIsCaching(false)
         }
     }
 
@@ -170,6 +195,31 @@ export function TweetCard({
                     >
                         <Pin className={cn("h-3.5 w-3.5", isPinned && "fill-current rotate-45")} />
                     </Button>
+
+                    {/* Cache Button */}
+                    {onCache && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={isCached && cachedSnapshotUrl ? () => window.open(cachedSnapshotUrl, '_blank') : handleCache}
+                            disabled={isCaching}
+                            className={cn(
+                                "h-7 w-7 rounded-full bg-background/80 backdrop-blur-md shadow-sm border border-border/10 transition-all hover:scale-105",
+                                isCached
+                                    ? "text-emerald-500 hover:text-emerald-600 bg-emerald-50/80 dark:bg-emerald-900/20 ring-1 ring-emerald-500/20"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background"
+                            )}
+                            title={isCached ? "View cached snapshot" : "Cache this tweet"}
+                        >
+                            {isCaching ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : isCached ? (
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                            ) : (
+                                <Archive className="h-3.5 w-3.5" />
+                            )}
+                        </Button>
+                    )}
 
                     <Button
                         variant="ghost"
