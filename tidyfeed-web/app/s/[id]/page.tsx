@@ -166,7 +166,7 @@ export default function SnapshotViewerPage() {
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-8 py-8 pb-32">
 
                     {/* Loading State - Thinking Animation */}
                     {summaryLoading && (
@@ -205,46 +205,49 @@ export default function SnapshotViewerPage() {
                             <ReactMarkdown
                                 components={{
                                     p: ({ children }) => (
-                                        <p className="text-[15px] leading-[1.75] text-zinc-600 mb-5 last:mb-0 font-normal">{children}</p>
+                                        <p className="text-[16px] leading-[1.8] text-zinc-800 mb-6 last:mb-0 font-normal tracking-wide">{children}</p>
                                     ),
                                     strong: ({ children }) => (
                                         <strong className="font-semibold text-zinc-900">{children}</strong>
                                     ),
                                     ul: ({ children }) => (
-                                        <ul className="space-y-3 mb-6 pl-1">{children}</ul>
+                                        <ul className="space-y-4 mb-8 pl-1">{children}</ul>
                                     ),
                                     ol: ({ children }) => (
-                                        <ol className="space-y-3 mb-6 list-decimal list-outside ml-4">{children}</ol>
+                                        <ol className="space-y-4 mb-8 list-decimal list-outside ml-5 text-zinc-800 font-medium">{children}</ol>
                                     ),
                                     li: ({ children }) => (
-                                        <li className="flex gap-3 text-[15px] leading-relaxed text-zinc-700">
-                                            <span className="flex-shrink-0 mt-[9px] w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+                                        <li className="flex gap-3 text-[16px] leading-[1.7] text-zinc-700">
+                                            <span className="flex-shrink-0 mt-[10px] w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
                                             <span className="flex-1">{children}</span>
                                         </li>
                                     ),
                                     h1: ({ children }) => (
-                                        <h1 className="text-lg font-bold text-zinc-900 mb-4 pb-2 border-b border-zinc-100 tracking-tight">{children}</h1>
+                                        <h1 className="text-xl font-bold text-zinc-900 mb-6 pb-3 border-b border-zinc-100 tracking-tight">{children}</h1>
                                     ),
                                     h2: ({ children }) => (
-                                        <h2 className="text-[16px] font-bold text-zinc-900 mt-8 mb-3 flex items-center gap-2">
+                                        <h2 className="text-[17px] font-bold text-zinc-900 mt-10 mb-4 flex items-center gap-2 tracking-tight">
                                             {children}
                                         </h2>
                                     ),
                                     h3: ({ children }) => (
-                                        <h3 className="text-[15px] font-semibold text-zinc-900 mt-6 mb-2">{children}</h3>
+                                        <h3 className="text-[16px] font-semibold text-zinc-900 mt-8 mb-3">{children}</h3>
                                     ),
                                     blockquote: ({ children }) => (
-                                        <blockquote className="border-l-[3px] border-violet-500 bg-violet-50/30 pl-4 py-3 pr-4 rounded-r-lg italic text-zinc-700 my-6 text-[15px] leading-7">
-                                            "{children}"
+                                        <blockquote className="border-l-4 border-zinc-200 pl-5 py-2 my-8 italic text-zinc-600 text-[17px] leading-loose bg-zinc-50/50 rounded-r-lg">
+                                            {children}
                                         </blockquote>
                                     ),
                                     a: ({ href, children }) => (
-                                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-700 hover:underline underline-offset-2 font-medium">
+                                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-700 hover:underline underline-offset-4 decoration-violet-200 font-medium">
                                             {children}
                                         </a>
                                     ),
                                     code: ({ children }) => (
-                                        <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-[13px] font-mono text-zinc-800">{children}</code>
+                                        <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-[14px] font-mono text-zinc-800 border border-zinc-200/50">{children}</code>
+                                    ),
+                                    hr: () => (
+                                        <hr className="my-10 border-zinc-100" />
                                     ),
                                 }}
                             >{summary}</ReactMarkdown>
@@ -253,7 +256,7 @@ export default function SnapshotViewerPage() {
 
                     {/* Empty State */}
                     {!summary && !summaryLoading && !summaryError && (
-                        <div className="h-full flex flex-col items-center justify-center text-center opacity-60 mt-12">
+                        <div className="h-full flex flex-col items-center justify-center text-center opacity-60 mt-12 pb-32">
                             <div className="h-16 w-16 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center mb-4 rotate-3">
                                 <Sparkles className="h-8 w-8 text-zinc-300" />
                             </div>
