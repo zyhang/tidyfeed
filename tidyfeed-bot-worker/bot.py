@@ -92,6 +92,28 @@ def call_bot_save(handle: str, tweet_url: str, mention_id: str = None,
         return {'success': False, 'error': str(e)}
 
 
+def check_bot_enabled() -> bool:
+    """
+    Check if bot is enabled via backend API.
+    Returns True if enabled or on error (fail open to keep running), False if explicitly paused.
+    """
+    try:
+        response = requests.get(
+            f'{API_BASE_URL}/api/internal/bot-status',
+            headers={'X-Service-Key': INTERNAL_SERVICE_KEY},
+            timeout=10
+        )
+        if response.ok:
+            data = response.json()
+            return data.get('enabled', True)
+        else:
+            logger.warning(f'⚠️ Failed to check bot status: HTTP {response.status_code}')
+            return True  # Fail open
+    except Exception as e:
+        logger.warning(f'⚠️ Failed to check bot status: {e}')
+        return True  # Fail open
+
+
 # ============================================
 # Tweet Parsing
 # ============================================
@@ -451,6 +473,12 @@ async def run_bot():
     
     while True:
         try:
+            # Check pause status
+            if not check_bot_enabled():
+                logger.info('⏸️ Bot execution paused by system setting. Sleeping...')
+                await asyncio.sleep(POLL_MIN_SECONDS)
+                continue
+
             processed = await bot.poll_once()
             
             if processed > 0:

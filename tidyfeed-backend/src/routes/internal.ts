@@ -259,6 +259,53 @@ internal.post('/bot-save', async (c) => {
 });
 
 /**
+ * GET /api/internal/bot-status
+ * Check if the bot should be running.
+ */
+internal.get('/bot-status', async (c) => {
+    try {
+        const setting = await c.env.DB.prepare(
+            "SELECT value FROM system_settings WHERE key = 'bot_enabled'"
+        ).first<{ value: string }>();
+
+        // Default to true if not set
+        const enabled = setting ? setting.value === 'true' : true;
+
+        return c.json({ enabled });
+    } catch (error) {
+        console.error('[Internal] Get bot status error:', error);
+        return c.json({ error: 'Internal server error' }, 500);
+    }
+});
+
+/**
+ * POST /api/internal/bot-status
+ * Update bot execution status.
+ */
+internal.post('/bot-status', async (c) => {
+    try {
+        const { enabled } = await c.req.json();
+
+        if (typeof enabled !== 'boolean') {
+            return c.json({ error: 'enabled (boolean) is required' }, 400);
+        }
+
+        const value = String(enabled);
+
+        await c.env.DB.prepare(
+            `INSERT INTO system_settings (key, value, updated_at)
+             VALUES ('bot_enabled', ?, CURRENT_TIMESTAMP)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+        ).bind(value).run();
+
+        return c.json({ success: true, enabled });
+    } catch (error) {
+        console.error('[Internal] Set bot status error:', error);
+        return c.json({ error: 'Internal server error' }, 500);
+    }
+});
+
+/**
  * GET /api/internal/health
  * 
  * Simple health check for internal services.
