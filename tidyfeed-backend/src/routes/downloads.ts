@@ -383,6 +383,7 @@ downloads.put('/internal/upload-url', internalServiceAuth, async (c) => {
                     const meta = JSON.parse(taskWithMeta.metadata);
                     if (meta.video_index !== undefined) {
                         videoIndex = String(meta.video_index);
+                        videoIndex = `quoted_${videoIndex}`;
                     }
                 }
             } catch (err) {
