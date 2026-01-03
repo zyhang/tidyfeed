@@ -34,42 +34,49 @@ function getLocaleString(key: string): string {
     return LOCALE_STRINGS[key]?.[locale] || LOCALE_STRINGS[key]?.['en'] || key;
 }
 
-// Button Styles - Minimal Badge Design
+// Button Styles - Optimized for perfect alignment with X action buttons
+// Design system: 34x34px touch target (padding-based) matching X's interaction patterns
 const BUTTON_STYLES = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9999px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 7px;
+  border-radius: 50%;
   cursor: pointer;
   color: rgb(113, 118, 123);
   background: transparent;
   border: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  margin-left: 0;
+  transition: all 0.15s ease-out;
   position: relative;
+  flex-shrink: 0;
+  outline: none;
+  line-height: 1;
 `;
 
 const BOOKMARK_BUTTON_HOVER_STYLES = `
-  background-color: rgba(0, 186, 124, 0.12);
+  background-color: rgba(0, 186, 124, 0.1);
   color: rgb(0, 186, 124);
-  transform: scale(1.05);
 `;
 
 const BOOKMARK_BUTTON_ACTIVE_STYLES = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9999px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 7px;
+  border-radius: 50%;
   cursor: pointer;
   color: rgb(0, 186, 124);
   background: transparent;
   border: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s ease-out;
   position: relative;
+  flex-shrink: 0;
+  outline: none;
+  line-height: 1;
 `;
 
 // Premium Icons with TidyFeed "T" Badge
@@ -383,17 +390,15 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
 
     if (!article) return;
 
-    // Premium bounce animation with pulse glow effect
-    button.style.transform = 'scale(0.8)';
-    button.style.filter = 'brightness(1.2)';
+    // Refined spring animation - subtle and professional
+    // Matches X's refined interaction patterns
+    button.style.transform = 'scale(0.85)';
     setTimeout(() => {
-        button.style.transform = 'scale(1.1)';
-        button.style.filter = 'brightness(1) drop-shadow(0 0 8px rgba(0, 186, 124, 0.5))';
-    }, 100);
+        button.style.transform = 'scale(1.08)';
+    }, 50);
     setTimeout(() => {
         button.style.transform = 'scale(1)';
-        button.style.filter = 'brightness(1)';
-    }, 250);
+    }, 150);
 
     const data = extractTweetData(article as HTMLElement);
     const xId = data.tweetId;
@@ -514,16 +519,18 @@ async function createBookmarkButton(tweetId: string): Promise<HTMLButtonElement>
     button.innerHTML = isSaved ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
     button.style.cssText = isSaved ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
 
-    // Hover effects
+    // Enhanced hover effects with smooth transitions
     button.addEventListener('mouseenter', () => {
         if (!button.disabled) {
-            const currentStyle = button.innerHTML === BOOKMARK_ICON_FILLED ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
-            button.style.cssText = currentStyle + BOOKMARK_BUTTON_HOVER_STYLES;
+            // Apply hover style without disrupting base style by adding class-like approach
+            const baseStyle = button.innerHTML === BOOKMARK_ICON_FILLED ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+            button.style.cssText = baseStyle + BOOKMARK_BUTTON_HOVER_STYLES;
         }
     });
 
     button.addEventListener('mouseleave', () => {
         if (!button.disabled) {
+            // Restore base style smoothly via transition
             button.style.cssText = button.innerHTML === BOOKMARK_ICON_FILLED ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
         }
     });
@@ -542,7 +549,7 @@ async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
     }
     article.dataset.tidyfeedInjected = 'true';
 
-    // Find the action bar
+    // Find the action bar (button group)
     let actionBar: Element | null = null;
     const allGroups = article.querySelectorAll('div[role="group"]');
 
@@ -583,10 +590,17 @@ async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
 
     if (tweetId) {
         const bookmarkBtn = await createBookmarkButton(tweetId);
-        // Insert as the last child of the action bar, 
-        // effectively replacing the default bookmark button if we choose to hide it via CSS later,
-        // or getting a spot at the end.
-        actionBar.appendChild(bookmarkBtn);
+        // Insert after native bookmark button if found, otherwise append to end
+        // This ensures perfect alignment with X's native action buttons
+        const nativeBookmark = actionBar.querySelector('[data-testid="bookmark"]');
+        if (nativeBookmark) {
+            // Hide native bookmark and insert our button right after it
+            (nativeBookmark as HTMLElement).style.display = 'none';
+            nativeBookmark.parentElement?.insertBefore(bookmarkBtn, nativeBookmark.nextSibling);
+        } else {
+            // No native bookmark found, append to end of action bar
+            actionBar.appendChild(bookmarkBtn);
+        }
         return true;
     }
 

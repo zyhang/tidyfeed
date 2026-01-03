@@ -225,31 +225,12 @@ app.post('/auth/google', async (c) => {
 
 // Redirect to Google OAuth consent screen
 app.get('/auth/login/google', (c) => {
-	// Verify state parameter against cookie to prevent CSRF
-	const callbackState = c.req.query('state');
-	const cookieHeader = c.req.header('Cookie');
-	let savedState = null;
-
-	if (cookieHeader) {
-		const cookies = Object.fromEntries(
-			cookieHeader.split(';').map((c) => {
-				const [key, ...val] = c.trim().split('=');
-				return [key, val.join('=')];
-			})
-		);
-		savedState = cookies['oauth_state'];
-	}
-
-	if (!callbackState || !savedState || callbackState !== savedState) {
-		console.error('State mismatch or missing:', { callbackState, savedState });
-		return c.redirect('https://a.tidyfeed.app/?error=invalid_state');
-	}
-
 	const isDev = c.req.url.includes('localhost') || c.req.url.includes('127.0.0.1');
 	const redirectUri = isDev
 		? 'http://localhost:8787/auth/callback/google'
 		: 'https://api.tidyfeed.app/auth/callback/google';
 
+	// Generate a random state for CSRF protection
 	const state = crypto.randomUUID();
 
 	const params = new URLSearchParams({
@@ -264,7 +245,7 @@ app.get('/auth/login/google', (c) => {
 
 	const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
-	// Store state in HttpOnly cookie to prevent CSRF
+	// Store state in HttpOnly cookie to prevent CSRF - will be validated in callback
 	const cookieOptions = [
 		`oauth_state=${state}`,
 		'Path=/',
@@ -275,6 +256,7 @@ app.get('/auth/login/google', (c) => {
 
 	if (!isDev) {
 		cookieOptions.push('Secure');
+		cookieOptions.push('Domain=.tidyfeed.app'); // Allow cookie to be read by api.tidyfeed.app
 	}
 
 	return new Response(null, {
@@ -291,6 +273,7 @@ app.get('/auth/callback/google', async (c) => {
 	try {
 		const code = c.req.query('code');
 		const error = c.req.query('error');
+		const callbackState = c.req.query('state');
 
 		if (error) {
 			console.error('Google OAuth error:', error);
@@ -299,6 +282,25 @@ app.get('/auth/callback/google', async (c) => {
 
 		if (!code) {
 			return c.json({ error: 'Authorization code is required' }, 400);
+		}
+
+		// Validate state parameter to prevent CSRF attacks
+		const cookieHeader = c.req.header('Cookie');
+		let savedState = null;
+
+		if (cookieHeader) {
+			const cookies = Object.fromEntries(
+				cookieHeader.split(';').map((cookie) => {
+					const [key, ...val] = cookie.trim().split('=');
+					return [key, val.join('=')];
+				})
+			);
+			savedState = cookies['oauth_state'];
+		}
+
+		if (!callbackState || !savedState || callbackState !== savedState) {
+			console.error('State mismatch or missing:', { callbackState, savedState, hasCookie: !!cookieHeader });
+			return c.redirect('https://a.tidyfeed.app/?error=invalid_state');
 		}
 
 		const isDev = c.req.url.includes('localhost') || c.req.url.includes('127.0.0.1');
@@ -576,7 +578,7 @@ app.get('/api/auth/social-accounts', cookieAuthMiddleware, async (c) => {
 // Supports both GET (for web redirect) and POST (for extension)
 const logoutHandler = (c: any) => {
 	const isDev = c.req.url.includes('localhost') || c.req.url.includes('127.0.0.1');
-	
+
 	// Determine appropriate redirect URL
 	const redirectUrl = isDev ? 'http://localhost:3000' : 'https://a.tidyfeed.app';
 
