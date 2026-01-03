@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generateTweetSnapshot } from '../../../lib/snapshot';
-import { TikHubTweetData, TikHubComment } from '../../../lib/types';
+import { generateTweetSnapshot } from '../../../../lib/snapshot';
+import { TikHubTweetData, TikHubComment } from '../../../../lib/types';
 
 export const runtime = 'edge';
 
