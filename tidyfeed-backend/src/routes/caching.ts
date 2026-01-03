@@ -7,6 +7,7 @@
 import { Hono } from 'hono';
 import { TikHubService } from '../services/tikhub';
 import { generateTweetSnapshot } from '../services/snapshot';
+import { cacheMediaToR2, replaceMediaUrls } from '../services/imageCache';
 
 type Bindings = {
     DB: D1Database;
@@ -122,7 +123,7 @@ caching.get('/:tweet_id/cached', async (c) => {
  */
 caching.post('/cache', async (c) => {
     try {
-        const { tweet_id, include_comments = false } = await c.req.json();
+        const { tweet_id, include_comments = false, force = false } = await c.req.json();
 
         if (!tweet_id) {
             return c.json({ error: 'tweet_id is required' }, 400);
@@ -136,19 +137,21 @@ caching.post('/cache', async (c) => {
         // Clean tweet ID (extract from URL if needed)
         const cleanTweetId = tweet_id.trim().match(/status\/(\d+)/)?.[1] || tweet_id.trim();
 
-        // Check if already cached and fresh (within 24 hours)
-        const existing = await c.env.DB.prepare(
-            `SELECT cached_at, snapshot_r2_key FROM cached_tweets 
-			 WHERE tweet_id = ? AND cached_at > datetime('now', '-24 hours')`
-        ).bind(cleanTweetId).first<{ cached_at: string; snapshot_r2_key: string }>();
+        // Check if already cached and fresh (within 24 hours) - skip if force=true
+        if (!force) {
+            const existing = await c.env.DB.prepare(
+                `SELECT cached_at, snapshot_r2_key FROM cached_tweets 
+				 WHERE tweet_id = ? AND cached_at > datetime('now', '-24 hours')`
+            ).bind(cleanTweetId).first<{ cached_at: string; snapshot_r2_key: string }>();
 
-        if (existing?.snapshot_r2_key) {
-            return c.json({
-                success: true,
-                cached: true,
-                message: 'Tweet already cached',
-                snapshotUrl: `${c.env.WEB_APP_URL || 'https://tidyfeed.app'}/s/${cleanTweetId}`,
-            });
+            if (existing?.snapshot_r2_key) {
+                return c.json({
+                    success: true,
+                    cached: true,
+                    message: 'Tweet already cached',
+                    snapshotUrl: `${c.env.WEB_APP_URL || 'https://tidyfeed.app'}/s/${cleanTweetId}`,
+                });
+            }
         }
 
         // Fetch from TikHub
@@ -166,13 +169,43 @@ caching.post('/cache', async (c) => {
             comments = commentsResult.comments;
         }
 
-        // Generate HTML snapshot
-        const snapshotHtml = generateTweetSnapshot(tweetData, comments, {
+        // Collect all media items and avatar URLs
+        const allMedia = [...(tweetData.media || [])];
+        const avatarUrls: string[] = [];
+
+        if (tweetData.author?.profile_image_url) {
+            avatarUrls.push(tweetData.author.profile_image_url.replace('_normal', '_bigger'));
+        }
+
+        if (tweetData.quoted_tweet) {
+            if (tweetData.quoted_tweet.media) {
+                allMedia.push(...tweetData.quoted_tweet.media);
+            }
+            if (tweetData.quoted_tweet.author?.profile_image_url) {
+                avatarUrls.push(tweetData.quoted_tweet.author.profile_image_url.replace('_normal', '_bigger'));
+            }
+        }
+
+        // Add comment author avatars
+        for (const comment of comments) {
+            if (comment.author?.profile_image_url) {
+                avatarUrls.push(comment.author.profile_image_url.replace('_normal', '_bigger'));
+            }
+        }
+
+        // Cache all images to R2
+        const { urlMap, totalSize } = await cacheMediaToR2(c.env.MEDIA_BUCKET, cleanTweetId, allMedia, avatarUrls);
+
+        // Replace URLs in tweet data with cached URLs
+        const cachedTweetData = replaceMediaUrls(tweetData, urlMap);
+
+        // Generate HTML snapshot with cached URLs
+        const snapshotHtml = generateTweetSnapshot(cachedTweetData, comments, {
             includeComments: include_comments,
             theme: 'auto',
         });
 
-        // Upload to R2
+        // Upload snapshot to R2
         const r2Key = `snapshots/${cleanTweetId}.html`;
         await c.env.MEDIA_BUCKET.put(r2Key, snapshotHtml, {
             httpMetadata: {
@@ -183,14 +216,15 @@ caching.post('/cache', async (c) => {
         // Determine metadata flags
         const hasMedia = !!(tweetData.media && tweetData.media.length > 0);
         const hasVideo = tweetData.media?.some(m => m.type === 'video' || m.type === 'animated_gif') || false;
+        const hasQuotedVideo = tweetData.quoted_tweet?.media?.some(m => m.type === 'video' || m.type === 'animated_gif') || false;
         const hasQuotedTweet = !!tweetData.quoted_tweet;
 
         // Upsert into database
         await c.env.DB.prepare(`
 			INSERT INTO cached_tweets (
 				tweet_id, cached_data, snapshot_r2_key, comments_data, 
-				comments_count, has_media, has_video, has_quoted_tweet
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+				comments_count, has_media, has_video, has_quoted_tweet, media_size
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(tweet_id) DO UPDATE SET
 				cached_data = excluded.cached_data,
 				snapshot_r2_key = excluded.snapshot_r2_key,
@@ -199,19 +233,65 @@ caching.post('/cache', async (c) => {
 				has_media = excluded.has_media,
 				has_video = excluded.has_video,
 				has_quoted_tweet = excluded.has_quoted_tweet,
+				media_size = excluded.media_size,
 				updated_at = CURRENT_TIMESTAMP
 		`).bind(
             cleanTweetId,
-            JSON.stringify(tweetData),
+            JSON.stringify(cachedTweetData),
             r2Key,
             comments.length > 0 ? JSON.stringify(comments) : null,
             comments.length,
             hasMedia ? 1 : 0,
-            hasVideo ? 1 : 0,
+            hasVideo || hasQuotedVideo ? 1 : 0,
             hasQuotedTweet ? 1 : 0,
+            totalSize
         ).run();
 
-        console.log(`[Caching] Cached tweet ${cleanTweetId} with ${comments.length} comments`);
+        // Queue video downloads for Python worker (if any videos detected)
+        if (hasVideo || hasQuotedVideo) {
+            const videosToQueue: { videoUrl: string }[] = [];
+
+            for (const media of (tweetData.media || [])) {
+                if (media.type === 'video' || media.type === 'animated_gif') {
+                    const videoUrl = TikHubService.getBestVideoUrl(media);
+                    if (videoUrl) {
+                        videosToQueue.push({ videoUrl });
+                    }
+                }
+            }
+
+            if (tweetData.quoted_tweet?.media) {
+                for (const media of tweetData.quoted_tweet.media) {
+                    if (media.type === 'video' || media.type === 'animated_gif') {
+                        const videoUrl = TikHubService.getBestVideoUrl(media);
+                        if (videoUrl) {
+                            videosToQueue.push({ videoUrl });
+                        }
+                    }
+                }
+            }
+
+            for (const { videoUrl } of videosToQueue) {
+                try {
+                    // Check if task already exists
+                    const existingTask = await c.env.DB.prepare(
+                        `SELECT id FROM video_downloads WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' LIMIT 1`
+                    ).bind(cleanTweetId, videoUrl).first();
+
+                    if (!existingTask) {
+                        await c.env.DB.prepare(
+                            `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status)
+                             VALUES (?, ?, 'snapshot_video', ?, ?, 'pending')`
+                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl).run();
+                        console.log(`[Caching] Queued video download for tweet ${cleanTweetId}`);
+                    }
+                } catch (err) {
+                    console.error(`[Caching] Failed to queue video:`, err);
+                }
+            }
+        }
+
+        console.log(`[Caching] Cached tweet ${cleanTweetId} with ${urlMap.size} images and ${comments.length} comments`);
 
         const webAppUrl = c.env.WEB_APP_URL || 'https://tidyfeed.app';
 
