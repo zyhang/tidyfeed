@@ -384,6 +384,8 @@ downloads.put('/internal/upload-url', internalServiceAuth, async (c) => {
                     if (meta.video_index !== undefined) {
                         videoIndex = String(meta.video_index);
                         videoIndex = `quoted_${videoIndex}`;
+                    } else {
+                        videoIndex = '0';
                     }
                 }
             } catch (err) {
