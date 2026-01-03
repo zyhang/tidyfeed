@@ -29,7 +29,7 @@ export default function SnapshotViewerPage() {
 
         const fetchSnapshot = async () => {
             try {
-                const response = await fetch(`/s/${tweetId}`);
+                const response = await fetch(`/api/s/${tweetId}`);
                 if (response.ok) {
                     const html = await response.text();
                     setSnapshotHtml(html);
