@@ -21,6 +21,10 @@ export async function GET(
     // --- Step 1: Try to fetch JSON data with retries ---
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
+            // Attempt 1: revalidate 60s (standard)
+            // Retry attempts: revalidate 0 (fresh)
+            const nextConfig = attempt > 1 ? { revalidate: 0 } : { revalidate: 60 };
+
             console.log(`[SnapshotProxy] Attempt ${attempt}: Fetching JSON from ${tweetsUrl}`);
             const response = await fetch(tweetsUrl, {
                 method: 'GET',
@@ -28,9 +32,7 @@ export async function GET(
                     'Content-Type': 'application/json',
                     'User-Agent': 'TidyFeed-Web-Proxy/1.0',
                 },
-                // Use no-store for retries to avoid caching a failure
-                cache: attempt > 1 ? 'no-store' : 'default',
-                next: { revalidate: 60 }
+                next: nextConfig
             });
 
             if (response.ok) {
@@ -73,7 +75,7 @@ export async function GET(
         const fallbackResponse = await fetch(staticSnapshotUrl, {
             method: 'GET',
             headers: { 'User-Agent': 'TidyFeed-Web-Proxy/1.0' },
-            cache: 'no-store'
+            next: { revalidate: 0 }
         });
 
         if (fallbackResponse.ok) {
