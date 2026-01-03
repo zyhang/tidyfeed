@@ -422,7 +422,7 @@ downloads.post('/internal/complete', internalServiceAuth, async (c) => {
                      file_size = ?,
                      twitter_cookies = NULL,
                      completed_at = strftime('%s', 'now')
-                 WHERE id = ?`
+                 WHERE id = ? AND status != 'invalid'`
             ).bind(
                 status,
                 r2_key || null,
