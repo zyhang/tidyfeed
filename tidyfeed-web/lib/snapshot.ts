@@ -44,17 +44,19 @@ export function generateTweetSnapshot(
 	// The backend (caching.ts) stores videos sequentially: main tweet videos first, then quoted tweet videos.
 	// URL Format: https://api.tidyfeed.app/api/videos/{tweet_id}/{index}.mp4
 
-	let videoIndex = 0;
 	// Determine API URL (with fallback for safety)
 	const apiUrl = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL)
 		? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
 		: 'https://api.tidyfeed.app';
 
-	const replaceVideoWithCached = (mediaItems: TikHubMedia[] | undefined) => {
+	const replaceVideoWithCached = (mediaItems: TikHubMedia[] | undefined, prefix: string = '') => {
 		if (!mediaItems) return;
+		let localIndex = 0;
 		mediaItems.forEach(media => {
 			if (media.type === 'video' || media.type === 'animated_gif') {
-				const cachedUrl = `${apiUrl}/api/videos/${tweet.id}/${videoIndex}.mp4`;
+				// Format: "0.mp4" or "quoted_0.mp4"
+				const filename = `${prefix}${localIndex}.mp4`;
+				const cachedUrl = `${apiUrl}/api/videos/${tweet.id}/${filename}`;
 
 				// Overwrite video info with a single variant pointing to our cache
 				media.video_info = {
@@ -65,20 +67,17 @@ export function generateTweetSnapshot(
 					}]
 				};
 
-				// Also update the main URL and preview if needed (though preview is usually an image)
-				// We keep the preview_url as is, because it's an image.
-
-				videoIndex++;
+				localIndex++;
 			}
 		});
 	};
 
-	// 1. Process main tweet videos
-	replaceVideoWithCached(tweet.media);
+	// 1. Process main tweet videos (prefix: "") -> 0.mp4, 1.mp4
+	replaceVideoWithCached(tweet.media, '');
 
-	// 2. Process quoted tweet videos
+	// 2. Process quoted tweet videos (prefix: "quoted_") -> quoted_0.mp4, quoted_1.mp4
 	if (tweet.quoted_tweet) {
-		replaceVideoWithCached(tweet.quoted_tweet.media);
+		replaceVideoWithCached(tweet.quoted_tweet.media, 'quoted_');
 	}
 	// ---------------------------------
 

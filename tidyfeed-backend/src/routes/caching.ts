@@ -257,7 +257,7 @@ caching.post('/cache', async (c) => {
                 if (media.type === 'video' || media.type === 'animated_gif') {
                     const videoUrl = TikHubService.getBestVideoUrl(media);
                     if (videoUrl) {
-                        videosToQueue.push({ videoUrl, key: `main_${index}` });
+                        videosToQueue.push({ videoUrl, key: `${index}` });
                     }
                 }
             });
@@ -278,19 +278,9 @@ caching.post('/cache', async (c) => {
             const apiUrl = webAppUrl.replace('tidyfeed.app', 'api.tidyfeed.app'); // Heuristic for API URL
             let dataUpdated = false;
 
-            videosToQueue.forEach(({ videoUrl, key }, i) => {
-                // Use simple index for filename to match worker logic: 0.mp4, 1.mp4, etc.
-                // The key in the loop above was overly complex (main_0, quoted_0), 
-                // but for the filename we just want the simple index relative to the *entire* list of videos for this tweet?
-                // Actually, let's keep it simple: we want the index to be 0, 1, 2... based on the order we queue them.
-                // BUT, the worker uses `video_index` metadata if present, or `task_id` if not.
-                // In downloads.ts: 
-                // if (meta.video_index !== undefined) videoIndex = String(meta.video_index);
-                // key = `videos/${task.tweet_id}/${videoIndex}.${extension}`;
-
-                // So we should just use the array index `i` from videosToQueue as the video_index.
-                const videoIndex = i; // 0, 1, 2...
-                const predictedUrl = `${apiUrl}/api/videos/${cleanTweetId}/${videoIndex}.mp4`;
+            videosToQueue.forEach(({ videoUrl, key }) => {
+                // key is now "0", "1", ... or "quoted_0", "quoted_1", ...
+                const predictedUrl = `${apiUrl}/api/videos/${cleanTweetId}/${key}.mp4`;
 
                 // Helper to update media URL
                 const updateMedia = (mediaList: any[]) => {
@@ -314,10 +304,6 @@ caching.post('/cache', async (c) => {
 
                 if (tweetData.media) updateMedia(tweetData.media);
                 if (tweetData.quoted_tweet?.media) updateMedia(tweetData.quoted_tweet.media);
-
-                // Update key for metadata usage below
-                // We'll store the index in metadata so downloads.ts knows what filename to use
-                videosToQueue[i].key = String(videoIndex);
             });
 
             // If we updated URLs, re-generate snapshot IMMEDIATELY with predicted URLs
@@ -349,7 +335,7 @@ caching.post('/cache', async (c) => {
                         `SELECT id, metadata, status FROM video_downloads WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' LIMIT 1`
                     ).bind(cleanTweetId, videoUrl).first<{ id: number; metadata: string | null; status: string }>();
 
-                    const metadata = { video_index: parseInt(key) }; // key is now "0", "1", etc.
+                    const metadata = { video_index: key }; // key is "0", "1", ... or "quoted_0", ...
                     const metadataStr = JSON.stringify(metadata);
 
                     if (!existingTask) {
