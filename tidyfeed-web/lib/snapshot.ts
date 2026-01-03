@@ -361,10 +361,10 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 			margin-bottom: 12px;
 		}
 		.media-gallery.single { grid-template-columns: 1fr; }
-		.media-gallery.double { grid-template-columns: 1fr 1fr; }
-		.media-gallery.triple { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+		.media-gallery.double { grid-template-columns: 1fr 1fr; aspect-ratio: 16 / 9; }
+		.media-gallery.triple { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; aspect-ratio: 16 / 9; }
 		.media-gallery.triple .media-item:first-child { grid-row: span 2; }
-		.media-gallery.quad { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+		.media-gallery.quad { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; aspect-ratio: 16 / 9; }
 		
 		.media-item { display: block; background: var(--hover); }
 		.media-item img { width: 100%; height: 100%; object-fit: cover; display: block; }

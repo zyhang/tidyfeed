@@ -59,7 +59,7 @@ export async function GET(
         return new NextResponse(html, {
             headers: {
                 'Content-Type': 'text/html; charset=utf-8',
-                'Cache-Control': 'public, max-age=3600, s-maxage=3600, update-while-revalidate=60', // 1 hour cache
+                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=3600',
             },
         });
 
