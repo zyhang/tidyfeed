@@ -133,7 +133,7 @@ caching.post('/cache', async (c) => {
         }
 
         // Clean tweet ID (extract from URL if needed)
-        const cleanTweetId = tweet_id.match(/status\/(\d+)/)?.[1] || tweet_id;
+        const cleanTweetId = tweet_id.trim().match(/status\/(\d+)/)?.[1] || tweet_id.trim();
 
         // Check if already cached and fresh (within 24 hours)
         const existing = await c.env.DB.prepare(

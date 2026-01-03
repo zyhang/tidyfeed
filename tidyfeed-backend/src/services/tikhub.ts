@@ -87,13 +87,16 @@ export class TikHubService {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${this.apiKey}`,
-                        'Content-Type': 'application/json',
+                        'User-Agent': 'TidyFeed/1.0',
                     },
                 }
             );
 
             if (!response.ok) {
-                console.error(`[TikHub] Tweet fetch failed: ${response.status}`);
+                const errorText = await response.text();
+                console.error(`[TikHub] Tweet fetch failed: ${response.status} - ${errorText}`);
+                console.error(`[TikHub] Request URL: ${TIKHUB_BASE_URL}/fetch_tweet_detail?tweet_id=${tweetId}`);
+                console.error(`[TikHub] API Key present: ${!!this.apiKey}, length: ${this.apiKey?.length}`);
                 return null;
             }
 
@@ -181,12 +184,12 @@ export class TikHubService {
     }
 
     /**
-     * Parse raw tweet data from TikHub response
+     * Parse raw TikHub response into our internal format
      */
-    private parseTweetData(raw: any): TikHubTweetData {
+    private parseTweetData(data: any): TikHubTweetData {
         // TikHub returns data in different structures depending on the endpoint
         // This handles common patterns
-        const tweet = raw.tweet || raw.data || raw;
+        const tweet = data.tweet || data.data || data;
         const user = tweet.user || tweet.author || {};
         const legacy = tweet.legacy || tweet;
 
