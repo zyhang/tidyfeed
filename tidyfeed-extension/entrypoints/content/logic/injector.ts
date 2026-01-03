@@ -496,8 +496,23 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
     const savedIds: string[] = (storage.saved_x_ids as string[]) || [];
     const isCurrentlySaved = savedIds.includes(xId);
 
-    // OPTIMISTIC UI: Toggle the icon immediately
+    // If trying to save (not unsave), check auth FIRST before any optimistic UI
     const newSavedState = !isCurrentlySaved;
+    if (newSavedState) {
+        // Pre-flight auth check
+        try {
+            const authResult = await browser.runtime.sendMessage({ type: 'CHECK_AUTH' });
+            if (!authResult?.authenticated) {
+                showLoginToast();
+                return; // Exit early - don't show any "saved" toast or UI
+            }
+        } catch (err) {
+            console.warn('[TidyFeed] Auth check failed:', err);
+            // Continue anyway - the save API will fail and show login prompt
+        }
+    }
+
+    // OPTIMISTIC UI: Toggle the icon (only after auth check passes for saves)
     button.innerHTML = newSavedState ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
     button.style.cssText = newSavedState ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
     button.setAttribute('aria-label', newSavedState ? getLocaleString('saved') : getLocaleString('bookmark'));
@@ -673,23 +688,28 @@ async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
     if (tweetId) {
         const bookmarkBtn = await createBookmarkButton(tweetId);
 
-        // Strategy 1: Try to insert after the Share button (most common position)
-        // This keeps the native bookmark button and adds TidyFeed as a complementary action
-        const shareButton = actionBar.querySelector('[data-testid="share"]');
-        if (shareButton && shareButton.parentElement) {
-            shareButton.parentElement.insertBefore(bookmarkBtn, shareButton.nextSibling);
+        // Strategy 1: Insert before the native Bookmark button (keeps bookmark functions together)
+        const nativeBookmark = actionBar.querySelector('[data-testid="bookmark"]');
+        if (nativeBookmark && nativeBookmark.parentElement) {
+            nativeBookmark.parentElement.insertBefore(bookmarkBtn, nativeBookmark);
             return true;
         }
 
-        // Strategy 2: Insert after Like button if Share not found
+        // Strategy 2: Insert after the Like button
         const likeButton = actionBar.querySelector('[data-testid="like"]');
         if (likeButton && likeButton.parentElement) {
             likeButton.parentElement.insertBefore(bookmarkBtn, likeButton.nextSibling);
             return true;
         }
 
-        // Strategy 3: Append to end of action bar as fallback
-        // This preserves all native buttons and adds TidyFeed as an additional option
+        // Strategy 3: Insert after Share button
+        const shareButton = actionBar.querySelector('[data-testid="share"]');
+        if (shareButton && shareButton.parentElement) {
+            shareButton.parentElement.insertBefore(bookmarkBtn, shareButton.nextSibling);
+            return true;
+        }
+
+        // Strategy 4: Append to end of action bar as fallback
         actionBar.appendChild(bookmarkBtn);
         return true;
     }
