@@ -688,28 +688,7 @@ async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
     if (tweetId) {
         const bookmarkBtn = await createBookmarkButton(tweetId);
 
-        // Strategy 1: Insert before the native Bookmark button (keeps bookmark functions together)
-        const nativeBookmark = actionBar.querySelector('[data-testid="bookmark"]');
-        if (nativeBookmark && nativeBookmark.parentElement) {
-            nativeBookmark.parentElement.insertBefore(bookmarkBtn, nativeBookmark);
-            return true;
-        }
-
-        // Strategy 2: Insert after the Like button
-        const likeButton = actionBar.querySelector('[data-testid="like"]');
-        if (likeButton && likeButton.parentElement) {
-            likeButton.parentElement.insertBefore(bookmarkBtn, likeButton.nextSibling);
-            return true;
-        }
-
-        // Strategy 3: Insert after Share button
-        const shareButton = actionBar.querySelector('[data-testid="share"]');
-        if (shareButton && shareButton.parentElement) {
-            shareButton.parentElement.insertBefore(bookmarkBtn, shareButton.nextSibling);
-            return true;
-        }
-
-        // Strategy 4: Append to end of action bar as fallback
+        // Append to far right of action bar
         actionBar.appendChild(bookmarkBtn);
         return true;
     }
