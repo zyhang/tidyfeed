@@ -355,18 +355,26 @@ downloads.put('/internal/upload-url', internalServiceAuth, async (c) => {
             return c.json({ error: 'task_id is required' }, 400);
         }
 
-        // Get task to verify it exists and get user_id for path
+        // Get task to verify it exists and get user_id/tweet_id for path
         const task = await c.env.DB.prepare(
-            `SELECT id, user_id FROM video_downloads WHERE id = ?`
-        ).bind(task_id).first<{ id: number; user_id: string }>();
+            `SELECT id, user_id, task_type, tweet_id FROM video_downloads WHERE id = ?`
+        ).bind(task_id).first<{ id: number; user_id: string; task_type: string; tweet_id: string }>();
 
         if (!task) {
             return c.json({ error: 'Task not found' }, 404);
         }
 
-        // Generate R2 key: videos/{user_id}/{task_id}.mp4
+        // Generate R2 key based on task type
         const extension = filename?.split('.').pop() || 'mp4';
-        const key = `videos/${task.user_id}/${task_id}.${extension}`;
+        let key: string;
+
+        if (task.task_type === 'snapshot_video' && task.tweet_id) {
+            // For snapshot videos, use tweet_id so the /api/videos/:tweetId/:filename endpoint works
+            key = `videos/${task.tweet_id}/${task_id}.${extension}`;
+        } else {
+            // For user downloads, use user_id
+            key = `videos/${task.user_id}/${task_id}.${extension}`;
+        }
 
         // Note: R2 presigned URLs require additional setup.
         // For now, we return the key and the Python worker will upload directly
