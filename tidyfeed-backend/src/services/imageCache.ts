@@ -29,20 +29,15 @@ export async function cacheMediaToR2(
 
     // Collect all URLs to cache
     const urlsToCache: { url: string; type: 'media' | 'avatar' }[] = [];
-    const videosToCache: { media: TikHubMedia; tweetId: string }[] = [];
 
-    // Add media URLs
+    // Add media URLs (images only - videos handled by Python worker)
     for (const m of media) {
         if (m.type === 'photo' && m.url) {
             urlsToCache.push({ url: m.url, type: 'media' });
         }
-        // Cache video poster/preview images
+        // Cache video poster/preview images (the video itself is handled by Python worker)
         if ((m.type === 'video' || m.type === 'animated_gif') && m.preview_url) {
             urlsToCache.push({ url: m.preview_url, type: 'media' });
-        }
-        // Queue videos for caching
-        if ((m.type === 'video' || m.type === 'animated_gif') && m.video_info?.variants) {
-            videosToCache.push({ media: m, tweetId });
         }
     }
 
@@ -66,29 +61,12 @@ export async function cacheMediaToR2(
         }
     });
 
-    // Process each video
-    const videoCachePromises = videosToCache.map(async ({ media: m, tweetId: tid }) => {
-        try {
-            const result = await cacheVideoToR2(mediaBucket, tid, m);
-            if (result) {
-                // Map the original video variant URLs to cached URL
-                for (const variant of (m.video_info?.variants || [])) {
-                    if (variant.url) {
-                        urlMap.set(variant.url, result.cachedUrl);
-                    }
-                }
-                totalSize += result.fileSize || 0;
-            }
-        } catch (error) {
-            console.error(`[MediaCache] Failed to cache video:`, error);
-        }
-    });
+    await Promise.all(imageCachePromises);
 
-    await Promise.all([...imageCachePromises, ...videoCachePromises]);
-
-    console.log(`[MediaCache] Cached ${urlMap.size} media items for tweet ${tweetId}, total size: ${totalSize} bytes`);
+    console.log(`[MediaCache] Cached ${urlMap.size} images for tweet ${tweetId}, total size: ${totalSize} bytes`);
     return { urlMap, totalSize };
 }
+
 
 /**
  * Cache a video to R2 storage

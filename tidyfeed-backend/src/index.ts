@@ -863,7 +863,7 @@ async function triggerCacheInBackground(
 			console.log(`[AutoCache] Failed to fetch comments for ${tweetId}:`, err);
 		}
 
-		// Cache all images to R2
+		// Cache all images to R2 (videos are handled separately by Python worker)
 		const { urlMap, totalSize } = await cacheMediaToR2(env.MEDIA_BUCKET, tweetId, allMedia, avatarUrls);
 
 		// Replace URLs in tweet data with cached URLs
@@ -886,6 +886,7 @@ async function triggerCacheInBackground(
 		// Determine metadata flags
 		const hasMedia = !!(tweetData.media && tweetData.media.length > 0);
 		const hasVideo = tweetData.media?.some(m => m.type === 'video' || m.type === 'animated_gif') || false;
+		const hasQuotedVideo = tweetData.quoted_tweet?.media?.some(m => m.type === 'video' || m.type === 'animated_gif') || false;
 		const hasQuotedTweet = !!tweetData.quoted_tweet;
 
 		// Upsert into database
@@ -912,7 +913,7 @@ async function triggerCacheInBackground(
 			comments.length > 0 ? JSON.stringify(comments) : null,
 			comments.length,
 			hasMedia ? 1 : 0,
-			hasVideo ? 1 : 0,
+			hasVideo || hasQuotedVideo ? 1 : 0,
 			hasQuotedTweet ? 1 : 0,
 			totalSize
 		).run();
@@ -926,10 +927,57 @@ async function triggerCacheInBackground(
 		}
 
 		console.log(`[AutoCache] Successfully cached tweet ${tweetId} with ${urlMap.size} images and ${comments.length} comments`);
+
+		// Queue video downloads for Python worker (if any videos detected)
+		if (hasVideo || hasQuotedVideo) {
+			const videosToQueue: { tweetId: string; videoUrl: string }[] = [];
+
+			// Check main tweet for videos
+			for (const media of (tweetData.media || [])) {
+				if (media.type === 'video' || media.type === 'animated_gif') {
+					const videoUrl = TikHubService.getBestVideoUrl(media);
+					if (videoUrl) {
+						videosToQueue.push({ tweetId, videoUrl });
+					}
+				}
+			}
+
+			// Check quoted tweet for videos
+			if (tweetData.quoted_tweet?.media) {
+				for (const media of tweetData.quoted_tweet.media) {
+					if (media.type === 'video' || media.type === 'animated_gif') {
+						const videoUrl = TikHubService.getBestVideoUrl(media);
+						if (videoUrl) {
+							// Use main tweetId so video is associated with the snapshot
+							videosToQueue.push({ tweetId, videoUrl });
+						}
+					}
+				}
+			}
+
+			// Queue each video for Python worker
+			for (const { tweetId: tid, videoUrl } of videosToQueue) {
+				try {
+					await env.DB.prepare(
+						`INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status)
+						 VALUES (?, ?, 'snapshot_video', ?, ?, 'pending')`
+					).bind(
+						userId || 'system',
+						`https://x.com/i/status/${tid}`,
+						tid,
+						videoUrl
+					).run();
+					console.log(`[AutoCache] Queued video download for tweet ${tid}`);
+				} catch (err) {
+					console.error(`[AutoCache] Failed to queue video for tweet ${tid}:`, err);
+				}
+			}
+		}
 	} catch (error) {
 		console.error(`[AutoCache] Error caching tweet ${tweetId}:`, error);
 	}
 }
+
 
 // Create a saved post
 app.post('/api/posts', cookieAuthMiddleware, async (c) => {

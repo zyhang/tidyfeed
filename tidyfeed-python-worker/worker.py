@@ -239,13 +239,98 @@ def write_cookies_file(filepath: str, cookies_string: str):
 
 
 def process_task(task: dict):
-    """Process a single download task."""
+    """Route task to appropriate handler based on task_type."""
+    task_type = task.get('task_type', 'user_download')
+    
+    if task_type == 'snapshot_video':
+        process_snapshot_video_task(task)
+    else:
+        process_user_download_task(task)
+
+
+def process_snapshot_video_task(task: dict):
+    """
+    Process a snapshot video task.
+    Downloads video directly from CDN URL (no yt-dlp needed).
+    """
+    task_id = task['id']
+    video_url = task.get('video_url')
+    tweet_id = task.get('tweet_id')
+    user_id = task.get('user_id', 'system')
+    
+    logger.info(f'Processing snapshot video task {task_id} for tweet {tweet_id}')
+    
+    if not video_url:
+        logger.error(f'Task {task_id}: No video_url provided')
+        complete_task(task_id, 'failed', error_message='No video URL provided')
+        return
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            # Step 1: Download video directly from CDN
+            logger.info(f'Downloading video from: {video_url[:80]}...')
+            
+            response = requests.get(video_url, stream=True, timeout=300, headers={
+                'User-Agent': 'TidyFeed/1.0 (Video Cache)'
+            })
+            response.raise_for_status()
+            
+            # Save to temp file
+            file_path = os.path.join(temp_dir, f'{tweet_id}.mp4')
+            with open(file_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            file_size = os.path.getsize(file_path)
+            logger.info(f'Downloaded {file_size / 1024 / 1024:.2f} MB')
+            
+            # Check size limit (50MB for snapshot videos)
+            max_size = 50 * 1024 * 1024
+            if file_size > max_size:
+                logger.warning(f'Video too large ({file_size / 1024 / 1024:.2f} MB), skipping')
+                complete_task(task_id, 'failed', error_message=f'Video too large ({file_size / 1024 / 1024:.0f}MB > 50MB limit)')
+                return
+            
+            # Step 2: Get upload destination
+            filename = os.path.basename(file_path)
+            upload_info = get_upload_info(task_id, filename)
+            
+            if not upload_info:
+                complete_task(task_id, 'failed', error_message='Failed to get upload URL')
+                return
+            
+            r2_key = upload_info['key']
+            
+            # Step 3: Upload to R2
+            if not upload_to_r2(file_path, r2_key):
+                complete_task(task_id, 'failed', error_message='Upload to R2 failed')
+                return
+            
+            # Step 4: Mark as completed
+            metadata = {
+                'source_url': video_url,
+                'tweet_id': tweet_id,
+                'type': 'snapshot_video'
+            }
+            complete_task(task_id, 'completed', r2_key=r2_key, metadata=metadata, file_size=file_size)
+            logger.info(f'Snapshot video task {task_id} completed successfully')
+            
+        except requests.RequestException as e:
+            logger.error(f'Download failed: {e}')
+            complete_task(task_id, 'failed', error_message=f'Download failed: {str(e)[:200]}')
+        except Exception as e:
+            logger.error(f'Unexpected error: {e}')
+            complete_task(task_id, 'failed', error_message=f'Error: {str(e)[:200]}')
+
+
+def process_user_download_task(task: dict):
+    """Process a user-initiated download task (existing logic)."""
     task_id = task['id']
     tweet_url = task['tweet_url']
     cookies_string = task.get('cookies')
     user_id = task['user_id']
     
-    logger.info(f'Processing task {task_id}: {tweet_url}')
+    logger.info(f'Processing user download task {task_id}: {tweet_url}')
     
     # Check if cookies exist (they might have been wiped if task was retried)
     if not cookies_string:
@@ -283,6 +368,7 @@ def process_task(task: dict):
         # Step 4: Mark as completed (THIS WIPES THE COOKIES!)
         complete_task(task_id, 'completed', r2_key=r2_key, metadata=metadata, file_size=file_size)
         logger.info(f'Task {task_id} completed successfully')
+
 
 
 def main():

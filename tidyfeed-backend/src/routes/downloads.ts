@@ -301,12 +301,20 @@ downloads.get('/internal/next-task', internalServiceAuth, async (c) => {
     try {
         // Find one pending task and atomically update to processing
         const task = await c.env.DB.prepare(
-            `SELECT id, user_id, tweet_url, twitter_cookies
+            `SELECT id, user_id, tweet_url, twitter_cookies, task_type, tweet_id, video_url
 			 FROM video_downloads
 			 WHERE status = 'pending'
 			 ORDER BY created_at ASC
 			 LIMIT 1`
-        ).first<{ id: number; user_id: string; tweet_url: string; twitter_cookies: string }>();
+        ).first<{
+            id: number;
+            user_id: string;
+            tweet_url: string;
+            twitter_cookies: string;
+            task_type: string;
+            tweet_id: string;
+            video_url: string;
+        }>();
 
         if (!task) {
             return c.json({ task: null, message: 'No pending tasks' });
@@ -322,7 +330,10 @@ downloads.get('/internal/next-task', internalServiceAuth, async (c) => {
                 id: task.id,
                 user_id: task.user_id,
                 tweet_url: task.tweet_url,
-                cookies: task.twitter_cookies
+                cookies: task.twitter_cookies,
+                task_type: task.task_type || 'user_download',
+                tweet_id: task.tweet_id,
+                video_url: task.video_url
             }
         });
     } catch (error) {
@@ -444,6 +455,75 @@ downloads.post('/internal/complete', internalServiceAuth, async (c) => {
         });
     } catch (error) {
         console.error('Complete task error:', error);
+        return c.json({ error: 'Internal server error' }, 500);
+    }
+});
+
+/**
+ * POST /api/downloads/internal/queue-snapshot-video
+ * Queue a video download for snapshot caching (no cookies needed)
+ * Auth: Internal Service Key
+ * 
+ * Used by triggerCacheInBackground when a tweet contains video
+ */
+downloads.post('/internal/queue-snapshot-video', internalServiceAuth, async (c) => {
+    try {
+        const { tweet_id, video_url, user_id } = await c.req.json();
+
+        if (!tweet_id) {
+            return c.json({ error: 'tweet_id is required' }, 400);
+        }
+        if (!video_url) {
+            return c.json({ error: 'video_url is required' }, 400);
+        }
+
+        // Check if this video is already queued or completed for this tweet
+        const existing = await c.env.DB.prepare(
+            `SELECT id, status, r2_key FROM video_downloads 
+             WHERE tweet_id = ? AND task_type = 'snapshot_video'
+             ORDER BY id DESC LIMIT 1`
+        ).bind(tweet_id).first<{ id: number; status: string; r2_key: string }>();
+
+        if (existing) {
+            if (existing.status === 'completed' && existing.r2_key) {
+                return c.json({
+                    success: true,
+                    task_id: existing.id,
+                    message: 'Video already cached',
+                    r2_key: existing.r2_key
+                });
+            }
+            if (existing.status === 'pending' || existing.status === 'processing') {
+                return c.json({
+                    success: true,
+                    task_id: existing.id,
+                    message: 'Video download already in progress',
+                    status: existing.status
+                });
+            }
+        }
+
+        // Create new snapshot video task
+        const result = await c.env.DB.prepare(
+            `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status)
+             VALUES (?, ?, 'snapshot_video', ?, ?, 'pending')`
+        ).bind(
+            user_id || 'system',
+            `https://x.com/i/status/${tweet_id}`,  // Placeholder URL
+            tweet_id,
+            video_url
+        ).run();
+
+        const taskId = result.meta.last_row_id;
+        console.log(`[SnapshotVideo] Queued task ${taskId} for tweet ${tweet_id}`);
+
+        return c.json({
+            success: true,
+            task_id: taskId,
+            message: 'Snapshot video download queued'
+        });
+    } catch (error) {
+        console.error('Queue snapshot video error:', error);
         return c.json({ error: 'Internal server error' }, 500);
     }
 });
