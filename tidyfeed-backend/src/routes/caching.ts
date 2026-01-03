@@ -249,29 +249,83 @@ caching.post('/cache', async (c) => {
 
         // Queue video downloads for Python worker (if any videos detected)
         if (hasVideo || hasQuotedVideo) {
-            const videosToQueue: { videoUrl: string }[] = [];
+            const videosToQueue: { videoUrl: string; index: number; type: 'main' | 'quoted' }[] = [];
 
-            for (const media of (tweetData.media || [])) {
+            // Main tweet videos
+            const mainMedia = tweetData.media || [];
+            mainMedia.forEach((media, index) => {
                 if (media.type === 'video' || media.type === 'animated_gif') {
                     const videoUrl = TikHubService.getBestVideoUrl(media);
                     if (videoUrl) {
-                        videosToQueue.push({ videoUrl });
+                        videosToQueue.push({ videoUrl, index, type: 'main' });
                     }
                 }
-            }
+            });
 
-            if (tweetData.quoted_tweet?.media) {
-                for (const media of tweetData.quoted_tweet.media) {
-                    if (media.type === 'video' || media.type === 'animated_gif') {
-                        const videoUrl = TikHubService.getBestVideoUrl(media);
-                        if (videoUrl) {
-                            videosToQueue.push({ videoUrl });
+            // Quoted tweet videos
+            const quotedMedia = tweetData.quoted_tweet?.media || [];
+            quotedMedia.forEach((media, index) => {
+                if (media.type === 'video' || media.type === 'animated_gif') {
+                    const videoUrl = TikHubService.getBestVideoUrl(media);
+                    if (videoUrl) {
+                        // Use a distinct index offset or identifier for quoted videos if needed
+                        // For simplicity, we can use a string index for R2 key or a large offset
+                        // Let's use a large offset for quoted videos: 100 + index
+                        videosToQueue.push({ videoUrl, index: 100 + index, type: 'quoted' });
+                    }
+                }
+            });
+
+            // Update tweetData with predicted URLs immediately
+            const webAppUrl = c.env.WEB_APP_URL || 'https://tidyfeed.app';
+            const apiUrl = webAppUrl.replace('tidyfeed.app', 'api.tidyfeed.app'); // Heuristic for API URL
+            let dataUpdated = false;
+
+            videosToQueue.forEach(({ videoUrl, index }) => {
+                const predictedUrl = `${apiUrl}/api/videos/${cleanTweetId}/${index}.mp4`;
+
+                // Helper to update media URL
+                const updateMedia = (mediaList: any[]) => {
+                    mediaList.forEach(m => {
+                        if ((m.type === 'video' || m.type === 'animated_gif') && m.video_info?.variants) {
+                            const hasMatchingVariant = m.video_info.variants.some((v: any) => v.url === videoUrl);
+                            if (hasMatchingVariant) {
+                                m.video_info.variants.forEach((v: any) => {
+                                    if (v.content_type === 'video/mp4') {
+                                        v.url = predictedUrl;
+                                        dataUpdated = true;
+                                    }
+                                });
+                            }
                         }
-                    }
-                }
+                    });
+                };
+
+                if (tweetData.media) updateMedia(tweetData.media);
+                if (tweetData.quoted_tweet?.media) updateMedia(tweetData.quoted_tweet.media);
+            });
+
+            // If we updated URLs, re-generate snapshot IMMEDIATELY with predicted URLs
+            if (dataUpdated) {
+                // Update cached_data in DB
+                await c.env.DB.prepare(
+                    `UPDATE cached_tweets SET cached_data = ?, updated_at = CURRENT_TIMESTAMP WHERE tweet_id = ?`
+                ).bind(JSON.stringify(tweetData), cleanTweetId).run();
+
+                // Regenerate snapshot
+                const snapshotHtml = generateTweetSnapshot(tweetData, comments, {
+                    includeComments: include_comments,
+                    theme: 'auto',
+                });
+
+                // Upload updated snapshot
+                await c.env.MEDIA_BUCKET.put(r2Key, snapshotHtml, {
+                    httpMetadata: { contentType: 'text/html; charset=utf-8' },
+                });
+                console.log(`[Caching] Regenerated snapshot with predicted video URLs for ${cleanTweetId}`);
             }
 
-            for (const { videoUrl } of videosToQueue) {
+            for (const { videoUrl, index } of videosToQueue) {
                 try {
                     // Check if task already exists
                     const existingTask = await c.env.DB.prepare(
@@ -279,11 +333,12 @@ caching.post('/cache', async (c) => {
                     ).bind(cleanTweetId, videoUrl).first();
 
                     if (!existingTask) {
+                        const metadata = { video_index: index };
                         await c.env.DB.prepare(
-                            `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status)
-                             VALUES (?, ?, 'snapshot_video', ?, ?, 'pending')`
-                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl).run();
-                        console.log(`[Caching] Queued video download for tweet ${cleanTweetId}`);
+                            `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status, metadata)
+                             VALUES (?, ?, 'snapshot_video', ?, ?, 'pending', ?)`
+                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, JSON.stringify(metadata)).run();
+                        console.log(`[Caching] Queued video download for tweet ${cleanTweetId} (index ${index})`);
                     }
                 } catch (err) {
                     console.error(`[Caching] Failed to queue video:`, err);

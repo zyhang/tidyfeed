@@ -369,10 +369,28 @@ downloads.put('/internal/upload-url', internalServiceAuth, async (c) => {
         let key: string;
 
         if (task.task_type === 'snapshot_video' && task.tweet_id) {
-            // For snapshot videos, use tweet_id so the /api/videos/:tweetId/:filename endpoint works
-            key = `videos/${task.tweet_id}/${task_id}.${extension}`;
+            // Check metadata for video_index to enable deterministic filenames
+            let videoIndex = '0';
+            try {
+                // Get metadata specifically for this task
+                const taskWithMeta = await c.env.DB.prepare(
+                    `SELECT metadata FROM video_downloads WHERE id = ?`
+                ).bind(task_id).first<{ metadata: string | null }>();
+
+                if (taskWithMeta?.metadata) {
+                    const meta = JSON.parse(taskWithMeta.metadata);
+                    if (meta.video_index !== undefined) {
+                        videoIndex = String(meta.video_index);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to parse metadata for filename generation', err);
+            }
+
+            // For snapshot videos, use deterministic path: videos/{tweet_id}/{index}.{ext}
+            key = `videos/${task.tweet_id}/${videoIndex}.${extension}`;
         } else {
-            // For user downloads, use user_id
+            // For user downloads, usage user_id and task_id
             key = `videos/${task.user_id}/${task_id}.${extension}`;
         }
 
