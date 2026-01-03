@@ -7,6 +7,12 @@ export default defineBackground(() => {
   // Configuration
   const BACKEND_URL = 'https://api.tidyfeed.app';
 
+  // Feature flags (disabled because UI buttons are not present)
+  // Set to false to avoid making network calls for features not exposed in the extension UI
+  const FEATURE_BLOCKING_ENABLED = false; // native X block via extension
+  const FEATURE_CLOUD_DOWNLOAD_ENABLED = false; // cloud download queue via extension
+  const FEATURE_REPORTING_ENABLED = false; // report/block-report to backend
+
   // Cloud Regex Sync Logic
   const REMOTE_REGEX_URL = 'https://tidyfeed.app/regex_rules.json';
   const REGEX_SYNC_ALARM = 'tidyfeed_regex_sync';
@@ -415,235 +421,21 @@ export default defineBackground(() => {
     }
   }
 
-  /**
-   * Handle Cloud Video Download request
-   * Captures Twitter cookies and sends to backend for server-side download
-   */
-  async function handleCloudDownload(
-    tweetUrl: string
-  ): Promise<{ success: boolean; task_id?: number; error?: string }> {
-    try {
-      // Step 1: Get auth_token cookie
-      const authCookie = await browser.cookies.get({
-        url: 'https://x.com',
-        name: 'auth_token'
-      });
+  // Cloud download feature has been removed from this build.
+  // Previous implementation sent cookies and tweet URL to the backend queue.
+  // If reintroducing cloud download, restore the implementation above and the corresponding message handler.
 
-      // Step 2: Get ct0 (CSRF) cookie
-      const csrfCookie = await browser.cookies.get({
-        url: 'https://x.com',
-        name: 'ct0'
-      });
-
-      if (!authCookie?.value || !csrfCookie?.value) {
-        return {
-          success: false,
-          error: 'Please log in to X.com first'
-        };
-      }
-
-      // Step 3: Format cookies string
-      const cookiesString = `auth_token=${authCookie.value}; ct0=${csrfCookie.value}`;
-
-      console.log('[TidyFeed] Cloud download request:', tweetUrl);
-
-      // Step 4: Send to backend API
-      const response = await fetch(`${BACKEND_URL}/api/downloads/queue`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tweet_url: tweetUrl,
-          cookies: cookiesString
-        }),
-      });
-
-      // Check content type before parsing
-      const contentType = response.headers.get('content-type');
-      if (!contentType?.includes('application/json')) {
-        const text = await response.text();
-        console.error('[TidyFeed] Non-JSON response:', response.status, text.slice(0, 200));
-        return {
-          success: false,
-          error: `Server error: ${response.status}. Please ensure backend is deployed.`
-        };
-      }
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error('[TidyFeed] Cloud download API error:', data);
-
-        // Handle Storage Quota (403)
-        if (response.status === 403) {
-          return {
-            success: false,
-            error: 'Storage full. Please delete items to free up space.'
-          };
-        }
-
-        return {
-          success: false,
-          error: data.error || `API error: ${response.status}`
-        };
-      }
-
-      console.log('[TidyFeed] Cloud download queued:', data);
-      return {
-        success: true,
-        task_id: data.task_id
-      };
-    } catch (error) {
-      console.error('[TidyFeed] Cloud download error:', error);
-      return {
-        success: false,
-        error: String(error)
-      };
-    }
-  }
 
   // Handle report block request to backend
-  async function handleReportBlock(
-    blockedId: string,
-    blockedName: string,
-    reason: string
-  ): Promise<{ success: boolean; data?: unknown; error?: string }> {
-    try {
-      const storage = await browser.storage.local.get(['tidyfeed_uid', 'user_type']);
-      const tidyfeed_uid = (storage.tidyfeed_uid as string) || 'unknown';
-      const user_type = (storage.user_type as string) || 'guest';
+  // Reporting feature has been removed from this build.
+  // Previous implementation sent a POST to `${BACKEND_URL}/api/report` with blocked account details.
+  // If reporting is required again, restore the original implementation and enable FEATURE_REPORTING_ENABLED.
 
-      const response = await fetch(`${BACKEND_URL}/api/report`, {
-        method: 'POST',
-        credentials: 'include', // Send HttpOnly auth cookie
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': tidyfeed_uid,
-          'X-User-Type': user_type,
-        },
-        body: JSON.stringify({
-          blocked_x_id: blockedId,
-          blocked_x_name: blockedName,
-          reason: reason || 'manual_block'
-        }),
-      });
 
-      const data = await response.json();
-      console.log('[TidyFeed] Report sent:', data);
-      return { success: response.ok, data };
-    } catch (error) {
-      console.error('[TidyFeed] Report error:', error);
-      return { success: false, error: String(error) };
-    }
-  }
+  // Native X block feature has been removed from this build.
+  // The original implementation called `POST https://x.com/i/api/1.1/blocks/create.json` using the user's cookies and CSRF token.
+  // If needed later, restore the implementation above and enable FEATURE_BLOCKING_ENABLED.
 
-  // X Web Client Bearer Token (public, used by X web app)
-  const X_BEARER_TOKEN = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
-
-  /**
-   * Perform native X/Twitter block using internal API
-   * Uses user's login session via cookies
-   */
-  async function performBlockOnX(targetUserId: string): Promise<{
-    success: boolean;
-    userId?: string | null;       // Numeric user ID from response
-    screenName?: string;          // Screen name from response
-    error?: string;
-    errorCode?: 'CSRF_MISSING' | 'AUTH_FAILED' | 'RATE_LIMITED' | 'NETWORK_ERROR';
-  }> {
-    try {
-      // Add random delay (500ms - 2000ms) for anti-detection
-      const delay = Math.floor(Math.random() * 1500) + 500;
-      await new Promise(resolve => setTimeout(resolve, delay));
-
-      // Step A: Get CSRF token from cookies
-      const csrfCookie = await browser.cookies.get({
-        url: 'https://x.com',
-        name: 'ct0'
-      });
-
-      if (!csrfCookie?.value) {
-        console.error('[TidyFeed] CSRF token (ct0) not found - user may not be logged in');
-        return {
-          success: false,
-          error: 'Please log in to X.com first',
-          errorCode: 'CSRF_MISSING'
-        };
-      }
-
-      const csrfToken = csrfCookie.value;
-      console.log('[TidyFeed] Got CSRF token:', csrfToken.substring(0, 10) + '...');
-
-      // Step B: Construct and send block request
-      // Use screen_name since we extract handles from DOM (not numeric user IDs)
-      const response = await fetch('https://x.com/i/api/1.1/blocks/create.json', {
-        method: 'POST',
-        headers: {
-          'authorization': X_BEARER_TOKEN,
-          'x-csrf-token': csrfToken,
-          'content-type': 'application/x-www-form-urlencoded',
-          'x-twitter-active-user': 'yes',
-          'x-twitter-client-language': 'en',
-        },
-        body: `screen_name=${encodeURIComponent(targetUserId)}`,
-        credentials: 'include', // Include cookies
-      });
-
-      // Step C: Handle response
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[TidyFeed] ✅ X Block successful:', data?.screen_name, 'ID:', data?.id_str);
-        return {
-          success: true,
-          userId: data?.id_str || null,       // Numeric user ID
-          screenName: data?.screen_name || targetUserId
-        };
-      }
-
-      // Error handling
-      if (response.status === 401 || response.status === 403) {
-        console.error('[TidyFeed] Auth failed:', response.status);
-        return {
-          success: false,
-          error: 'Session expired, please refresh X.com',
-          errorCode: 'AUTH_FAILED'
-        };
-      }
-
-      if (response.status === 429) {
-        console.error('[TidyFeed] Rate limited');
-        return {
-          success: false,
-          error: 'Too many requests, please wait a moment',
-          errorCode: 'RATE_LIMITED'
-        };
-      }
-
-      // Other errors
-      const errorText = await response.text();
-      console.error('[TidyFeed] Block API error:', response.status, errorText);
-
-      let friendlyError = `Block failed: ${response.status}`;
-      if (response.status === 404) friendlyError = 'User not found or suspended';
-      else if (response.status >= 500) friendlyError = 'X Server Error, please try again';
-
-      return {
-        success: false,
-        error: friendlyError,
-        errorCode: 'NETWORK_ERROR'
-      };
-
-    } catch (error) {
-      console.error('[TidyFeed] Network error during block:', error);
-      return {
-        success: false,
-        error: String(error),
-        errorCode: 'NETWORK_ERROR'
-      };
-    }
-  }
 
   // Initial Sync & Alarm Setup + User Identification
   browser.runtime.onInstalled.addListener(async (details) => {
@@ -727,32 +519,8 @@ export default defineBackground(() => {
       return true;
     }
 
-    if (message.type === 'REPORT_BLOCK') {
-      handleReportBlock(message.blockedId, message.blockedName, message.reason)
-        .then((result) => {
-          sendResponse(result);
-        })
-        .catch((error) => {
-          console.error('[TidyFeed] Report block error:', error);
-          sendResponse({ success: false, error: error.message });
-        });
-
-      return true;
-    }
-
-    if (message.type === 'BLOCK_USER') {
-      // Block user via X's internal API
-      performBlockOnX(message.userId)
-        .then((result) => {
-          sendResponse(result);
-        })
-        .catch((error) => {
-          console.error('[TidyFeed] Block user error:', error);
-          sendResponse({ success: false, error: error.message });
-        });
-
-      return true;
-    }
+    // REPORT_BLOCK and BLOCK_USER messages are intentionally removed in this build.
+    // Reporting, native block, and cloud download features have been disabled and their handlers removed to avoid making external requests.
 
     if (message.type === 'TOGGLE_SAVE') {
       handleToggleSave(message.action, message.postData)
@@ -781,12 +549,8 @@ export default defineBackground(() => {
       return true;
     }
 
-    if (message.type === 'QUEUE_DOWNLOAD') {
-      handleCloudDownload(message.tweetUrl)
-        .then((result) => sendResponse(result))
-        .catch((error) => sendResponse({ success: false, error: error.message }));
-      return true;
-    }
+    // QUEUE_DOWNLOAD message handler removed: cloud download is disabled in this build.
+
   });
 });
 

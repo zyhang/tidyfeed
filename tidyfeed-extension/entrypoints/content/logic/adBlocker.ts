@@ -344,7 +344,6 @@ function collapseTweet(container: HTMLElement, reason: string, scoreResult: Scor
 
     foldBar.innerHTML = `
         <span class="tidyfeed-fold-text">👁️ Hidden: ${displayReason} - Click to View</span>
-        <button class="tidyfeed-block-btn" title="Block & Report this account">🚫 Block</button>
     `;
 
     Object.assign(foldBar.style, {
@@ -365,39 +364,9 @@ function collapseTweet(container: HTMLElement, reason: string, scoreResult: Scor
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
     });
 
-    const blockBtn = foldBar.querySelector('.tidyfeed-block-btn') as HTMLButtonElement;
-    if (blockBtn) {
-        Object.assign(blockBtn.style, {
-            background: 'transparent',
-            border: '1px solid rgba(244, 67, 54, 0.5)',
-            borderRadius: '4px',
-            padding: '4px 8px',
-            fontSize: '12px',
-            cursor: 'pointer',
-            color: '#f44336',
-            transition: 'all 0.2s'
-        });
+    // Note: Block button and server-side report are removed in this build because the UI does not expose a dedicated block action.
+    // If needed in the future, re-add a dedicated UI and wire up reporter.reportBlock accordingly.
 
-        blockBtn.onmouseenter = () => {
-            blockBtn.style.background = 'rgba(244, 67, 54, 0.1)';
-            blockBtn.style.borderColor = '#f44336';
-        };
-        blockBtn.onmouseleave = () => {
-            blockBtn.style.background = 'transparent';
-            blockBtn.style.borderColor = 'rgba(244, 67, 54, 0.5)';
-        };
-
-        blockBtn.onclick = async (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-
-            const { reportBlock } = await import('./reporter');
-            container.style.display = 'none';
-            container.dataset.tidyfeedBlocked = 'true';
-            await reportBlock(userHandle, userHandle, reason);
-            console.log(`[TidyFeed] 🚫 Blocked and reported: ${userHandle}`);
-        };
-    }
 
     const textSpan = foldBar.querySelector('.tidyfeed-fold-text') as HTMLElement;
     if (textSpan) {

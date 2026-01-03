@@ -17,8 +17,6 @@ function App() {
   const blockedKeywords = useStorageValue<string[]>('user_blocked_keywords', []);
   const enableRegex = useStorageValue<boolean>('enable_regex_filter', false);
   const cloudRegexList = useStorageValue<string[]>('cloud_regex_list', []);
-  const autoDownloadVideos = useStorageValue<boolean>('settings_auto_download_video', false);
-
   const [inputValue, setInputValue] = useState('');
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -92,10 +90,6 @@ function App() {
 
   const handleToggleRegex = () => {
     browser.storage.local.set({ enable_regex_filter: !enableRegex });
-  };
-
-  const handleToggleAutoDownload = () => {
-    browser.storage.local.set({ settings_auto_download_video: !autoDownloadVideos });
   };
 
   const handleAddKeyword = () => {

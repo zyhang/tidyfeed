@@ -34,7 +34,7 @@ function getLocaleString(key: string): string {
     return LOCALE_STRINGS[key]?.[locale] || LOCALE_STRINGS[key]?.['en'] || key;
 }
 
-// Button Styles
+// Button Styles - Minimal Badge Design
 const BUTTON_STYLES = `
   display: inline-flex;
   align-items: center;
@@ -46,13 +46,15 @@ const BUTTON_STYLES = `
   color: rgb(113, 118, 123);
   background: transparent;
   border: none;
-  transition: background-color 0.2s, color 0.2s, transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   margin-left: 0;
+  position: relative;
 `;
 
 const BOOKMARK_BUTTON_HOVER_STYLES = `
-  background-color: rgba(0, 186, 124, 0.1);
+  background-color: rgba(0, 186, 124, 0.12);
   color: rgb(0, 186, 124);
+  transform: scale(1.05);
 `;
 
 const BOOKMARK_BUTTON_ACTIVE_STYLES = `
@@ -63,20 +65,32 @@ const BOOKMARK_BUTTON_ACTIVE_STYLES = `
   height: 34px;
   border-radius: 9999px;
   cursor: pointer;
-  color: rgb(0, 186, 124); /* TidyFeed Emerald */
+  color: rgb(0, 186, 124);
   background: transparent;
   border: none;
-  transition: background-color 0.2s, color 0.2s, transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 `;
 
-// New Premium Icons (Sleeker Look)
-const BOOKMARK_ICON_OUTLINE = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+// Premium Icons with TidyFeed "T" Badge
+// Default: Outline bookmark with subtle "T" badge
+const BOOKMARK_ICON_OUTLINE = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Bookmark ribbon -->
+  <path d="M17 3H7C5.9 3 5 3.9 5 5V21L12 18L19 21V5C19 3.9 18.1 3 17 3Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- TidyFeed "T" badge -->
+  <circle cx="18" cy="6" r="4.5" fill="rgb(113, 118, 123)" stroke="rgb(21, 32, 43)" stroke-width="1.5"/>
+  <text x="18" y="8.5" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="6" font-weight="700" fill="white" text-anchor="middle">T</text>
 </svg>`;
 
-const BOOKMARK_ICON_FILLED = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" stroke="none">
-  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+// Saved: Filled bookmark with highlighted "T" badge and checkmark
+const BOOKMARK_ICON_FILLED = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Filled bookmark ribbon -->
+  <path d="M17 3H7C5.9 3 5 3.9 5 5V21L12 18L19 21V5C19 3.9 18.1 3 17 3Z" fill="currentColor" stroke="none"/>
+  <!-- Highlighted TidyFeed badge with checkmark -->
+  <circle cx="18" cy="6" r="4.5" fill="rgb(0, 186, 124)" stroke="rgb(21, 32, 43)" stroke-width="1.5"/>
+  <path d="M16 6L17.2 7.2L20 4.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>`;
+
 
 interface MediaItem {
     url: string;
@@ -369,11 +383,17 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
 
     if (!article) return;
 
-    // Add pop/scale animation
-    button.style.transform = 'scale(0.85)';
+    // Premium bounce animation with pulse glow effect
+    button.style.transform = 'scale(0.8)';
+    button.style.filter = 'brightness(1.2)';
+    setTimeout(() => {
+        button.style.transform = 'scale(1.1)';
+        button.style.filter = 'brightness(1) drop-shadow(0 0 8px rgba(0, 186, 124, 0.5))';
+    }, 100);
     setTimeout(() => {
         button.style.transform = 'scale(1)';
-    }, 150);
+        button.style.filter = 'brightness(1)';
+    }, 250);
 
     const data = extractTweetData(article as HTMLElement);
     const xId = data.tweetId;
@@ -450,14 +470,8 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
         } else {
             // Auto-download video if enabled
             if (newSavedState && data.hasVideo) {
-                const settings = await browser.storage.local.get('settings_auto_download_video');
-                if (settings.settings_auto_download_video === true) {
-                    browser.runtime.sendMessage({
-                        type: 'QUEUE_DOWNLOAD',
-                        tweetUrl: data.tweetUrl,
-                        savedPostId: result.postId
-                    }).catch(e => console.warn('[TidyFeed] Auto-download error:', e));
-                }
+                // Auto-download disabled in this build (feature not available)
+                console.log('[TidyFeed] Auto-download skipped (feature disabled) for', data.tweetUrl);
             }
         }
     } catch (error) {

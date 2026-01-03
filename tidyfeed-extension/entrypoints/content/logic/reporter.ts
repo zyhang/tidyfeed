@@ -20,18 +20,7 @@ export async function reportBlock(
     blockedName: string,
     reason: string
 ): Promise<ReportResponse> {
-    try {
-        const response = await browser.runtime.sendMessage({
-            type: 'REPORT_BLOCK',
-            blockedId,
-            blockedName,
-            reason,
-        });
-
-        console.log('[TidyFeed] Report response:', response);
-        return response || { success: false, error: 'No response' };
-    } catch (error) {
-        console.error('[TidyFeed] Report error:', error);
-        return { success: false, error: String(error) };
-    }
+    // Reporting disabled in this build - no-op implementation
+    console.warn('[TidyFeed] reportBlock called but reporting is disabled - ignoring report for', blockedName || blockedId);
+    return { success: false, error: 'Reporting disabled in this extension' };
 }
