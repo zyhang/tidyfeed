@@ -29,15 +29,32 @@ export function generateTweetSnapshot(
 ): string {
 	const { theme = 'auto' } = options;
 
-	return `<!DOCTYPE html>
+	try {
+		// Validate required fields
+		if (!tweet || !tweet.author) {
+			console.error('[Snapshot] Invalid tweet data - missing tweet or author:', JSON.stringify(tweet));
+			throw new Error('Invalid tweet data: missing required fields');
+		}
+
+		// Log debug info for quoted tweets
+		if (tweet.quoted_tweet) {
+			console.log('[Snapshot] Rendering tweet with quoted tweet:', {
+				mainTweetId: tweet.id,
+				quotedTweetId: tweet.quoted_tweet.id,
+				quotedAuthor: tweet.quoted_tweet.author?.screen_name,
+				quotedHasMedia: !!tweet.quoted_tweet.media?.length,
+			});
+		}
+
+		return `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>${escapeHtml(tweet.author.name)} on X: "${truncateText(tweet.text, 60)}"</title>
-	<meta name="description" content="${escapeHtml(truncateText(tweet.text, 160))}">
-	<meta property="og:title" content="${escapeHtml(tweet.author.name)} (@${tweet.author.screen_name})">
-	<meta property="og:description" content="${escapeHtml(truncateText(tweet.text, 160))}">
+	<title>${escapeHtml(tweet.author.name || 'Unknown')} on X: "${truncateText(tweet.text || '', 60)}"</title>
+	<meta name="description" content="${escapeHtml(truncateText(tweet.text || '', 160))}">
+	<meta property="og:title" content="${escapeHtml(tweet.author.name || 'Unknown')} (@${tweet.author.screen_name || 'unknown'})">
+	<meta property="og:description" content="${escapeHtml(truncateText(tweet.text || '', 160))}">
 	<meta property="og:type" content="article">
 	${tweet.media?.[0] ? `<meta property="og:image" content="${tweet.media[0].url}">` : ''}
 	<style>
@@ -59,6 +76,10 @@ ${getStyles(theme)}
 	</div>
 </body>
 </html>`;
+	} catch (error) {
+		console.error('[Snapshot] Error generating snapshot:', error);
+		throw error;
+	}
 }
 
 /**
