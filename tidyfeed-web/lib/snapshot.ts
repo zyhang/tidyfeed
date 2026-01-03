@@ -251,19 +251,7 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 			--hover: #f7f9f9;
 		}
 		
-		@media (prefers-color-scheme: dark) {
-			:root {
-				--bg: #000000;
-				--text: #e7e9ea;
-				--text-secondary: #71767b;
-				--border: #2f3336;
-				--link: #1d9bf0;
-				--card-bg: #000000;
-				--quote-bg: #000000;
-				--quote-border: #536471;
-				--hover: #080808;
-			}
-		}
+		/* Force light theme - removed dark mode media query */
 
 		* { margin: 0; padding: 0; box-sizing: border-box; }
 
