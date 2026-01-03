@@ -509,6 +509,38 @@ downloads.post('/internal/complete', internalServiceAuth, async (c) => {
                                 `UPDATE cached_tweets SET cached_data = ?, updated_at = CURRENT_TIMESTAMP WHERE tweet_id = ?`
                             ).bind(JSON.stringify(tweetData), task.tweet_id).run();
                             console.log(`[SnapshotVideo] Updated cached_tweets with R2 video URL for tweet ${task.tweet_id}`);
+
+                            // Regenerate HTML snapshot with new video URLs
+                            try {
+                                const { generateTweetSnapshot } = await import('../services/snapshot');
+
+                                // Get comments if any
+                                const commentsRow = await c.env.DB.prepare(
+                                    `SELECT comments_data FROM cached_tweets WHERE tweet_id = ?`
+                                ).bind(task.tweet_id).first<{ comments_data: string | null }>();
+
+                                const comments = commentsRow?.comments_data
+                                    ? JSON.parse(commentsRow.comments_data)
+                                    : [];
+
+                                // Generate new snapshot HTML with cached video URLs
+                                const snapshotHtml = generateTweetSnapshot(tweetData, comments, {
+                                    includeComments: comments.length > 0,
+                                    theme: 'auto',
+                                });
+
+                                // Upload regenerated snapshot to R2
+                                const r2SnapshotKey = `snapshots/${task.tweet_id}.html`;
+                                await c.env.MEDIA_BUCKET.put(r2SnapshotKey, snapshotHtml, {
+                                    httpMetadata: {
+                                        contentType: 'text/html; charset=utf-8',
+                                    },
+                                });
+                                console.log(`[SnapshotVideo] Regenerated HTML snapshot for tweet ${task.tweet_id} with cached video URLs`);
+                            } catch (snapshotErr) {
+                                console.error(`[SnapshotVideo] Failed to regenerate snapshot:`, snapshotErr);
+                                // Don't fail - the video is still cached, just the snapshot won't have the new URL
+                            }
                         }
                     }
                 } catch (err) {
