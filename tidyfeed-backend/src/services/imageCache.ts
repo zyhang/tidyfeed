@@ -1,7 +1,7 @@
 /**
- * Image Caching Service
+ * Media Caching Service
  * 
- * Downloads images from external URLs and uploads them to R2 storage.
+ * Downloads images and videos from external URLs and uploads them to R2 storage.
  * Returns a mapping of original URLs to cached R2 URLs.
  */
 
@@ -29,8 +29,9 @@ export async function cacheMediaToR2(
 
     // Collect all URLs to cache
     const urlsToCache: { url: string; type: 'media' | 'avatar' }[] = [];
+    const videosToCache: { media: TikHubMedia; tweetId: string }[] = [];
 
-    // Add media URLs (images only, not videos)
+    // Add media URLs
     for (const m of media) {
         if (m.type === 'photo' && m.url) {
             urlsToCache.push({ url: m.url, type: 'media' });
@@ -38,6 +39,10 @@ export async function cacheMediaToR2(
         // Cache video poster/preview images
         if ((m.type === 'video' || m.type === 'animated_gif') && m.preview_url) {
             urlsToCache.push({ url: m.preview_url, type: 'media' });
+        }
+        // Queue videos for caching
+        if ((m.type === 'video' || m.type === 'animated_gif') && m.video_info?.variants) {
+            videosToCache.push({ media: m, tweetId });
         }
     }
 
@@ -48,8 +53,8 @@ export async function cacheMediaToR2(
         }
     }
 
-    // Process each URL
-    const cachePromises = urlsToCache.map(async ({ url, type }) => {
+    // Process each image URL
+    const imageCachePromises = urlsToCache.map(async ({ url, type }) => {
         try {
             const result = await cacheImageToR2(mediaBucket, tweetId, url, type);
             if (result) {
@@ -57,14 +62,125 @@ export async function cacheMediaToR2(
                 totalSize += result.fileSize || 0;
             }
         } catch (error) {
-            console.error(`[ImageCache] Failed to cache ${url}:`, error);
+            console.error(`[MediaCache] Failed to cache image ${url}:`, error);
         }
     });
 
-    await Promise.all(cachePromises);
+    // Process each video
+    const videoCachePromises = videosToCache.map(async ({ media: m, tweetId: tid }) => {
+        try {
+            const result = await cacheVideoToR2(mediaBucket, tid, m);
+            if (result) {
+                // Map the original video variant URLs to cached URL
+                for (const variant of (m.video_info?.variants || [])) {
+                    if (variant.url) {
+                        urlMap.set(variant.url, result.cachedUrl);
+                    }
+                }
+                totalSize += result.fileSize || 0;
+            }
+        } catch (error) {
+            console.error(`[MediaCache] Failed to cache video:`, error);
+        }
+    });
 
-    console.log(`[ImageCache] Cached ${urlMap.size} images for tweet ${tweetId}, total size: ${totalSize} bytes`);
+    await Promise.all([...imageCachePromises, ...videoCachePromises]);
+
+    console.log(`[MediaCache] Cached ${urlMap.size} media items for tweet ${tweetId}, total size: ${totalSize} bytes`);
     return { urlMap, totalSize };
+}
+
+/**
+ * Cache a video to R2 storage
+ * Downloads the best quality MP4 variant and stores it
+ */
+async function cacheVideoToR2(
+    mediaBucket: R2Bucket,
+    tweetId: string,
+    media: TikHubMedia
+): Promise<CachedMediaResult | null> {
+    try {
+        // Get the best quality video URL
+        const variants = media.video_info?.variants || [];
+        const mp4Variants = variants.filter(v => v.content_type === 'video/mp4');
+
+        if (mp4Variants.length === 0) {
+            console.log(`[VideoCache] No MP4 variants found for tweet ${tweetId}`);
+            return null;
+        }
+
+        // Sort by bitrate descending and get highest quality
+        const sorted = mp4Variants.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+        const bestVariant = sorted[0];
+        const videoUrl = bestVariant.url;
+
+        if (!videoUrl) {
+            console.log(`[VideoCache] No video URL in best variant for tweet ${tweetId}`);
+            return null;
+        }
+
+        // Generate filename
+        const urlHash = await hashString(videoUrl);
+        const filename = `${urlHash}.mp4`;
+        const r2Key = `videos/${tweetId}/${filename}`;
+
+        // Check if already cached
+        const existing = await mediaBucket.head(r2Key);
+        if (existing) {
+            console.log(`[VideoCache] Video already cached for tweet ${tweetId}`);
+            return {
+                originalUrl: videoUrl,
+                cachedUrl: `https://api.tidyfeed.app/api/videos/${tweetId}/${filename}`,
+                r2Key,
+                fileSize: existing.size,
+            };
+        }
+
+        console.log(`[VideoCache] Downloading video for tweet ${tweetId} from ${videoUrl.substring(0, 80)}...`);
+
+        // Download the video
+        const response = await fetch(videoUrl, {
+            headers: {
+                'User-Agent': 'TidyFeed/1.0 (Video Cache)',
+            },
+        });
+
+        if (!response.ok) {
+            console.error(`[VideoCache] Failed to fetch video: ${response.status}`);
+            return null;
+        }
+
+        const contentType = response.headers.get('content-type') || 'video/mp4';
+        const videoData = await response.arrayBuffer();
+        const fileSize = videoData.byteLength;
+
+        // Limit video size to 50MB to avoid excessive storage
+        const maxVideoSize = 50 * 1024 * 1024; // 50MB
+        if (fileSize > maxVideoSize) {
+            console.log(`[VideoCache] Video too large (${(fileSize / 1024 / 1024).toFixed(2)}MB), skipping cache for tweet ${tweetId}`);
+            return null;
+        }
+
+        // Upload to R2
+        await mediaBucket.put(r2Key, videoData, {
+            httpMetadata: {
+                contentType,
+                cacheControl: 'public, max-age=31536000, immutable', // 1 year cache
+            },
+        });
+
+        console.log(`[VideoCache] Cached video for tweet ${tweetId}, size: ${(fileSize / 1024 / 1024).toFixed(2)}MB`);
+
+        return {
+            originalUrl: videoUrl,
+            cachedUrl: `https://api.tidyfeed.app/api/videos/${tweetId}/${filename}`,
+            r2Key,
+            fileSize,
+        };
+    } catch (error) {
+        console.error(`[VideoCache] Error caching video for tweet ${tweetId}:`, error);
+        return null;
+    }
 }
 
 /**
@@ -205,6 +321,22 @@ export function replaceMediaUrls(
                 if (cachedUrl) {
                     newMedia.preview_url = cachedUrl;
                 }
+            }
+
+            // Replace video variant URLs
+            if (m.video_info?.variants) {
+                newMedia.video_info = {
+                    ...m.video_info,
+                    variants: m.video_info.variants.map((v: any) => {
+                        if (v.url) {
+                            const cachedUrl = findCachedUrl(v.url, urlMap);
+                            if (cachedUrl) {
+                                return { ...v, url: cachedUrl };
+                            }
+                        }
+                        return v;
+                    })
+                };
             }
 
             return newMedia;

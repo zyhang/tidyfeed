@@ -95,6 +95,67 @@ app.get('/api/images/:tweetId/:type/:filename', async (c) => {
 	}
 });
 
+/**
+ * GET /api/videos/:tweetId/:filename
+ * Serve cached videos from R2 bucket
+ */
+app.get('/api/videos/:tweetId/:filename', async (c) => {
+	const { tweetId, filename } = c.req.param();
+
+	const r2Key = `videos/${tweetId}/${filename}`;
+
+	try {
+		const object = await c.env.MEDIA_BUCKET.get(r2Key);
+
+		if (!object) {
+			return c.json({ error: 'Video not found' }, 404);
+		}
+
+		const headers = new Headers();
+		headers.set('Content-Type', object.httpMetadata?.contentType || 'video/mp4');
+		headers.set('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year cache
+		headers.set('ETag', object.etag);
+		headers.set('Accept-Ranges', 'bytes');
+
+		// Handle range requests for video seeking
+		const rangeHeader = c.req.header('Range');
+		if (rangeHeader && object.size) {
+			const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+			if (match) {
+				const start = parseInt(match[1], 10);
+				const end = match[2] ? parseInt(match[2], 10) : object.size - 1;
+				const contentLength = end - start + 1;
+
+				// Get the range from R2
+				const rangeObject = await c.env.MEDIA_BUCKET.get(r2Key, {
+					range: { offset: start, length: contentLength }
+				});
+
+				if (rangeObject) {
+					headers.set('Content-Range', `bytes ${start}-${end}/${object.size}`);
+					headers.set('Content-Length', contentLength.toString());
+
+					return new Response(rangeObject.body, {
+						status: 206,
+						headers,
+					});
+				}
+			}
+		}
+
+		// Full video response
+		headers.set('Content-Length', (object.size || 0).toString());
+
+		return new Response(object.body, {
+			status: 200,
+			headers,
+		});
+	} catch (error) {
+		console.error(`[Videos] Error serving ${r2Key}:`, error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
 // ============================================
 // Auth Routes
 // ============================================
