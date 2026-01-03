@@ -102,7 +102,7 @@ function renderTweetContent(tweet: TikHubTweetData, isQuote: boolean = false): s
 			<time datetime="${tweet.created_at}">${formatFullDate(tweet.created_at)}</time>
 		</div>
 
-		${!isQuote ? renderMetrics(tweet) : ''}
+
 	`;
 }
 
@@ -164,22 +164,7 @@ function renderQuotedTweet(quoted: TikHubTweetData): string {
 	`;
 }
 
-/**
- * Render tweet metrics (likes, retweets, views)
- */
-function renderMetrics(tweet: TikHubTweetData): string {
-	const { metrics } = tweet;
-	if (!metrics) return '';
 
-	return `
-		<div class="tweet-metrics">
-			${metrics.reply_count ? `<span class="metric"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z"/></svg>${formatNumber(metrics.reply_count)}</span>` : ''}
-			${metrics.retweet_count ? `<span class="metric"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"/></svg>${formatNumber(metrics.retweet_count)}</span>` : ''}
-			${metrics.like_count ? `<span class="metric"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M16.697 5.5c-1.222-.06-2.679.51-3.89 2.16l-.805 1.09-.806-1.09C9.984 6.01 8.526 5.44 7.304 5.5c-1.243.07-2.349.78-2.91 1.91-.552 1.12-.633 2.78.479 4.82 1.074 1.97 3.257 4.27 7.129 6.61 3.87-2.34 6.052-4.64 7.126-6.61 1.111-2.04 1.03-3.7.477-4.82-.561-1.13-1.666-1.84-2.908-1.91zm4.187 7.69c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.41-4.86-.514-6.67.887-1.79 2.647-2.91 4.601-3.01 1.651-.09 3.368.56 4.798 2.01 1.429-1.45 3.146-2.1 4.796-2.01 1.954.1 3.714 1.22 4.601 3.01.896 1.81.846 4.17-.514 6.67z"/></svg>${formatNumber(metrics.like_count)}</span>` : ''}
-			${metrics.view_count ? `<span class="metric views"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M8.75 21V3h2v18h-2zM18 21V8.5h2V21h-2zM4 21l.004-10h2L6 21H4zm9.248 0v-7h2v7h-2z"/></svg>${formatNumber(metrics.view_count)} views</span>` : ''}
-		</div>
-	`;
-}
 
 /**
  * Render comments section
@@ -200,7 +185,7 @@ function renderCommentsSection(comments: TikHubComment[]): string {
 								<time class="comment-time">${formatRelativeTime(comment.created_at)}</time>
 							</div>
 							<div class="comment-text">${formatTweetText(comment.text)}</div>
-							${comment.like_count ? `<div class="comment-likes"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M16.697 5.5c-1.222-.06-2.679.51-3.89 2.16l-.805 1.09-.806-1.09C9.984 6.01 8.526 5.44 7.304 5.5c-1.243.07-2.349.78-2.91 1.91-.552 1.12-.633 2.78.479 4.82 1.074 1.97 3.257 4.27 7.129 6.61 3.87-2.34 6.052-4.64 7.126-6.61 1.111-2.04 1.03-3.7.477-4.82-.561-1.13-1.666-1.84-2.908-1.91z"/></svg>${comment.like_count}</div>` : ''}
+
 						</div>
 					</div>
 				`).join('')}
@@ -220,366 +205,191 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 	return `
 		:root {
 			--bg: #ffffff;
-			--text: #0f1419;
-			--text-secondary: #536471;
-			--border: #eff3f4;
-			--link: #1d9bf0;
+			--text: #1a1a1a;
+			--text-secondary: #666;
+			--border: #f0f0f0;
+			--link: #000000;
 			--card-bg: #ffffff;
-			--hover: #f7f9f9;
+			--quote-bg: #fafafa;
+			--hover: #f5f5f5;
+			--accent: #222;
 		}
 		${theme === 'dark' ? '' : `${themeSelector} {`}
 		${theme === 'auto' ? `
 			:root {
-				--bg: #000000;
-				--text: #e7e9ea;
-				--text-secondary: #71767b;
-				--border: #2f3336;
-				--link: #1d9bf0;
-				--card-bg: #16181c;
-				--hover: #1d1f23;
+				--bg: #111111;
+				--text: #ededed;
+				--text-secondary: #888;
+				--border: #222;
+				--link: #ffffff;
+				--card-bg: #111111;
+				--quote-bg: #1a1a1a;
+				--hover: #1f1f1f;
+				--accent: #eee;
 			}
 		` : theme === 'dark' ? `
-			--bg: #000000;
-			--text: #e7e9ea;
-			--text-secondary: #71767b;
-			--border: #2f3336;
-			--link: #1d9bf0;
-			--card-bg: #16181c;
-			--hover: #1d1f23;
+			--bg: #111111;
+			--text: #ededed;
+			--text-secondary: #888;
+			--border: #222;
+			--link: #ffffff;
+			--card-bg: #111111;
+			--quote-bg: #1a1a1a;
+			--hover: #1f1f1f;
+			--accent: #eee;
 		` : ''}
 		${theme === 'auto' ? '}' : ''}
 
-		* {
-			margin: 0;
-			padding: 0;
-			box-sizing: border-box;
-		}
+		* { margin: 0; padding: 0; box-sizing: border-box; }
 
 		body {
-			font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+			font-family: 'Georgia', 'Cambria', 'Times New Roman', serif; /* Editorial feel */
 			background: var(--bg);
 			color: var(--text);
-			line-height: 1.5;
+			line-height: 1.6;
 			-webkit-font-smoothing: antialiased;
+			padding: 40px 20px;
 		}
+		
+		/* Switch back to sans-serif for UI elements if preferred, but let's keep it consistent */
+		.sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 
 		.container {
-			max-width: 600px;
+			max-width: 640px;
 			margin: 0 auto;
-			padding: 20px;
 		}
 
 		.tweet-card {
-			background: var(--card-bg);
-			border: 1px solid var(--border);
-			border-radius: 16px;
-			padding: 16px;
+			/* No border for the main card, just clean reading layout */
+			padding: 0;
+			margin-bottom: 40px;
 		}
 
 		.tweet-header {
 			display: flex;
-			align-items: flex-start;
+			align-items: center;
 			gap: 12px;
-			margin-bottom: 12px;
+			margin-bottom: 24px;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 		}
 
-		.author-avatar img,
-		.avatar-placeholder {
-			width: 48px;
-			height: 48px;
+		.author-avatar img, .avatar-placeholder {
+			width: 44px;
+			height: 44px;
 			border-radius: 50%;
 			object-fit: cover;
 		}
-
+		
 		.avatar-placeholder {
-			background: linear-gradient(135deg, #1d9bf0, #1a8cd8);
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			color: white;
-			font-weight: 700;
-			font-size: 20px;
+			background: #333;
+			color: #fff;
+			display: flex; align-items: center; justify-content: center;
+			font-weight: 600;
 		}
 
-		.author-info {
-			flex: 1;
-			min-width: 0;
-		}
+		.author-info { flex: 1; }
 
 		.author-name {
-			font-weight: 700;
-			font-size: 15px;
-			display: flex;
-			align-items: center;
-			gap: 4px;
+			font-weight: 600;
+			font-size: 16px;
+			color: var(--text);
+			display: flex; align-items: center; gap: 4px;
 		}
-
-		.verified-badge {
-			width: 18px;
-			height: 18px;
-			color: #1d9bf0;
-		}
+		
+		.verified-badge { color: var(--text); width: 16px; height: 16px; }
 
 		.author-handle {
 			color: var(--text-secondary);
-			font-size: 15px;
+			font-size: 14px;
+			font-weight: 400;
 		}
-
-		.x-logo {
-			color: var(--text);
-			opacity: 0.8;
-			transition: opacity 0.2s;
-		}
-
-		.x-logo:hover {
-			opacity: 1;
-		}
-
-		.x-logo svg {
-			width: 24px;
-			height: 24px;
+		
+		.tweet-date-header {
+			color: var(--text-secondary);
+			font-size: 14px;
+			margin-top: 2px;
 		}
 
 		.tweet-text {
-			font-size: 17px;
-			line-height: 1.6;
-			margin-bottom: 12px;
+			font-size: 20px; /* Larger reading size */
+			line-height: 1.65;
+			margin-bottom: 20px;
 			white-space: pre-wrap;
 			word-wrap: break-word;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; /* Keep tweets sans-serif usually, or change to serif if purely editorial */
+			font-weight: 400;
+			color: var(--text);
 		}
 
 		.tweet-text a {
 			color: var(--link);
-			text-decoration: none;
+			text-decoration: underline;
+			text-decoration-thickness: 1px;
+			text-underline-offset: 2px;
+			text-decoration-color: var(--text-secondary);
 		}
 
 		.tweet-text a:hover {
-			text-decoration: underline;
+			text-decoration-color: var(--link);
 		}
 
 		.media-gallery {
 			display: grid;
-			gap: 2px;
-			border-radius: 16px;
-			overflow: hidden;
-			margin-bottom: 12px;
-		}
-
-		.media-gallery.single {
-			grid-template-columns: 1fr;
-		}
-
-		.media-gallery.double {
-			grid-template-columns: 1fr 1fr;
-		}
-
-		.media-gallery.triple {
-			grid-template-columns: 1fr 1fr;
-			grid-template-rows: 1fr 1fr;
-		}
-
-		.media-gallery.triple .media-item:first-child {
-			grid-row: span 2;
-		}
-
-		.media-gallery.quad {
-			grid-template-columns: 1fr 1fr;
-			grid-template-rows: 1fr 1fr;
-		}
-
-		.media-item {
-			display: block;
-			aspect-ratio: 16/9;
-			overflow: hidden;
-		}
-
-		.media-gallery.single .media-item {
-			aspect-ratio: auto;
-			max-height: 500px;
-		}
-
-		.media-item img {
-			width: 100%;
-			height: 100%;
-			object-fit: cover;
-			transition: transform 0.3s;
-		}
-
-		.media-item:hover img {
-			transform: scale(1.02);
-		}
-
-		.placeholder-img {
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			justify-content: center;
-			gap: 8px;
-			background: linear-gradient(135deg, rgba(29, 155, 240, 0.1) 0%, rgba(29, 155, 240, 0.05) 100%);
-			color: var(--text-secondary);
-			font-size: 13px;
-			padding: 32px 16px;
+			gap: 8px; /* More spacing */
 			border-radius: 12px;
-			min-height: 120px;
-			height: 100%;
-			text-align: center;
+			overflow: hidden;
+			margin-bottom: 24px;
 		}
-
-		.placeholder-img svg {
-			opacity: 0.5;
-		}
+		.media-gallery.single .media-item { max-height: 600px; }
+		.media-item { background: var(--hover); }
+		.media-item img { width: 100%; height: 100%; object-fit: cover; }
 
 		.video-container {
-			border-radius: 16px;
+			border-radius: 12px;
 			overflow: hidden;
-			margin-bottom: 12px;
-		}
-
-		.video-container video {
-			width: 100%;
-			display: block;
+			margin-bottom: 24px;
 			background: #000;
 		}
 
 		.quoted-tweet {
 			border: 1px solid var(--border);
-			border-radius: 16px;
-			padding: 12px;
+			background: var(--quote-bg);
+			border-radius: 12px;
+			padding: 16px;
+			margin-top: 24px;
 			margin-bottom: 12px;
-			transition: background 0.2s;
-		}
-
-		.quoted-tweet:hover {
-			background: var(--hover);
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 		}
 
 		.quoted-header {
 			display: flex;
 			align-items: center;
 			gap: 8px;
-			margin-bottom: 8px;
+			margin-bottom: 12px;
 		}
 
-		.quoted-avatar {
-			width: 20px;
-			height: 20px;
-			border-radius: 50%;
-		}
-
-		.quoted-name {
-			font-weight: 700;
-			font-size: 14px;
-		}
-
-		.quoted-handle {
-			color: var(--text-secondary);
-			font-size: 14px;
-		}
+		.quoted-avatar { width: 24px; height: 24px; border-radius: 50%; }
+		.quoted-name { font-weight: 600; font-size: 14px; color: var(--text); }
+		.quoted-handle { color: var(--text-secondary); font-size: 14px; }
 
 		.quoted-text {
-			font-size: 15px;
+			font-size: 16px;
 			line-height: 1.5;
+			color: var(--text);
+			margin-bottom: 12px;
 		}
-
-		.tweet-time {
-			color: var(--text-secondary);
-			font-size: 15px;
-			padding: 12px 0;
-			border-bottom: 1px solid var(--border);
-		}
-
-		.tweet-metrics {
-			display: flex;
-			gap: 20px;
-			padding-top: 12px;
-			flex-wrap: wrap;
-		}
-
-		.metric {
-			display: flex;
-			align-items: center;
-			gap: 4px;
-			color: var(--text-secondary);
-			font-size: 14px;
-		}
-
-		.metric svg {
-			width: 18px;
-			height: 18px;
-		}
-
-		.metric.views {
-			margin-left: auto;
-		}
-
+		
 		.comments-section {
-			margin-top: 24px;
+			margin-top: 40px;
+			padding-top: 40px;
+			border-top: 1px solid var(--border);
 		}
-
+		
 		.comments-title {
-			font-size: 20px;
-			font-weight: 700;
-			margin-bottom: 16px;
-			padding-bottom: 12px;
-			border-bottom: 1px solid var(--border);
-		}
-
-		.comment {
-			display: flex;
-			gap: 12px;
-			padding: 12px 0;
-			border-bottom: 1px solid var(--border);
-		}
-
-		.comment-avatar {
-			width: 40px;
-			height: 40px;
-			border-radius: 50%;
-			flex-shrink: 0;
-		}
-
-		.comment-content {
-			flex: 1;
-			min-width: 0;
-		}
-
-		.comment-header {
-			display: flex;
-			align-items: center;
-			gap: 4px;
-			flex-wrap: wrap;
-			margin-bottom: 4px;
-		}
-
-		.comment-name {
-			font-weight: 700;
-			font-size: 15px;
-		}
-
-		.comment-handle,
-		.comment-dot,
-		.comment-time {
-			color: var(--text-secondary);
-			font-size: 15px;
-		}
-
-		.comment-text {
-			font-size: 15px;
-			line-height: 1.5;
-		}
-
-		.comment-likes {
-			display: flex;
-			align-items: center;
-			gap: 4px;
-			color: var(--text-secondary);
-			font-size: 13px;
-			margin-top: 8px;
-		}
-
-		.comment-likes svg {
-			width: 16px;
-			height: 16px;
+			font-size: 16px;
+			font-weight: 600;
+			margin-bottom: 24px;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 		}
 
 		.watermark {
@@ -587,26 +397,17 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 			align-items: center;
 			justify-content: center;
 			gap: 6px;
-			margin-top: 24px;
-			padding-top: 16px;
-			border-top: 1px solid var(--border);
+			margin-top: 60px;
+			padding-top: 20px;
+			border-top: 1px dashed var(--border);
 			color: var(--text-secondary);
-			font-size: 13px;
+			font-size: 12px;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+			opacity: 0.6;
 		}
-
-		.watermark a {
-			color: var(--link);
-			text-decoration: none;
-			font-weight: 600;
-		}
-
-		.watermark a:hover {
-			text-decoration: underline;
-		}
-
-		.watermark .dot {
-			opacity: 0.5;
-		}
+		
+		.watermark:hover { opacity: 1; transition: opacity 0.2s; }
+		.watermark a { color: var(--text); text-decoration: none; font-weight: 500; }
 	`;
 }
 
@@ -680,18 +481,10 @@ function formatRelativeTime(dateStr: string): string {
 	const diffDays = Math.floor(diffMs / 86400000);
 
 	if (diffMins < 1) return 'now';
-	if (diffMins < 60) return `${diffMins}m`;
-	if (diffHours < 24) return `${diffHours}h`;
-	if (diffDays < 7) return `${diffDays}d`;
+	if (diffMins < 60) return `${diffMins} m`;
+	if (diffHours < 24) return `${diffHours} h`;
+	if (diffDays < 7) return `${diffDays} d`;
 	return formatDate(dateStr);
 }
 
-function formatNumber(num: number): string {
-	if (num >= 1000000) {
-		return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-	}
-	if (num >= 1000) {
-		return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-	}
-	return num.toString();
-}
+
