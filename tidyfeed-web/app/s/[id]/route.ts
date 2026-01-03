@@ -13,58 +13,86 @@ export async function GET(
 
     const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app').replace(/\/$/, '');
     const tweetsUrl = `${apiUrl}/api/tweets/${id}/cached`;
+    const staticSnapshotUrl = `${apiUrl}/api/tweets/${id}/snapshot`;
 
-    try {
+    const MAX_RETRIES = 3;
+    let lastError: any = null;
 
-        console.log(`[SnapshotProxy] Fetching data from ${tweetsUrl}`);
+    // --- Step 1: Try to fetch JSON data with retries ---
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            console.log(`[SnapshotProxy] Attempt ${attempt}: Fetching JSON from ${tweetsUrl}`);
+            const response = await fetch(tweetsUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'TidyFeed-Web-Proxy/1.0',
+                },
+                // Use no-store for retries to avoid caching a failure
+                cache: attempt > 1 ? 'no-store' : 'default',
+                next: { revalidate: 60 }
+            });
 
-        const response = await fetch(tweetsUrl, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                // Pass a user-agent to identify this service
-                'User-Agent': 'TidyFeed-Web-Proxy/1.0',
-            },
-            next: { revalidate: 60 } // Cache data fetch for 60 seconds
-        });
+            if (response.ok) {
+                const json = await response.json() as any;
+                if (json.success && json.tweet?.data) {
+                    // Success! Generate HTML locally
+                    const html = generateTweetSnapshot(
+                        json.tweet.data,
+                        json.tweet.comments || [],
+                        { theme: 'auto' }
+                    );
 
-        if (!response.ok) {
-            if (response.status === 404) {
+                    return new NextResponse(html, {
+                        headers: {
+                            'Content-Type': 'text/html; charset=utf-8',
+                            'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=3600',
+                        },
+                    });
+                }
+            } else if (response.status === 404) {
+                // Not found is likely permanent or at least doesn't need retries/fallback
                 return new NextResponse('Tweet snapshot not found (not cached yet?)', { status: 404 });
             }
-            console.error(`[SnapshotProxy] Backend error: ${response.status}`);
-            return new NextResponse(`Error fetching snapshot data: ${response.status}`, { status: response.status });
+
+            console.warn(`[SnapshotProxy] Attempt ${attempt} failed with status: ${response.status}`);
+        } catch (error) {
+            lastError = error;
+            console.error(`[SnapshotProxy] Attempt ${attempt} exception:`, error);
         }
 
-        const json = await response.json() as {
-            success: boolean;
-            tweet: {
-                data: TikHubTweetData;
-                comments?: TikHubComment[] | null;
-            }
-        };
-
-        if (!json.success || !json.tweet || !json.tweet.data) {
-            return new NextResponse('Invalid snapshot data received', { status: 500 });
+        // Small delay before retry (except for last attempt)
+        if (attempt < MAX_RETRIES) {
+            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
         }
+    }
 
-        // Generate HTML using the local library
-        // This allows us to modify the template in tidyfeed-web without redeploying backend
-        const html = generateTweetSnapshot(
-            json.tweet.data,
-            json.tweet.comments || [],
-            { theme: 'auto' }
-        );
-
-        return new NextResponse(html, {
-            headers: {
-                'Content-Type': 'text/html; charset=utf-8',
-                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=3600',
-            },
+    // --- Step 2: Fallback to static R2 snapshot ---
+    console.log(`[SnapshotProxy] JSON path failed. Falling back to static snapshot: ${staticSnapshotUrl}`);
+    try {
+        const fallbackResponse = await fetch(staticSnapshotUrl, {
+            method: 'GET',
+            headers: { 'User-Agent': 'TidyFeed-Web-Proxy/1.0' },
+            cache: 'no-store'
         });
 
-    } catch (error) {
-        console.error('[SnapshotProxy] Error:', error);
-        return new NextResponse('Internal Server Error', { status: 500 });
+        if (fallbackResponse.ok) {
+            const staticHtml = await fallbackResponse.text();
+            console.log(`[SnapshotProxy] Successfully served static fallback for ${id}`);
+            return new NextResponse(staticHtml, {
+                headers: {
+                    'Content-Type': 'text/html; charset=utf-8',
+                    'Cache-Control': 'public, s-maxage=300', // Short cache for fallbacks
+                },
+            });
+        }
+    } catch (fallbackError) {
+        console.error(`[SnapshotProxy] Fallback also failed:`, fallbackError);
     }
+
+    // --- Final Failure ---
+    return new NextResponse(
+        `Error loading snapshot. Please try again later. (Error: ${lastError?.message || 'Upstream Error'})`,
+        { status: 500 }
+    );
 }
