@@ -11,6 +11,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import downloads from './routes/downloads';
 import internal from './routes/internal';
 import caching from './routes/caching';
+import admin from './routes/admin';
 
 // Google OAuth JWKS endpoint for ID token verification
 const GOOGLE_JWKS = createRemoteJWKSet(
@@ -1702,6 +1703,9 @@ app.route('/api/internal', internal);
 
 // Mount tweet caching routes
 app.route('/api/tweets', caching);
+
+// Mount admin routes
+app.route('/api/admin', admin);
 
 export default app;
 
