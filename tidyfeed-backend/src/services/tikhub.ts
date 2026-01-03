@@ -30,6 +30,13 @@ export interface TikHubTweetData {
         view_count?: number;
     };
     source?: string;
+    entities?: {
+        urls: {
+            url: string;
+            expanded_url: string;
+            display_url: string;
+        }[];
+    };
 }
 
 export interface TikHubMedia {
@@ -237,6 +244,13 @@ export class TikHubService {
                 view_count: tweet.views?.count ? parseInt(tweet.views.count) : (typeof tweet.views === 'string' ? parseInt(tweet.views) : (tweet.views || 0)),
             },
             source: legacy.source || '',
+            entities: {
+                urls: (legacy.entities?.urls || []).map((u: any) => ({
+                    url: u.url,
+                    expanded_url: u.expanded_url,
+                    display_url: u.display_url,
+                })),
+            },
         };
     }
 

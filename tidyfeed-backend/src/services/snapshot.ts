@@ -110,7 +110,7 @@ function renderTweetContent(tweet: TikHubTweetData): string {
 			</a>
 		</header>
 
-		<div class="tweet-text">${formatTweetText(tweet.text)}</div>
+		<div class="tweet-text">${formatTweetText(tweet.text, tweet.entities)}</div>
 
 		${images.length > 0 && !hasVideo ? renderMediaGallery(images) : ''}
 		${video ? renderVideo(video) : ''}
@@ -185,7 +185,7 @@ function renderQuotedTweet(quoted: TikHubTweetData): string {
 		: `<div class="quoted-avatar-placeholder">${authorName.charAt(0).toUpperCase()}</div>`;
 
 	return `
-		<a href="https://x.com/${screenName}/status/${tweetId}" class="quoted-tweet" target="_blank" rel="noopener">
+		<div class="quoted-tweet">
 			<div class="quoted-header">
 				${avatarHtml}
 				<span class="quoted-name">${escapeHtml(authorName)}</span>
@@ -195,7 +195,7 @@ function renderQuotedTweet(quoted: TikHubTweetData): string {
 			<div class="quoted-text">${escapeHtml(truncateText(quoted.text || '', 280))}</div>
 			${images.length > 0 && !hasVideo ? `<div class="quoted-media"><img src="${images[0].url}" alt="" loading="lazy"></div>` : ''}
 			${video ? renderQuotedVideo(video) : ''}
-		</a>
+		</div>
 	`;
 }
 
@@ -516,28 +516,59 @@ function truncateText(text: string, maxLength: number): string {
 	return text.substring(0, maxLength).trim() + '...';
 }
 
-function formatTweetText(text: string): string {
-	let formatted = escapeHtml(text);
+function formatTweetText(text: string, entities?: { urls: { url: string; expanded_url: string; display_url: string }[] }): string {
+	// Step 1: Decode HTML entities if the text is already escaped (fixes &#039; issue)
+	let formatted = decodeHtmlEntities(text);
 
-	// Convert URLs to links
-	formatted = formatted.replace(
-		/(https?:\/\/[^\s]+)/g,
-		'<a href="$1" target="_blank" rel="noopener">$1</a>'
-	);
+	// Step 2: Re-escape for safety
+	formatted = escapeHtml(formatted);
 
-	// Convert @mentions to links
+	// Step 3: Replace URLs using entities if available (most robust)
+	if (entities && entities.urls && entities.urls.length > 0) {
+		entities.urls.forEach(urlEntity => {
+			const linkHtml = `<a href="${urlEntity.expanded_url}" target="_blank" rel="noopener">${urlEntity.display_url}</a>`;
+			// Replace the t.co URL with the link
+			// We use split/join to replace all occurrences globally (though usually unique)
+			formatted = formatted.split(urlEntity.url).join(linkHtml);
+		});
+	} else {
+		// Fallback: Regex replacement with better punctuation handling
+		// Exclude trailing punctuation: , . : ; ! ? ) ] } ' " >
+		// Also exclude CJK punctuation: ， 。 ： ； ！？ ） 】 ”
+		formatted = formatted.replace(
+			/(https?:\/\/[a-zA-Z0-9.\-_/~%]+)/g, // Basic match
+			(match) => {
+				// Trim trailing punctuation (common issue in mixed text)
+				const cleanUrl = match.replace(/[.,:;!?)}\]'">，。：；！？）】”]+$/, '');
+				const trailing = match.substring(cleanUrl.length);
+				return `<a href="${cleanUrl}" target="_blank" rel="noopener">${cleanUrl}</a>${trailing}`;
+			}
+		);
+	}
+
+	// Step 4: Convert @mentions to links (regex is generally safe for screen_names)
 	formatted = formatted.replace(
 		/@(\w+)/g,
 		'<a href="https://x.com/$1" target="_blank" rel="noopener">@$1</a>'
 	);
 
-	// Convert #hashtags to links
+	// Step 5: Convert #hashtags to links
 	formatted = formatted.replace(
 		/#(\w+)/g,
 		'<a href="https://x.com/hashtag/$1" target="_blank" rel="noopener">#$1</a>'
 	);
 
 	return formatted;
+}
+
+function decodeHtmlEntities(text: string): string {
+	return text
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&quot;/g, '"')
+		.replace(/&#039;/g, "'")
+		.replace(/&apos;/g, "'")
+		.replace(/&amp;/g, '&');
 }
 
 function formatDate(dateStr: string): string {
