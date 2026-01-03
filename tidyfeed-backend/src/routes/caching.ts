@@ -332,7 +332,7 @@ caching.post('/cache', async (c) => {
                 try {
                     // Check if task already exists
                     const existingTask = await c.env.DB.prepare(
-                        `SELECT id, metadata, status, r2_key FROM video_downloads WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' LIMIT 1`
+                        `SELECT id, metadata, status, r2_key FROM video_downloads WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' AND status != 'invalid' LIMIT 1`
                     ).bind(cleanTweetId, videoUrl).first<{ id: number; metadata: string | null; status: string; r2_key: string | null }>();
 
                     const metadata = { video_index: key }; // key is "0", "1", ... or "quoted_0", ...

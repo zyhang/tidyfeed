@@ -301,7 +301,7 @@ downloads.get('/internal/next-task', internalServiceAuth, async (c) => {
     try {
         // Find one pending task and atomically update to processing
         const task = await c.env.DB.prepare(
-            `SELECT id, user_id, tweet_url, twitter_cookies, task_type, tweet_id, video_url
+            `SELECT id, user_id, tweet_url, twitter_cookies, task_type, tweet_id, video_url, metadata
 			 FROM video_downloads
 			 WHERE status = 'pending'
 			 ORDER BY created_at ASC
@@ -314,6 +314,7 @@ downloads.get('/internal/next-task', internalServiceAuth, async (c) => {
             task_type: string;
             tweet_id: string;
             video_url: string;
+            metadata: string;
         }>();
 
         if (!task) {
@@ -333,7 +334,8 @@ downloads.get('/internal/next-task', internalServiceAuth, async (c) => {
                 cookies: task.twitter_cookies,
                 task_type: task.task_type || 'user_download',
                 tweet_id: task.tweet_id,
-                video_url: task.video_url
+                video_url: task.video_url,
+                metadata: task.metadata ? JSON.parse(task.metadata) : null
             }
         });
     } catch (error) {
