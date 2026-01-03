@@ -179,6 +179,27 @@ function renderQuotedTweet(quoted: TikHubTweetData): string {
 }
 
 /**
+ * Render video in quoted tweet (smaller, inline)
+ */
+function renderQuotedVideo(video: TikHubMedia): string {
+	const videoUrl = TikHubService.getBestVideoUrl(video);
+	const posterUrl = video.preview_url || video.url || '';
+
+	return `
+		<div class="quoted-video">
+			<video 
+				controls 
+				preload="metadata" 
+				poster="${posterUrl}"
+				${video.type === 'animated_gif' ? 'autoplay loop muted playsinline' : ''}
+			>
+				${videoUrl ? `<source src="${videoUrl}" type="video/mp4">` : ''}
+			</video>
+		</div>
+	`;
+}
+
+/**
  * Render comments section
  */
 function renderCommentsSection(comments: TikHubComment[]): string {
@@ -383,6 +404,28 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 			overflow: hidden;
 		}
 		.quoted-media img { width: 100%; max-height: 200px; object-fit: cover; display: block; }
+		
+		.quoted-video {
+			margin-top: 12px;
+			border-radius: 12px;
+			overflow: hidden;
+			background: #000;
+		}
+		.quoted-video video { width: 100%; max-height: 200px; display: block; }
+		
+		.quoted-avatar-placeholder {
+			width: 20px;
+			height: 20px;
+			border-radius: 50%;
+			background: var(--text-secondary);
+			color: var(--bg);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-weight: 700;
+			font-size: 10px;
+			flex-shrink: 0;
+		}
 
 		.tweet-time {
 			padding-top: 12px;
