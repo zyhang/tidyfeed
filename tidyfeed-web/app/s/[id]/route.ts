@@ -1,34 +1,73 @@
 
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { generateTweetSnapshot } from '../../../lib/snapshot';
+import { TikHubTweetData, TikHubComment } from '../../../lib/types';
 
 export const runtime = 'edge';
 
 export async function GET(
     request: NextRequest,
-    props: { params: Promise<{ id: string }> }
+    { params }: { params: Promise<{ id: string }> }
 ) {
-    const params = await props.params;
-    const id = params.id;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app';
+    const { id } = await params;
+
+    if (!process.env.NEXT_PUBLIC_API_URL) {
+        return new NextResponse('Configuration error: NEXT_PUBLIC_API_URL not set', { status: 500 });
+    }
 
     try {
-        const res = await fetch(`${apiUrl}/api/tweets/${id}/snapshot`);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
+        const tweetsUrl = `${apiUrl}/api/tweets/${id}/cached`;
 
-        if (!res.ok) {
-            if (res.status === 404) {
-                return new Response('Snapshot not found', { status: 404 });
+        console.log(`[SnapshotProxy] Fetching data from ${tweetsUrl}`);
+
+        const response = await fetch(tweetsUrl, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                // Pass a user-agent to identify this service
+                'User-Agent': 'TidyFeed-Web-Proxy/1.0',
+            },
+            next: { revalidate: 60 } // Cache data fetch for 60 seconds
+        });
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                return new NextResponse('Tweet snapshot not found (not cached yet?)', { status: 404 });
             }
-            return new Response('Error fetching snapshot', { status: res.status });
+            console.error(`[SnapshotProxy] Backend error: ${response.status}`);
+            return new NextResponse(`Error fetching snapshot data: ${response.status}`, { status: response.status });
         }
 
-        return new Response(res.body, {
+        const json = await response.json<{
+            success: boolean;
+            tweet: {
+                data: TikHubTweetData;
+                comments?: TikHubComment[] | null;
+            }
+        }>();
+
+        if (!json.success || !json.tweet || !json.tweet.data) {
+            return new NextResponse('Invalid snapshot data received', { status: 500 });
+        }
+
+        // Generate HTML using the local library
+        // This allows us to modify the template in tidyfeed-web without redeploying backend
+        const html = generateTweetSnapshot(
+            json.tweet.data,
+            json.tweet.comments || [],
+            { theme: 'auto' }
+        );
+
+        return new NextResponse(html, {
             headers: {
                 'Content-Type': 'text/html; charset=utf-8',
-                'Cache-Control': 'public, max-age=86400, immutable',
+                'Cache-Control': 'public, max-age=3600, s-maxage=3600, update-while-revalidate=60', // 1 hour cache
             },
         });
+
     } catch (error) {
-        console.error('Snapshot proxy error:', error);
-        return new Response('Internal Server Error', { status: 500 });
+        console.error('[SnapshotProxy] Error:', error);
+        return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
