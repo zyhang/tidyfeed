@@ -39,13 +39,13 @@ export async function GET(
             return new NextResponse(`Error fetching snapshot data: ${response.status}`, { status: response.status });
         }
 
-        const json = await response.json<{
+        const json = await response.json() as {
             success: boolean;
             tweet: {
                 data: TikHubTweetData;
                 comments?: TikHubComment[] | null;
             }
-        }>();
+        };
 
         if (!json.success || !json.tweet || !json.tweet.data) {
             return new NextResponse('Invalid snapshot data received', { status: 500 });
