@@ -278,8 +278,19 @@ caching.post('/cache', async (c) => {
             const apiUrl = webAppUrl.replace('tidyfeed.app', 'api.tidyfeed.app'); // Heuristic for API URL
             let dataUpdated = false;
 
-            videosToQueue.forEach(({ videoUrl, key }) => {
-                const predictedUrl = `${apiUrl}/api/videos/${cleanTweetId}/${key}.mp4`;
+            videosToQueue.forEach(({ videoUrl, key }, i) => {
+                // Use simple index for filename to match worker logic: 0.mp4, 1.mp4, etc.
+                // The key in the loop above was overly complex (main_0, quoted_0), 
+                // but for the filename we just want the simple index relative to the *entire* list of videos for this tweet?
+                // Actually, let's keep it simple: we want the index to be 0, 1, 2... based on the order we queue them.
+                // BUT, the worker uses `video_index` metadata if present, or `task_id` if not.
+                // In downloads.ts: 
+                // if (meta.video_index !== undefined) videoIndex = String(meta.video_index);
+                // key = `videos/${task.tweet_id}/${videoIndex}.${extension}`;
+
+                // So we should just use the array index `i` from videosToQueue as the video_index.
+                const videoIndex = i; // 0, 1, 2...
+                const predictedUrl = `${apiUrl}/api/videos/${cleanTweetId}/${videoIndex}.mp4`;
 
                 // Helper to update media URL
                 const updateMedia = (mediaList: any[]) => {
@@ -288,6 +299,8 @@ caching.post('/cache', async (c) => {
                             const hasMatchingVariant = m.video_info.variants.some((v: any) => v.url === videoUrl);
 
                             if (hasMatchingVariant) {
+                                // Replace ALL mp4 variants with our cached URL
+                                // This ensures the snapshot will pick it up regardless of bitrate sorting
                                 m.video_info.variants.forEach((v: any) => {
                                     if (v.content_type === 'video/mp4') {
                                         v.url = predictedUrl;
@@ -301,6 +314,10 @@ caching.post('/cache', async (c) => {
 
                 if (tweetData.media) updateMedia(tweetData.media);
                 if (tweetData.quoted_tweet?.media) updateMedia(tweetData.quoted_tweet.media);
+
+                // Update key for metadata usage below
+                // We'll store the index in metadata so downloads.ts knows what filename to use
+                videosToQueue[i].key = String(videoIndex);
             });
 
             // If we updated URLs, re-generate snapshot IMMEDIATELY with predicted URLs
@@ -332,7 +349,7 @@ caching.post('/cache', async (c) => {
                         `SELECT id, metadata, status FROM video_downloads WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' LIMIT 1`
                     ).bind(cleanTweetId, videoUrl).first<{ id: number; metadata: string | null; status: string }>();
 
-                    const metadata = { video_key: key };
+                    const metadata = { video_index: parseInt(key) }; // key is now "0", "1", etc.
                     const metadataStr = JSON.stringify(metadata);
 
                     if (!existingTask) {
@@ -340,12 +357,12 @@ caching.post('/cache', async (c) => {
                             `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status, metadata)
                              VALUES (?, ?, 'snapshot_video', ?, ?, 'pending', ?)`
                         ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, metadataStr).run();
-                        console.log(`[Caching] Queued video download for tweet ${cleanTweetId} (key ${key})`);
+                        console.log(`[Caching] Queued video download for tweet ${cleanTweetId} (index ${key})`);
                     } else {
                         await c.env.DB.prepare(
                             `UPDATE video_downloads SET metadata = ? WHERE id = ?`
                         ).bind(metadataStr, existingTask.id).run();
-                        console.log(`[Caching] Updated metadata for existing task ${existingTask.id} (key ${key})`);
+                        console.log(`[Caching] Updated metadata for existing task ${existingTask.id} (index ${key})`);
                     }
                 } catch (err) {
                     console.error(`[Caching] Failed to queue video:`, err);
