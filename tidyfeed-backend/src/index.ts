@@ -908,7 +908,7 @@ async function triggerCacheInBackground(
 				updated_at = CURRENT_TIMESTAMP
 		`).bind(
 			tweetId,
-			JSON.stringify(tweetData), // Store original data, not cached URLs
+			JSON.stringify(cachedTweetData), // Store data with cached image URLs
 			r2Key,
 			comments.length > 0 ? JSON.stringify(comments) : null,
 			comments.length,
@@ -1101,6 +1101,23 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 					await c.env.MEDIA_BUCKET.delete(obj.key);
 				}
 				console.log(`[Cleanup] Deleted ${imagesList.objects.length} cached images for tweet ${xId}`);
+
+				// Delete all R2 videos for this tweet
+				const videosList = await c.env.MEDIA_BUCKET.list({ prefix: `videos/${xId}/` });
+				for (const obj of videosList.objects) {
+					await c.env.MEDIA_BUCKET.delete(obj.key);
+				}
+				if (videosList.objects.length > 0) {
+					console.log(`[Cleanup] Deleted ${videosList.objects.length} cached videos for tweet ${xId}`);
+				}
+
+				// Mark video_downloads as 'invalid' for this tweet
+				const videoUpdateResult = await c.env.DB.prepare(
+					`UPDATE video_downloads SET status = 'invalid' WHERE tweet_id = ? AND task_type = 'snapshot_video'`
+				).bind(xId).run();
+				if (videoUpdateResult.meta.changes > 0) {
+					console.log(`[Cleanup] Marked ${videoUpdateResult.meta.changes} video_downloads as invalid for tweet ${xId}`);
+				}
 
 				// Delete R2 snapshot
 				await c.env.MEDIA_BUCKET.delete(`snapshots/${xId}.html`);
