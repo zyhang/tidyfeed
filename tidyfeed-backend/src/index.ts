@@ -964,7 +964,7 @@ async function triggerCacheInBackground(
 					// Check if a task already exists for this tweet_id and video_url
 					const existingTask = await env.DB.prepare(
 						`SELECT id, status FROM video_downloads 
-						 WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video'
+						 WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' AND status != 'invalid'
 						 LIMIT 1`
 					).bind(tid, videoUrl).first<{ id: number; status: string }>();
 
