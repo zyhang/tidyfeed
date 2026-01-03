@@ -272,8 +272,12 @@ function DashboardContent() {
                             onRemoveTag={handleRemoveTag}
                             onCache={async (xId) => {
                                 try {
-                                    const response = await fetch(`${API_URL}/api/posts/cache/${xId}`, {
+                                    const response = await fetch(`${API_URL}/api/tweets/cache`, {
                                         method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({ tweet_id: xId }),
                                         credentials: 'include'
                                     })
                                     if (response.ok) {

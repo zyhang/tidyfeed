@@ -25,6 +25,7 @@ type Bindings = {
 	MEDIA_BUCKET: R2Bucket;
 	INTERNAL_SERVICE_KEY: string;
 	TIKHUB_API_KEY: string;
+	WEB_APP_URL?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -1114,9 +1115,10 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 
 				cacheResult.results.forEach(row => {
 					if (row.snapshot_r2_key) {
+						const webAppUrl = c.env.WEB_APP_URL || 'https://tidyfeed.app';
 						cacheMap.set(row.tweet_id, {
 							cached: true,
-							snapshotUrl: `/api/tweets/${row.tweet_id}/snapshot`
+							snapshotUrl: `${webAppUrl}/s/${row.tweet_id}`
 						});
 					}
 				});
@@ -1445,7 +1447,7 @@ app.get('/api/tweets/by-tag/:tagId', cookieAuthMiddleware, async (c) => {
 				updatedAt: tweet.updated_at,
 				cacheInfo: tweet.snapshot_r2_key ? {
 					cached: true,
-					snapshotUrl: `/api/tweets/${tweet.tweet_id}/snapshot`
+					snapshotUrl: `${c.env.WEB_APP_URL || 'https://tidyfeed.app'}/s/${tweet.tweet_id}`
 				} : null
 			};
 		});
