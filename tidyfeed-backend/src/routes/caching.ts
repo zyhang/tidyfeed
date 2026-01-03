@@ -335,14 +335,11 @@ caching.post('/cache', async (c) => {
                         `SELECT id, metadata, status, r2_key FROM video_downloads WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' AND status != 'invalid' LIMIT 1`
                     ).bind(cleanTweetId, videoUrl).first<{ id: number; metadata: string | null; status: string; r2_key: string | null }>();
 
-                    const metadata = { video_index: key }; // key is "0", "1", ... or "quoted_0", ...
-                    const metadataStr = JSON.stringify(metadata);
-
                     if (!existingTask) {
                         await c.env.DB.prepare(
                             `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status, metadata)
                              VALUES (?, ?, 'snapshot_video', ?, ?, 'pending', ?)`
-                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, key).run();
+                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, `${key}`).run();
                         console.log(`[Caching] Queued video download for tweet ${cleanTweetId} (index ${key})`);
                     } else {
                         // Check if R2 key matches expected key
@@ -359,12 +356,12 @@ caching.post('/cache', async (c) => {
                             console.log(`[Caching] Existing video has wrong filename (${existingTask.r2_key}), forcing re-download as ${key}`);
                             await c.env.DB.prepare(
                                 `UPDATE video_downloads SET metadata = ?, status = 'pending', r2_key = NULL WHERE id = ?`
-                            ).bind(key, existingTask.id).run();
+                            ).bind(`${key}`, existingTask.id).run();
                         } else {
                             // Key matches, just update metadata (idempotent)
                             await c.env.DB.prepare(
                                 `UPDATE video_downloads SET metadata = ? WHERE id = ?`
-                            ).bind(key, existingTask.id).run();
+                            ).bind(`${key}`, existingTask.id).run();
                             console.log(`[Caching] Updated metadata for existing task ${existingTask.id} (index ${key})`);
                         }
                     }
