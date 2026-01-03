@@ -14,29 +14,29 @@
 import type { TikHubTweetData, TikHubComment, TikHubMedia } from './types';
 
 interface SnapshotOptions {
-    includeComments?: boolean;
-    maxComments?: number;
-    theme?: 'light' | 'dark' | 'auto';
+	includeComments?: boolean;
+	maxComments?: number;
+	theme?: 'light' | 'dark' | 'auto';
 }
 
 /**
  * Generate a complete HTML snapshot for a tweet
  */
 export function generateTweetSnapshot(
-    tweet: TikHubTweetData,
-    comments: TikHubComment[] = [],
-    options: SnapshotOptions = {}
+	tweet: TikHubTweetData,
+	comments: TikHubComment[] = [],
+	options: SnapshotOptions = {}
 ): string {
-    const { theme = 'auto' } = options;
+	const { theme = 'auto' } = options;
 
-    try {
-        // Validate required fields
-        if (!tweet || !tweet.author) {
-            console.error('[Snapshot] Invalid tweet data - missing tweet or author:', JSON.stringify(tweet));
-            throw new Error('Invalid tweet data: missing required fields');
-        }
+	try {
+		// Validate required fields
+		if (!tweet || !tweet.author) {
+			console.error('[Snapshot] Invalid tweet data - missing tweet or author:', JSON.stringify(tweet));
+			throw new Error('Invalid tweet data: missing required fields');
+		}
 
-        return `<!DOCTYPE html>
+		return `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
@@ -66,27 +66,27 @@ ${getStyles(theme)}
 	</div>
 </body>
 </html>`;
-    } catch (error) {
-        console.error('[Snapshot] Error generating snapshot:', error);
-        throw error;
-    }
+	} catch (error) {
+		console.error('[Snapshot] Error generating snapshot:', error);
+		throw error;
+	}
 }
 
 /**
  * Render the main tweet content
  */
 function renderTweetContent(tweet: TikHubTweetData): string {
-    const hasVideo = tweet.media?.some(m => m.type === 'video' || m.type === 'animated_gif');
-    const images = tweet.media?.filter(m => m.type === 'photo') || [];
-    const video = tweet.media?.find(m => m.type === 'video' || m.type === 'animated_gif');
+	const hasVideo = tweet.media?.some(m => m.type === 'video' || m.type === 'animated_gif');
+	const images = tweet.media?.filter(m => m.type === 'photo') || [];
+	const video = tweet.media?.find(m => m.type === 'video' || m.type === 'animated_gif');
 
-    return `
+	return `
 		<header class="tweet-header">
 			<a href="https://x.com/${tweet.author.screen_name}" class="author-avatar" target="_blank" rel="noopener">
 				${tweet.author.profile_image_url
-            ? `<img src="${tweet.author.profile_image_url.replace('_normal', '_bigger')}" alt="${escapeHtml(tweet.author.name)}" loading="lazy">`
-            : `<div class="avatar-placeholder">${tweet.author.name.charAt(0).toUpperCase()}</div>`
-        }
+			? `<img src="${tweet.author.profile_image_url.replace('_normal', '_bigger')}" alt="${escapeHtml(tweet.author.name)}" loading="lazy">`
+			: `<div class="avatar-placeholder">${tweet.author.name.charAt(0).toUpperCase()}</div>`
+		}
 			</a>
 			<div class="author-info">
 				<a href="https://x.com/${tweet.author.screen_name}" class="author-name-row" target="_blank" rel="noopener">
@@ -100,9 +100,7 @@ function renderTweetContent(tweet: TikHubTweetData): string {
     				</a>
     				<span class="author-handle">@${escapeHtml(tweet.author.screen_name)}</span>
     			</div>
-			<a href="https://x.com/${tweet.author.screen_name}/status/${tweet.id}" class="x-logo" target="_blank" rel="noopener" title="View on X">
-				<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-			</a>
+
 		</header>
 
 		<div class="tweet-text">${formatTweetText(tweet.text, tweet.entities)}</div>
@@ -123,10 +121,10 @@ function renderTweetContent(tweet: TikHubTweetData): string {
  * Render media gallery
  */
 function renderMediaGallery(images: TikHubMedia[]): string {
-    const count = Math.min(images.length, 4);
-    const gridClass = count === 1 ? 'single' : count === 2 ? 'double' : count === 3 ? 'triple' : 'quad';
+	const count = Math.min(images.length, 4);
+	const gridClass = count === 1 ? 'single' : count === 2 ? 'double' : count === 3 ? 'triple' : 'quad';
 
-    return `
+	return `
 		<div class="media-gallery ${gridClass}">
 			${images.slice(0, 4).map((img, i) => `
 				<a href="${img.url}" target="_blank" class="media-item" rel="noopener">
@@ -141,10 +139,10 @@ function renderMediaGallery(images: TikHubMedia[]): string {
  * Render video with poster
  */
 function renderVideo(video: TikHubMedia): string {
-    const videoUrl = getBestVideoUrl(video);
-    const posterUrl = video.preview_url || video.url;
+	const videoUrl = getBestVideoUrl(video);
+	const posterUrl = video.preview_url || video.url;
 
-    return `
+	return `
 		<div class="video-container">
 			<video 
 				controls 
@@ -163,22 +161,22 @@ function renderVideo(video: TikHubMedia): string {
  * Render quoted tweet (X-style card)
  */
 function renderQuotedTweet(quoted: TikHubTweetData): string {
-    const images = quoted.media?.filter(m => m.type === 'photo') || [];
-    const hasVideo = quoted.media?.some(m => m.type === 'video' || m.type === 'animated_gif');
-    const video = quoted.media?.find(m => m.type === 'video' || m.type === 'animated_gif');
+	const images = quoted.media?.filter(m => m.type === 'photo') || [];
+	const hasVideo = quoted.media?.some(m => m.type === 'video' || m.type === 'animated_gif');
+	const video = quoted.media?.find(m => m.type === 'video' || m.type === 'animated_gif');
 
-    // Safe access with fallbacks
-    const screenName = quoted.author?.screen_name || 'unknown';
-    const authorName = quoted.author?.name || screenName;
-    const avatarUrl = quoted.author?.profile_image_url?.replace('_normal', '_bigger') || '';
-    const isVerified = !!quoted.author?.verified;
+	// Safe access with fallbacks
+	const screenName = quoted.author?.screen_name || 'unknown';
+	const authorName = quoted.author?.name || screenName;
+	const avatarUrl = quoted.author?.profile_image_url?.replace('_normal', '_bigger') || '';
+	const isVerified = !!quoted.author?.verified;
 
-    // Generate avatar HTML with fallback
-    const avatarHtml = avatarUrl
-        ? `<img src="${avatarUrl}" alt="" class="quoted-avatar">`
-        : `<div class="quoted-avatar-placeholder">${authorName.charAt(0).toUpperCase()}</div>`;
+	// Generate avatar HTML with fallback
+	const avatarHtml = avatarUrl
+		? `<img src="${avatarUrl}" alt="" class="quoted-avatar">`
+		: `<div class="quoted-avatar-placeholder">${authorName.charAt(0).toUpperCase()}</div>`;
 
-    return `
+	return `
 		<div class="quoted-tweet">
 			<div class="quoted-header">
 				${avatarHtml}
@@ -197,10 +195,10 @@ function renderQuotedTweet(quoted: TikHubTweetData): string {
  * Render video in quoted tweet (smaller, inline)
  */
 function renderQuotedVideo(video: TikHubMedia): string {
-    const videoUrl = getBestVideoUrl(video);
-    const posterUrl = video.preview_url || video.url || '';
+	const videoUrl = getBestVideoUrl(video);
+	const posterUrl = video.preview_url || video.url || '';
 
-    return `
+	return `
 		<div class="quoted-video">
 			<video 
 				controls 
@@ -218,7 +216,7 @@ function renderQuotedVideo(video: TikHubMedia): string {
  * Render comments section
  */
 function renderCommentsSection(comments: TikHubComment[]): string {
-    return `
+	return `
 		<section class="comments-section">
 			<h2 class="comments-title">Replies</h2>
 			<div class="comments-list">
@@ -245,7 +243,7 @@ function renderCommentsSection(comments: TikHubComment[]): string {
  * Get CSS styles (X-like theme)
  */
 function getStyles(theme: 'light' | 'dark' | 'auto'): string {
-    return `
+	return `
 		:root {
 			--bg: #ffffff;
 			--text: #0f1419;
@@ -497,119 +495,119 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 // Helper functions
 
 function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+	return text
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#039;');
 }
 
 function truncateText(text: string, maxLength: number): string {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength).trim() + '...';
+	if (text.length <= maxLength) return text;
+	return text.substring(0, maxLength).trim() + '...';
 }
 
 function formatTweetText(text: string, entities?: { urls: { url: string; expanded_url: string; display_url: string }[] }): string {
-    // Step 1: Decode HTML entities if the text is already escaped (fixes &#039; issue)
-    let formatted = decodeHtmlEntities(text);
+	// Step 1: Decode HTML entities if the text is already escaped (fixes &#039; issue)
+	let formatted = decodeHtmlEntities(text);
 
-    // Step 2: Re-escape for safety
-    formatted = escapeHtml(formatted);
+	// Step 2: Re-escape for safety
+	formatted = escapeHtml(formatted);
 
-    // Step 3: Replace URLs using entities if available (most robust)
-    if (entities && entities.urls && entities.urls.length > 0) {
-        entities.urls.forEach(urlEntity => {
-            const linkHtml = `<a href="${urlEntity.expanded_url}" target="_blank" rel="noopener">${urlEntity.display_url}</a>`;
-            // Replace the t.co URL with the link
-            // We use split/join to replace all occurrences globally (though usually unique)
-            formatted = formatted.split(urlEntity.url).join(linkHtml);
-        });
-    } else {
-        // Fallback: Regex replacement with better punctuation handling
-        // Exclude trailing punctuation: , . : ; ! ? ) ] } ' " >
-        // Also exclude CJK punctuation: ， 。 ： ； ！？ ） 】 ”
-        formatted = formatted.replace(
-            /(https?:\/\/[a-zA-Z0-9.\-_/~%]+)/g, // Basic match
-            (match) => {
-                // Trim trailing punctuation (common issue in mixed text)
-                const cleanUrl = match.replace(/[.,:;!?)}\]'">，。：；！？）】”]+$/, '');
-                const trailing = match.substring(cleanUrl.length);
-                return `<a href="${cleanUrl}" target="_blank" rel="noopener">${cleanUrl}</a>${trailing}`;
-            }
-        );
-    }
+	// Step 3: Replace URLs using entities if available (most robust)
+	if (entities && entities.urls && entities.urls.length > 0) {
+		entities.urls.forEach(urlEntity => {
+			const linkHtml = `<a href="${urlEntity.expanded_url}" target="_blank" rel="noopener">${urlEntity.display_url}</a>`;
+			// Replace the t.co URL with the link
+			// We use split/join to replace all occurrences globally (though usually unique)
+			formatted = formatted.split(urlEntity.url).join(linkHtml);
+		});
+	} else {
+		// Fallback: Regex replacement with better punctuation handling
+		// Exclude trailing punctuation: , . : ; ! ? ) ] } ' " >
+		// Also exclude CJK punctuation: ， 。 ： ； ！？ ） 】 ”
+		formatted = formatted.replace(
+			/(https?:\/\/[a-zA-Z0-9.\-_/~%]+)/g, // Basic match
+			(match) => {
+				// Trim trailing punctuation (common issue in mixed text)
+				const cleanUrl = match.replace(/[.,:;!?)}\]'">，。：；！？）】”]+$/, '');
+				const trailing = match.substring(cleanUrl.length);
+				return `<a href="${cleanUrl}" target="_blank" rel="noopener">${cleanUrl}</a>${trailing}`;
+			}
+		);
+	}
 
-    // Step 4: Convert @mentions to links (regex is generally safe for screen_names)
-    formatted = formatted.replace(
-        /@(\w+)/g,
-        '<a href="https://x.com/$1" target="_blank" rel="noopener">@$1</a>'
-    );
+	// Step 4: Convert @mentions to links (regex is generally safe for screen_names)
+	formatted = formatted.replace(
+		/@(\w+)/g,
+		'<a href="https://x.com/$1" target="_blank" rel="noopener">@$1</a>'
+	);
 
-    // Step 5: Convert #hashtags to links
-    formatted = formatted.replace(
-        /#(\w+)/g,
-        '<a href="https://x.com/hashtag/$1" target="_blank" rel="noopener">#$1</a>'
-    );
+	// Step 5: Convert #hashtags to links
+	formatted = formatted.replace(
+		/#(\w+)/g,
+		'<a href="https://x.com/hashtag/$1" target="_blank" rel="noopener">#$1</a>'
+	);
 
-    return formatted;
+	return formatted;
 }
 
 function decodeHtmlEntities(text: string): string {
-    return text
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#039;/g, "'")
-        .replace(/&apos;/g, "'")
-        .replace(/&amp;/g, '&');
+	return text
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&quot;/g, '"')
+		.replace(/&#039;/g, "'")
+		.replace(/&apos;/g, "'")
+		.replace(/&amp;/g, '&');
 }
 
 function formatDate(dateStr: string): string {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-    });
+	const date = new Date(dateStr);
+	return date.toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
 }
 
 function formatFullDate(dateStr: string): string {
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-    });
+	const date = new Date(dateStr);
+	return date.toLocaleString('en-US', {
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true,
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
 }
 
 function formatRelativeTime(dateStr: string): string {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+	const date = new Date(dateStr);
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffMins = Math.floor(diffMs / 60000);
+	const diffHours = Math.floor(diffMs / 3600000);
+	const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'now';
-    if (diffMins < 60) return `${diffMins}m`;
-    if (diffHours < 24) return `${diffHours}h`;
-    if (diffDays < 7) return `${diffDays}d`;
-    return formatDate(dateStr);
+	if (diffMins < 1) return 'now';
+	if (diffMins < 60) return `${diffMins}m`;
+	if (diffHours < 24) return `${diffHours}h`;
+	if (diffDays < 7) return `${diffDays}d`;
+	return formatDate(dateStr);
 }
 
 function getBestVideoUrl(media: TikHubMedia): string | null {
-    if (media.type !== 'video' && media.type !== 'animated_gif') return null;
+	if (media.type !== 'video' && media.type !== 'animated_gif') return null;
 
-    const variants = media.video_info?.variants || [];
-    const mp4Variants = variants.filter(v => v.content_type === 'video/mp4');
+	const variants = media.video_info?.variants || [];
+	const mp4Variants = variants.filter(v => v.content_type === 'video/mp4');
 
-    if (mp4Variants.length === 0) return null;
+	if (mp4Variants.length === 0) return null;
 
-    // Sort by bitrate descending, get highest quality
-    const sorted = mp4Variants.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-    return sorted[0]?.url || null;
+	// Sort by bitrate descending, get highest quality
+	const sorted = mp4Variants.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+	return sorted[0]?.url || null;
 }
