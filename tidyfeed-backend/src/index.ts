@@ -955,9 +955,21 @@ async function triggerCacheInBackground(
 				}
 			}
 
-			// Queue each video for Python worker
+			// Queue each video for Python worker (with duplicate check)
 			for (const { tweetId: tid, videoUrl } of videosToQueue) {
 				try {
+					// Check if a task already exists for this tweet_id and video_url
+					const existingTask = await env.DB.prepare(
+						`SELECT id, status FROM video_downloads 
+						 WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video'
+						 LIMIT 1`
+					).bind(tid, videoUrl).first<{ id: number; status: string }>();
+
+					if (existingTask) {
+						console.log(`[AutoCache] Video task already exists for tweet ${tid} (status: ${existingTask.status})`);
+						continue;
+					}
+
 					await env.DB.prepare(
 						`INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status)
 						 VALUES (?, ?, 'snapshot_video', ?, ?, 'pending')`

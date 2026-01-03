@@ -443,7 +443,69 @@ downloads.post('/internal/complete', internalServiceAuth, async (c) => {
             return c.json({ error: 'Task not found' }, 404);
         }
 
+        // For snapshot_video tasks, update the cached_tweets table with the R2 video URL
+        if (status === 'completed' && r2_key) {
+            // Get task details
+            const task = await c.env.DB.prepare(
+                `SELECT task_type, tweet_id, video_url FROM video_downloads WHERE id = ?`
+            ).bind(task_id).first<{ task_type: string; tweet_id: string; video_url: string }>();
 
+            if (task?.task_type === 'snapshot_video' && task.tweet_id) {
+                try {
+                    // Construct the cached video URL
+                    const filename = r2_key.split('/').pop();
+                    const cachedVideoUrl = `https://api.tidyfeed.app/api/videos/${task.tweet_id}/${filename}`;
+
+                    // Get current cached_data and update video URLs
+                    const cachedTweet = await c.env.DB.prepare(
+                        `SELECT cached_data FROM cached_tweets WHERE tweet_id = ?`
+                    ).bind(task.tweet_id).first<{ cached_data: string }>();
+
+                    if (cachedTweet?.cached_data) {
+                        const tweetData = JSON.parse(cachedTweet.cached_data);
+                        let updated = false;
+
+                        // Update video URLs in media array
+                        if (tweetData.media) {
+                            for (const m of tweetData.media) {
+                                if ((m.type === 'video' || m.type === 'animated_gif') && m.video_info?.variants) {
+                                    for (const variant of m.video_info.variants) {
+                                        if (variant.url === task.video_url) {
+                                            variant.url = cachedVideoUrl;
+                                            updated = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Also check quoted_tweet media
+                        if (tweetData.quoted_tweet?.media) {
+                            for (const m of tweetData.quoted_tweet.media) {
+                                if ((m.type === 'video' || m.type === 'animated_gif') && m.video_info?.variants) {
+                                    for (const variant of m.video_info.variants) {
+                                        if (variant.url === task.video_url) {
+                                            variant.url = cachedVideoUrl;
+                                            updated = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (updated) {
+                            await c.env.DB.prepare(
+                                `UPDATE cached_tweets SET cached_data = ?, updated_at = CURRENT_TIMESTAMP WHERE tweet_id = ?`
+                            ).bind(JSON.stringify(tweetData), task.tweet_id).run();
+                            console.log(`[SnapshotVideo] Updated cached_tweets with R2 video URL for tweet ${task.tweet_id}`);
+                        }
+                    }
+                } catch (err) {
+                    console.error(`[SnapshotVideo] Failed to update cached_tweets:`, err);
+                    // Don't fail the whole request, the video is still cached
+                }
+            }
+        }
 
         console.log(`[SECURITY] Task ${task_id} completed. Cookies wiped.`);
 
