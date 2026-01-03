@@ -1,5 +1,7 @@
 'use client';
 
+export const runtime = 'edge';
+
 import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Sparkles, X, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
