@@ -158,7 +158,7 @@ export default function TagDetailPage({ params }: { params: Promise<{ id: string
                                 tags={[]} // Tag page doesn't need to show tags inside card necessarily, or we can pass the current tag
                                 cacheInfo={tweet.cacheInfo ? {
                                     ...tweet.cacheInfo,
-                                    snapshotUrl: tweet.cacheInfo.snapshotUrl ? `${API_URL}${tweet.cacheInfo.snapshotUrl}` : undefined
+                                    snapshotUrl: tweet.cacheInfo.snapshotUrl
                                 } : null}
                                 onDelete={async (xId: string) => {
                                     if (confirm('Are you sure you want to delete this post?')) {

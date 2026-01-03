@@ -265,7 +265,7 @@ function DashboardContent() {
                             videoInfo={post.videoInfo}
                             cacheInfo={post.cacheInfo ? {
                                 ...post.cacheInfo,
-                                snapshotUrl: post.cacheInfo.snapshotUrl ? `${API_URL}${post.cacheInfo.snapshotUrl}` : undefined
+                                snapshotUrl: post.cacheInfo.snapshotUrl
                             } : null}
                             onDelete={handleDelete}
                             onPin={handlePin}
@@ -284,7 +284,7 @@ function DashboardContent() {
                                                 ...p,
                                                 cacheInfo: { cached: true, snapshotUrl: data.snapshotUrl }
                                             } : p))
-                                            return { snapshotUrl: `${API_URL}${data.snapshotUrl}` }
+                                            return { snapshotUrl: data.snapshotUrl }
                                         }
                                     }
                                 } catch (e) {
