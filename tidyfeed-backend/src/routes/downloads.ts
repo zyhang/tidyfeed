@@ -359,8 +359,8 @@ downloads.put('/internal/upload-url', internalServiceAuth, async (c) => {
 
         // Get task to verify it exists and get user_id/tweet_id for path
         const task = await c.env.DB.prepare(
-            `SELECT id, user_id, task_type, tweet_id FROM video_downloads WHERE id = ?`
-        ).bind(task_id).first<{ id: number; user_id: string; task_type: string; tweet_id: string }>();
+            `SELECT id, user_id, task_type, tweet_id, metadata FROM video_downloads WHERE id = ?`
+        ).bind(task_id).first<{ id: number; user_id: string; task_type: string; tweet_id: string; metadata: string | null }>();
 
         if (!task) {
             return c.json({ error: 'Task not found' }, 404);
@@ -372,26 +372,10 @@ downloads.put('/internal/upload-url', internalServiceAuth, async (c) => {
 
         if (task.task_type === 'snapshot_video' && task.tweet_id) {
             // Check metadata for video_index to enable deterministic filenames
-            let videoIndex = '0';
-            try {
-                // Get metadata specifically for this task
-                const taskWithMeta = await c.env.DB.prepare(
-                    `SELECT metadata FROM video_downloads WHERE id = ?`
-                ).bind(task_id).first<{ metadata: string | null }>();
-
-                if (taskWithMeta?.metadata) {
-                    const meta = JSON.parse(taskWithMeta.metadata);
-                    if (meta.video_index !== undefined) {
-                        videoIndex = String(meta.video_index);
-                        videoIndex = `quoted_${videoIndex}`;
-                    } else {
-                        videoIndex = '0';
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to parse metadata for filename generation', err);
+            let videoIndex = task.metadata ? JSON.parse(task.metadata).video_index : '0';
+            if (videoIndex === undefined) {
+                videoIndex = '0';
             }
-
             // For snapshot videos, use deterministic path: videos/{tweet_id}/{index}.{ext}
             key = `videos/${task.tweet_id}/${videoIndex}.${extension}`;
         } else {

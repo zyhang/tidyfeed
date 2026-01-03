@@ -342,7 +342,7 @@ caching.post('/cache', async (c) => {
                         await c.env.DB.prepare(
                             `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status, metadata)
                              VALUES (?, ?, 'snapshot_video', ?, ?, 'pending', ?)`
-                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, metadataStr).run();
+                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, key).run();
                         console.log(`[Caching] Queued video download for tweet ${cleanTweetId} (index ${key})`);
                     } else {
                         // Check if R2 key matches expected key
