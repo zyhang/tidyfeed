@@ -11,13 +11,10 @@ export async function GET(
 ) {
     const { id } = await params;
 
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-        return new NextResponse('Configuration error: NEXT_PUBLIC_API_URL not set', { status: 500 });
-    }
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app').replace(/\/$/, '');
+    const tweetsUrl = `${apiUrl}/api/tweets/${id}/cached`;
 
     try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
-        const tweetsUrl = `${apiUrl}/api/tweets/${id}/cached`;
 
         console.log(`[SnapshotProxy] Fetching data from ${tweetsUrl}`);
 
