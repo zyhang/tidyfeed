@@ -573,13 +573,17 @@ app.get('/api/auth/social-accounts', cookieAuthMiddleware, async (c) => {
 });
 
 // Logout - clear auth cookie
-app.get('/auth/logout', (c) => {
+// Supports both GET (for web redirect) and POST (for extension)
+const logoutHandler = (c: any) => {
 	const isDev = c.req.url.includes('localhost') || c.req.url.includes('127.0.0.1');
+	
+	// Determine appropriate redirect URL
 	const redirectUrl = isDev ? 'http://localhost:3000' : 'https://a.tidyfeed.app';
 
 	// Clear the auth cookie by setting it to expire immediately
+	// These options must match the ones used when setting the cookie
 	const cookieOptions = [
-		'auth_token=',
+		'auth_token=', // Empty value to clear
 		'Path=/',
 		'HttpOnly',
 		'Max-Age=0', // Expire immediately
@@ -588,20 +592,34 @@ app.get('/auth/logout', (c) => {
 	if (!isDev) {
 		cookieOptions.push('Secure');
 		cookieOptions.push('Domain=.tidyfeed.app');
-		cookieOptions.push('SameSite=None');
+		cookieOptions.push('SameSite=None'); // Must match the setting
 	} else {
 		cookieOptions.push('SameSite=None');
 		cookieOptions.push('Secure');
 	}
 
-	return new Response(null, {
-		status: 302,
-		headers: {
-			'Location': redirectUrl,
-			'Set-Cookie': cookieOptions.join('; '),
-		},
-	});
-});
+	// For GET requests, redirect to home page
+	// For POST requests, just clear the cookie and return OK
+	if (c.req.method === 'POST') {
+		return c.json({ success: true, message: 'Logged out successfully' }, {
+			headers: {
+				'Set-Cookie': cookieOptions.join('; '),
+			},
+		});
+	} else {
+		// GET request - redirect
+		return new Response(null, {
+			status: 302,
+			headers: {
+				'Location': redirectUrl,
+				'Set-Cookie': cookieOptions.join('; '),
+			},
+		});
+	}
+};
+
+app.get('/auth/logout', logoutHandler);
+app.post('/auth/logout', logoutHandler);
 
 // ============================================
 // Public API Routes

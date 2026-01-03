@@ -70,18 +70,24 @@ function App() {
   const handleLogout = async () => {
     try {
       // Call backend logout endpoint to clear cookies
-      await fetch(`${BACKEND_URL}/auth/logout`, {
+      const response = await fetch(`${BACKEND_URL}/auth/logout`, {
         method: 'POST',
-        credentials: 'include',
+        credentials: 'include', // Important: include cookies in request
       });
+
+      if (!response.ok) {
+        console.warn('[TidyFeed] Logout API returned status:', response.status);
+      } else {
+        console.log('[TidyFeed] Logout API call successful');
+      }
     } catch (error) {
       console.error('[TidyFeed] Logout request error:', error);
     }
 
-    // Clear local state
+    // Clear local state immediately
     setUserInfo(null);
     await browser.storage.local.set({ user_type: 'guest' });
-    console.log('[TidyFeed] Logged out');
+    console.log('[TidyFeed] Logged out locally');
   };
 
   const handleGoToDashboard = () => {
