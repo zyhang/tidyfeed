@@ -1,166 +1,174 @@
-'use client'
+'use client';
 
-export const runtime = 'edge'
+import { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { Sparkles, X, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { useParams } from 'next/navigation';
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, ExternalLink, AlertCircle, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+export default function SnapshotViewerPage() {
+    const params = useParams();
+    const tweetId = params.id as string;
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
+    const [snapshotHtml, setSnapshotHtml] = useState<string>('');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-export default function SnapshotPage() {
-    const params = useParams()
-    const router = useRouter()
-    const tweetId = params.id as string
+    // AI Summary state
+    const [showSummary, setShowSummary] = useState(false);
+    const [summary, setSummary] = useState<string | null>(null);
+    const [summaryLoading, setSummaryLoading] = useState(false);
+    const [summaryError, setSummaryError] = useState<string | null>(null);
 
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
-    const [snapshotHtml, setSnapshotHtml] = useState<string | null>(null)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app';
 
+    // Fetch snapshot HTML on mount
     useEffect(() => {
-        if (!tweetId) return
+        if (!tweetId) return;
 
         const fetchSnapshot = async () => {
             try {
-                setLoading(true)
-                setError(null)
-
-                const response = await fetch(`${API_URL}/api/tweets/${tweetId}/snapshot`)
-
-                if (!response.ok) {
-                    if (response.status === 404) {
-                        setError('Snapshot not found. This tweet may not have been cached yet.')
-                    } else {
-                        setError('Failed to load snapshot')
-                    }
-                    return
+                const response = await fetch(`/s/${tweetId}`);
+                if (response.ok) {
+                    const html = await response.text();
+                    setSnapshotHtml(html);
+                } else {
+                    setError('Failed to load snapshot');
                 }
-
-                const html = await response.text()
-                setSnapshotHtml(html)
             } catch (err) {
-                console.error('Error fetching snapshot:', err)
-                setError('Failed to load snapshot. Please try again.')
+                setError('Error loading snapshot');
             } finally {
-                setLoading(false)
+                setLoading(false);
             }
+        };
+
+        fetchSnapshot();
+    }, [tweetId]);
+
+    // Generate AI Summary
+    const handleGenerateSummary = async () => {
+        if (summaryLoading) return;
+
+        setSummaryLoading(true);
+        setSummaryError(null);
+        setShowSummary(true);
+
+        try {
+            const response = await fetch(`${apiUrl}/api/ai/summarize`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({ tweet_id: tweetId }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setSummary(data.summary);
+            } else if (response.status === 401) {
+                setSummaryError('Please login to use AI Summary');
+            } else {
+                const data = await response.json();
+                setSummaryError(data.error || 'Failed to generate summary');
+            }
+        } catch (err) {
+            setSummaryError('Error connecting to AI service');
+        } finally {
+            setSummaryLoading(false);
         }
+    };
 
-        fetchSnapshot()
-    }, [tweetId])
-
-    // Auto-redirect to dashboard when snapshot not found
-    useEffect(() => {
-        if (error && error.includes('not found')) {
-            const timer = setTimeout(() => {
-                router.push('/dashboard')
-            }, 5000)
-            return () => clearTimeout(timer)
-        }
-    }, [error, router])
-
-    // Loading state
     if (loading) {
         return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="text-muted-foreground">Loading snapshot...</p>
-                </div>
+            <div className="min-h-screen bg-black flex items-center justify-center">
+                <Loader2 className="h-8 w-8 text-white animate-spin" />
             </div>
-        )
+        );
     }
 
-    // Error state
     if (error) {
         return (
-            <div className="min-h-screen bg-background flex items-center justify-center p-4">
-                <div className="max-w-md w-full text-center space-y-6">
-                    <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto">
-                        <AlertCircle className="h-8 w-8 text-amber-500" />
-                    </div>
-                    <div className="space-y-2">
-                        <h1 className="text-2xl font-bold">Snapshot Not Available</h1>
-                        <p className="text-muted-foreground">
-                            {error.includes('not found')
-                                ? 'This post has been unsaved and its cached content has been deleted.'
-                                : error}
-                        </p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        <Button asChild variant="default">
-                            <Link href="/dashboard">
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Go to Dashboard
-                            </Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                            <Link
-                                href={`https://x.com/i/status/${tweetId}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                View on X
-                                <ExternalLink className="h-4 w-4 ml-2" />
-                            </Link>
-                        </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground/60">
-                        Redirecting to dashboard in 5 seconds...
-                    </p>
-                </div>
+            <div className="min-h-screen bg-black flex items-center justify-center text-white">
+                <p>{error}</p>
             </div>
-        )
+        );
     }
 
-    // Render snapshot in an iframe for isolation
     return (
-        <div className="min-h-screen bg-background">
-            {/* Header bar */}
-            <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b">
-                <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => router.back()}
-                        className="gap-2"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back
-                    </Button>
+        <div className="min-h-screen bg-black relative">
+            {/* AI Summary Button - Floating */}
+            <button
+                onClick={handleGenerateSummary}
+                className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full shadow-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 hover:scale-105"
+            >
+                <Sparkles className="h-4 w-4" />
+                <span className="font-medium">AI Summary</span>
+            </button>
 
+            {/* Snapshot Content */}
+            <div
+                className={`transition-all duration-300 ${showSummary ? 'mr-96' : ''}`}
+                dangerouslySetInnerHTML={{ __html: snapshotHtml }}
+            />
+
+            {/* AI Summary Panel - Slide-in from right */}
+            <div
+                className={`fixed top-0 right-0 h-full w-96 bg-zinc-900 border-l border-zinc-800 shadow-2xl transform transition-transform duration-300 ease-in-out z-40 ${showSummary ? 'translate-x-0' : 'translate-x-full'
+                    }`}
+            >
+                {/* Panel Header */}
+                <div className="flex items-center justify-between p-4 border-b border-zinc-800">
                     <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-full">
-                            Cached Snapshot
-                        </span>
-                        <Button asChild variant="outline" size="sm">
-                            <Link
-                                href={`https://x.com/i/status/${tweetId}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="gap-2"
-                            >
-                                Original
-                                <ExternalLink className="h-3.5 w-3.5" />
-                            </Link>
-                        </Button>
+                        <Sparkles className="h-5 w-5 text-purple-400" />
+                        <h2 className="font-semibold text-white">AI Summary</h2>
                     </div>
+                    <button
+                        onClick={() => setShowSummary(false)}
+                        className="p-1 hover:bg-zinc-800 rounded-full transition-colors"
+                    >
+                        <X className="h-5 w-5 text-zinc-400" />
+                    </button>
                 </div>
-            </header>
 
-            {/* Snapshot content */}
-            <main className="max-w-4xl mx-auto py-8">
-                {snapshotHtml && (
-                    <iframe
-                        srcDoc={snapshotHtml}
-                        className="w-full min-h-[80vh] border-0"
-                        title="Tweet Snapshot"
-                        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-                    />
-                )}
-            </main>
+                {/* Panel Content */}
+                <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
+                    {summaryLoading && (
+                        <div className="flex flex-col items-center justify-center py-12">
+                            <Loader2 className="h-8 w-8 text-purple-400 animate-spin mb-4" />
+                            <p className="text-zinc-400 text-sm">AI analyzing content...</p>
+                        </div>
+                    )}
+
+                    {summaryError && (
+                        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 text-red-400 text-sm">
+                            {summaryError}
+                        </div>
+                    )}
+
+                    {summary && !summaryLoading && (
+                        <div className="prose prose-invert prose-sm max-w-none">
+                            <ReactMarkdown>{summary}</ReactMarkdown>
+                        </div>
+                    )}
+
+                    {!summary && !summaryLoading && !summaryError && (
+                        <div className="text-center py-12">
+                            <Sparkles className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
+                            <p className="text-zinc-500 text-sm">Click the button to generate an AI summary of this tweet.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Toggle button when panel is closed */}
+            {!showSummary && summary && (
+                <button
+                    onClick={() => setShowSummary(true)}
+                    className="fixed top-1/2 right-0 transform -translate-y-1/2 z-40 p-2 bg-zinc-800 rounded-l-lg border border-r-0 border-zinc-700 hover:bg-zinc-700 transition-colors"
+                >
+                    <ChevronLeft className="h-5 w-5 text-zinc-400" />
+                </button>
+            )}
         </div>
-    )
+    );
 }

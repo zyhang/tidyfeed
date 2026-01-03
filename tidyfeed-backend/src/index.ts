@@ -12,6 +12,7 @@ import downloads from './routes/downloads';
 import internal from './routes/internal';
 import caching from './routes/caching';
 import admin from './routes/admin';
+import ai from './routes/ai';
 
 // Google OAuth JWKS endpoint for ID token verification
 const GOOGLE_JWKS = createRemoteJWKSet(
@@ -26,6 +27,7 @@ type Bindings = {
 	MEDIA_BUCKET: R2Bucket;
 	INTERNAL_SERVICE_KEY: string;
 	TIKHUB_API_KEY: string;
+	BIGMODEL_API_KEY?: string;
 	WEB_APP_URL?: string;
 };
 
@@ -1706,6 +1708,9 @@ app.route('/api/tweets', caching);
 
 // Mount admin routes
 app.route('/api/admin', admin);
+
+// Mount AI routes
+app.route('/api/ai', ai);
 
 export default app;
 
