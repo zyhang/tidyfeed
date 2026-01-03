@@ -13,6 +13,7 @@ type Bindings = {
     MEDIA_BUCKET: R2Bucket;
     TIKHUB_API_KEY: string;
     JWT_SECRET: string;
+    WEB_APP_URL?: string;
 };
 
 const caching = new Hono<{ Bindings: Bindings }>();
@@ -99,7 +100,7 @@ caching.get('/:tweet_id/cached', async (c) => {
                 cachedAt: cached.cached_at,
                 updatedAt: cached.updated_at,
                 snapshotUrl: cached.snapshot_r2_key
-                    ? `/api/tweets/${tweetId}/snapshot`
+                    ? `${c.env.WEB_APP_URL || 'https://tidyfeed.app'}/s/${tweetId}`
                     : null,
             },
         });
@@ -146,7 +147,7 @@ caching.post('/cache', async (c) => {
                 success: true,
                 cached: true,
                 message: 'Tweet already cached',
-                snapshotUrl: `/api/tweets/${cleanTweetId}/snapshot`,
+                snapshotUrl: `${c.env.WEB_APP_URL || 'https://tidyfeed.app'}/s/${cleanTweetId}`,
             });
         }
 
@@ -212,11 +213,13 @@ caching.post('/cache', async (c) => {
 
         console.log(`[Caching] Cached tweet ${cleanTweetId} with ${comments.length} comments`);
 
+        const webAppUrl = c.env.WEB_APP_URL || 'https://tidyfeed.app';
+
         return c.json({
             success: true,
             cached: true,
             tweetId: cleanTweetId,
-            snapshotUrl: `/api/tweets/${cleanTweetId}/snapshot`,
+            snapshotUrl: `${webAppUrl}/s/${cleanTweetId}`,
             hasMedia,
             hasVideo,
             hasQuotedTweet,
