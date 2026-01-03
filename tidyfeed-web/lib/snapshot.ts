@@ -29,6 +29,59 @@ export function generateTweetSnapshot(
 ): string {
 	const { theme = 'auto' } = options;
 
+	// Log debug info for quoted tweets
+	if (tweet.quoted_tweet) {
+		console.log('[Snapshot] Rendering tweet with quoted tweet:', {
+			mainTweetId: tweet.id,
+			quotedTweetId: tweet.quoted_tweet.id,
+			quotedAuthor: tweet.quoted_tweet.author?.screen_name,
+			quotedHasMedia: !!tweet.quoted_tweet.media?.length,
+		});
+	}
+
+	// --- Enforce Cached Video URLs ---
+	// We explicitly ignore any video links from the platform (X/Twitter) and force the use of our cached videos.
+	// The backend (caching.ts) stores videos sequentially: main tweet videos first, then quoted tweet videos.
+	// URL Format: https://api.tidyfeed.app/api/videos/{tweet_id}/{index}.mp4
+
+	let videoIndex = 0;
+	// Determine API URL (with fallback for safety)
+	const apiUrl = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL)
+		? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
+		: 'https://api.tidyfeed.app';
+
+	const replaceVideoWithCached = (mediaItems: TikHubMedia[] | undefined) => {
+		if (!mediaItems) return;
+		mediaItems.forEach(media => {
+			if (media.type === 'video' || media.type === 'animated_gif') {
+				const cachedUrl = `${apiUrl}/api/videos/${tweet.id}/${videoIndex}.mp4`;
+
+				// Overwrite video info with a single variant pointing to our cache
+				media.video_info = {
+					variants: [{
+						url: cachedUrl,
+						content_type: 'video/mp4',
+						bitrate: 9999999 // High bitrate to ensure it's picked as "best"
+					}]
+				};
+
+				// Also update the main URL and preview if needed (though preview is usually an image)
+				// We keep the preview_url as is, because it's an image.
+
+				videoIndex++;
+			}
+		});
+	};
+
+	// 1. Process main tweet videos
+	replaceVideoWithCached(tweet.media);
+
+	// 2. Process quoted tweet videos
+	if (tweet.quoted_tweet) {
+		replaceVideoWithCached(tweet.quoted_tweet.media);
+	}
+	// ---------------------------------
+
 	try {
 		// Validate required fields
 		if (!tweet || !tweet.author) {
