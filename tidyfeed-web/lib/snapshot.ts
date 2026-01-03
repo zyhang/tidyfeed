@@ -102,7 +102,7 @@ function renderTweetContent(tweet: TikHubTweetData): string {
 
 		${images.length > 0 && !hasVideo ? renderMediaGallery(images) : ''}
 		${video ? renderVideo(video) : ''}
-		${tweet.quoted_tweet ? renderQuotedTweet(tweet.quoted_tweet) : ''}
+		${tweet.quoted_tweet && tweet.quoted_tweet.id !== tweet.id ? renderQuotedTweet(tweet.quoted_tweet) : ''}
 
 		<div class="tweet-time">
 			<a href="https://x.com/${tweet.author.screen_name}/status/${tweet.id}" target="_blank" rel="noopener">
