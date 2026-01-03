@@ -117,6 +117,9 @@ export default defineBackground(() => {
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            return { success: false, error: 'Not logged in', needs_login: true };
+          }
           const err = await response.json();
           return { success: false, error: err.error || 'Failed to save post' };
         }
@@ -546,6 +549,27 @@ export default defineBackground(() => {
       handleSyncPlatformIdentity(message.platform, sender.tab?.id)
         .then((result) => sendResponse(result))
         .catch((error) => sendResponse({ success: false, error: error.message }));
+      return true;
+    }
+
+    // Check if user is logged in to TidyFeed
+    if (message.type === 'CHECK_AUTH') {
+      (async () => {
+        try {
+          const response = await fetch(`${BACKEND_URL}/auth/me`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+          if (response.ok) {
+            const data = await response.json();
+            sendResponse({ authenticated: true, user: data.user });
+          } else {
+            sendResponse({ authenticated: false });
+          }
+        } catch (error) {
+          sendResponse({ authenticated: false, error: String(error) });
+        }
+      })();
       return true;
     }
 

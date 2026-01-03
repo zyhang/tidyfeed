@@ -21,6 +21,18 @@ const LOCALE_STRINGS: Record<string, Record<Locale, string>> = {
         zh: '已收藏到 TidyFeed',
         ja: 'TidyFeedに保存しました',
         es: 'Guardado en TidyFeed'
+    },
+    login_required: {
+        en: 'Login to save posts',
+        zh: '登录后即可收藏',
+        ja: 'ログインして保存',
+        es: 'Inicia sesión para guardar'
+    },
+    click_to_login: {
+        en: 'Click to login',
+        zh: '点击登录',
+        ja: 'クリックしてログイン',
+        es: 'Haz clic para iniciar sesión'
     }
 };
 
@@ -176,6 +188,58 @@ function showToast(message: string): void {
         toast.style.transform = 'translateX(-50%) translateY(10px)';
         setTimeout(() => toast.remove(), 300);
     }, 2500);
+}
+
+/**
+ * Show a login prompt toast with clickable link
+ */
+function showLoginToast(): void {
+    // Remove existing toast if any
+    const existingToast = document.getElementById('tidyfeed-toast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'tidyfeed-toast';
+    toast.innerHTML = `
+        <span>${getLocaleString('login_required')}</span>
+        <a href="https://a.tidyfeed.app" target="_blank" style="color: #3b82f6; margin-left: 8px; text-decoration: underline; font-weight: 600;">${getLocaleString('click_to_login')}</a>
+    `;
+    Object.assign(toast.style, {
+        position: 'fixed',
+        bottom: '32px',
+        left: '50%',
+        transform: 'translateX(-50%) translateY(20px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        backdropFilter: 'blur(8px)',
+        color: '#fff',
+        padding: '12px 20px',
+        borderRadius: '24px',
+        fontSize: '14px',
+        fontWeight: '500',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        zIndex: '10000',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+        transition: 'opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        opacity: '0',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+    });
+
+    document.body.appendChild(toast);
+
+    // Fade in
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+    });
+
+    // Auto remove after 5s (longer to give time to click)
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(10px)';
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
 }
 
 /**
@@ -471,7 +535,24 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
         });
 
         if (!result.success) {
-            throw new Error(result.error);
+            // Check if this is a login required error
+            if (result.needs_login) {
+                showLoginToast();
+                // Rollback optimistic UI update since save failed
+                button.innerHTML = isCurrentlySaved ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
+                button.style.cssText = isCurrentlySaved ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+                button.setAttribute('aria-label', isCurrentlySaved ? getLocaleString('saved') : getLocaleString('bookmark'));
+                // Rollback storage
+                if (newSavedState) {
+                    const idx = savedIds.indexOf(xId);
+                    if (idx > -1) savedIds.splice(idx, 1);
+                } else {
+                    if (!savedIds.includes(xId)) savedIds.push(xId);
+                }
+                await browser.storage.local.set({ saved_x_ids: savedIds });
+            } else {
+                throw new Error(result.error);
+            }
         } else {
             // Auto-download video if enabled
             if (newSavedState && data.hasVideo) {
@@ -479,12 +560,13 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
                 console.log('[TidyFeed] Auto-download skipped (feature disabled) for', data.tweetUrl);
             }
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error('[TidyFeed] Toggle save error:', error);
+        showToast('Sync failed');
+
         // Rollback on error
         button.innerHTML = isCurrentlySaved ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
         button.style.cssText = isCurrentlySaved ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
-        showToast('Sync failed');
 
         // Rollback storage
         const storageRollback = await browser.storage.local.get('saved_x_ids');
@@ -590,17 +672,25 @@ async function injectButtonIntoTweet(article: HTMLElement): Promise<boolean> {
 
     if (tweetId) {
         const bookmarkBtn = await createBookmarkButton(tweetId);
-        // Insert after native bookmark button if found, otherwise append to end
-        // This ensures perfect alignment with X's native action buttons
-        const nativeBookmark = actionBar.querySelector('[data-testid="bookmark"]');
-        if (nativeBookmark) {
-            // Hide native bookmark and insert our button right after it
-            (nativeBookmark as HTMLElement).style.display = 'none';
-            nativeBookmark.parentElement?.insertBefore(bookmarkBtn, nativeBookmark.nextSibling);
-        } else {
-            // No native bookmark found, append to end of action bar
-            actionBar.appendChild(bookmarkBtn);
+
+        // Strategy 1: Try to insert after the Share button (most common position)
+        // This keeps the native bookmark button and adds TidyFeed as a complementary action
+        const shareButton = actionBar.querySelector('[data-testid="share"]');
+        if (shareButton && shareButton.parentElement) {
+            shareButton.parentElement.insertBefore(bookmarkBtn, shareButton.nextSibling);
+            return true;
         }
+
+        // Strategy 2: Insert after Like button if Share not found
+        const likeButton = actionBar.querySelector('[data-testid="like"]');
+        if (likeButton && likeButton.parentElement) {
+            likeButton.parentElement.insertBefore(bookmarkBtn, likeButton.nextSibling);
+            return true;
+        }
+
+        // Strategy 3: Append to end of action bar as fallback
+        // This preserves all native buttons and adds TidyFeed as an additional option
+        actionBar.appendChild(bookmarkBtn);
         return true;
     }
 
