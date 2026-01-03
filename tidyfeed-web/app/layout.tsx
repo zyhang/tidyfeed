@@ -18,6 +18,9 @@ export const metadata: Metadata = {
     template: "%s | TidyFeed",
   },
   description: "Organize and manage your saved social media posts with TidyFeed",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({
