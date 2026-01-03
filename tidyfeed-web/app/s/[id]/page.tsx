@@ -82,22 +82,22 @@ export default function SnapshotViewerPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-black flex items-center justify-center">
-                <Loader2 className="h-8 w-8 text-white animate-spin" />
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <Loader2 className="h-8 w-8 text-gray-500 animate-spin" />
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="min-h-screen bg-black flex items-center justify-center text-white">
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-700">
                 <p>{error}</p>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-black relative">
+        <div className="min-h-screen bg-gray-50 relative">
             {/* AI Summary Button - Floating */}
             <button
                 onClick={handleGenerateSummary}
