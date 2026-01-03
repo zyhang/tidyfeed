@@ -193,61 +193,70 @@ export function TweetCard({
                 "overflow-hidden transition-all duration-300 break-inside-avoid mb-4 relative group border-border/40 hover:border-border/80 bg-card/80 hover:bg-card hover:shadow-xl dark:shadow-none dark:hover:bg-slate-900/50",
                 isPinned && "border-blue-500/30 bg-blue-50/30 dark:bg-blue-900/10"
             )}>
-                {/* Top Right Floating Actions */}
-                <div className={cn(
-                    "absolute top-3 right-3 flex items-center gap-1.5 z-20 transition-all duration-200",
-                    isPinned || isCached ? "opacity-100" : "opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0"
-                )}>
+                {/* Top Right Floating Actions - Hidden by default, animate in on hover */}
+                <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20">
+                    {/* Snapshot Button */}
                     {onCache && (
-                        <div className="relative group/cache">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={isCached && cachedSnapshotUrl ? () => window.open(cachedSnapshotUrl, '_blank') : handleCache}
-                                disabled={isCaching}
-                                className={cn(
-                                    "h-8 px-2.5 rounded-full backdrop-blur-md shadow-sm border transition-all hover:scale-105 flex items-center gap-1.5",
-                                    isCached
-                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
-                                        : "bg-background/80 text-muted-foreground hover:text-foreground hover:bg-background border-border/10"
-                                )}
-                            >
-                                {isCaching ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : isCached ? (
-                                    <>
-                                        <FileText className="h-3.5 w-3.5" />
-                                        <span className="text-[10px] font-semibold uppercase tracking-wider">Snapshot</span>
-                                    </>
-                                ) : (
-                                    <Archive className="h-3.5 w-3.5" />
-                                )}
-                            </Button>
-                        </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={isCached && cachedSnapshotUrl ? () => window.open(cachedSnapshotUrl, '_blank') : handleCache}
+                            disabled={isCaching}
+                            className={cn(
+                                "h-8 w-8 rounded-full backdrop-blur-md shadow-sm border transition-all duration-200",
+                                "opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0",
+                                "transition-[opacity,transform] delay-[0ms]",
+                                isCached
+                                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25 hover:scale-110"
+                                    : "bg-background/80 text-muted-foreground hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-border/10 hover:border-emerald-500/30 hover:scale-110"
+                            )}
+                            title={isCached ? "View snapshot" : "Create snapshot"}
+                        >
+                            {isCaching ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : isCached ? (
+                                <FileText className="h-3.5 w-3.5" />
+                            ) : (
+                                <Archive className="h-3.5 w-3.5" />
+                            )}
+                        </Button>
                     )}
 
+                    {/* Pin Button */}
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={handlePin}
                         disabled={pinning}
                         className={cn(
-                            "h-8 w-8 rounded-full bg-background/80 backdrop-blur-md shadow-sm border border-border/10 transition-all hover:scale-105",
+                            "h-8 w-8 rounded-full backdrop-blur-md shadow-sm border transition-all duration-200",
+                            "opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0",
+                            "transition-[opacity,transform] delay-[50ms]",
                             isPinned
-                                ? "text-blue-500 hover:text-blue-600 bg-blue-50/80 dark:bg-blue-900/20 ring-1 ring-blue-500/20"
-                                : "text-muted-foreground hover:text-foreground hover:bg-background"
+                                ? "bg-blue-500/15 text-blue-500 border-blue-500/30 hover:bg-blue-500/25 hover:scale-110"
+                                : "bg-background/80 text-muted-foreground hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 border-border/10 hover:border-blue-500/30 hover:scale-110"
                         )}
                         title={isPinned ? "Unpin post" : "Pin post"}
                     >
-                        <Pin className={cn("h-3.5 w-3.5", isPinned && "fill-current rotate-45")} />
+                        {pinning ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <Pin className={cn("h-3.5 w-3.5", isPinned && "fill-current rotate-45")} />
+                        )}
                     </Button>
 
+                    {/* Delete Button */}
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={handleDeleteClick}
                         disabled={deleting}
-                        className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 shadow-sm border border-border/10 transition-all hover:scale-105 opacity-0 group-hover:opacity-100"
+                        className={cn(
+                            "h-8 w-8 rounded-full backdrop-blur-md shadow-sm border transition-all duration-200",
+                            "opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0",
+                            "transition-[opacity,transform] delay-[100ms]",
+                            "bg-background/80 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 border-border/10 hover:border-red-500/30 hover:scale-110"
+                        )}
                         title="Delete post"
                     >
                         {deleting ? (
