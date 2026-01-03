@@ -58,25 +58,57 @@ export class AIService {
         db: D1Database,
         webAppUrl: string = 'https://tidyfeed.app'
     ): Promise<string> {
-        // Step A: Generate accessible URL
-        // Extract tweet ID from snapshot key (format: "snapshots/{tweetId}.html")
-        const tweetIdMatch = snapshotKey.match(/snapshots\/(\d+)\.html/);
-        if (!tweetIdMatch) {
-            throw new Error(`Invalid snapshot key format: ${snapshotKey}`);
+        // Step A: Fetch the actual snapshot content from R2
+        const snapshotObject = await r2.get(snapshotKey);
+        if (!snapshotObject) {
+            throw new Error(`Snapshot not found in R2: ${snapshotKey}`);
         }
-        const tweetId = tweetIdMatch[1];
-        const snapshotUrl = `${webAppUrl}/s/${tweetId}`;
 
-        // Step B: Fetch AI config from system_settings
+        const htmlContent = await snapshotObject.text();
+
+        // Step B: Extract text content from HTML (simple extraction)
+        const textContent = this.extractTextFromHtml(htmlContent);
+
+        // Step C: Fetch AI config from system_settings
         const config = await this.fetchAIConfig(db);
 
-        // Step C: Build prompt
-        const prompt = this.buildPrompt(config, snapshotUrl);
+        // Step D: Build prompt with the actual content
+        const prompt = this.buildPromptWithContent(config, textContent);
 
-        // Step D: Call BigModel API
+        // Step E: Call BigModel API (without web_search since we have the content)
         const response = await this.callBigModel(config.model, prompt);
 
         return response;
+    }
+
+    /**
+     * Simple HTML to text extraction
+     */
+    private extractTextFromHtml(html: string): string {
+        // Remove script and style tags
+        let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+        text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+
+        // Remove HTML tags
+        text = text.replace(/<[^>]+>/g, ' ');
+
+        // Decode HTML entities
+        text = text.replace(/&nbsp;/g, ' ');
+        text = text.replace(/&amp;/g, '&');
+        text = text.replace(/&lt;/g, '<');
+        text = text.replace(/&gt;/g, '>');
+        text = text.replace(/&quot;/g, '"');
+        text = text.replace(/&#39;/g, "'");
+
+        // Clean up whitespace
+        text = text.replace(/\s+/g, ' ').trim();
+
+        // Limit length to avoid token limits
+        if (text.length > 4000) {
+            text = text.substring(0, 4000) + '...';
+        }
+
+        return text;
     }
 
     /**
@@ -121,7 +153,22 @@ export class AIService {
     }
 
     /**
-     * Call the BigModel API with web_search enabled.
+     * Build prompt with actual content instead of URL.
+     */
+    private buildPromptWithContent(config: AIConfig, content: string): string {
+        // Create a prompt that includes the actual content
+        let prompt = `请阅读以下推文内容，并进行总结分析：\n\n---\n${content}\n---`;
+
+        // Append output format instructions
+        if (config.output_format) {
+            prompt += `\n\n请按照以下格式输出：\n${config.output_format}`;
+        }
+
+        return prompt;
+    }
+
+    /**
+     * Call the BigModel API.
      */
     private async callBigModel(model: string, userPrompt: string): Promise<string> {
         const messages: ChatMessage[] = [
@@ -133,15 +180,8 @@ export class AIService {
 
         const requestBody = {
             model: model,
-            messages: messages,
-            tools: [
-                {
-                    type: 'web_search',
-                    web_search: {
-                        enable: true
-                    }
-                }
-            ]
+            messages: messages
+            // Removed web_search tool since we provide content directly
         };
 
         const response = await fetch(this.baseUrl, {
