@@ -485,6 +485,11 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 			return c.json({ error: 'User not found' }, 404);
 		}
 
+		// Fetch saved posts count
+		const savedCount = await c.env.DB.prepare(
+			'SELECT COUNT(*) as count FROM saved_posts WHERE user_id = ?'
+		).bind(payload.sub).first<{ count: number }>();
+
 		return c.json({
 			user: {
 				id: dbUser.id,
@@ -493,6 +498,7 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 				avatarUrl: dbUser.avatar_url,
 				createdAt: dbUser.created_at,
 				storageUsage: dbUser.storage_usage || 0,
+				savedPostsCount: savedCount?.count || 0,
 			},
 		});
 	} catch (error) {

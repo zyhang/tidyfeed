@@ -7,6 +7,8 @@ interface UserInfo {
   name?: string;
   email?: string;
   avatar_url?: string;
+  storage_usage?: number; // bytes
+  saved_posts_count?: number;
 }
 
 // Backend URL
@@ -17,7 +19,14 @@ function App() {
   const blockedKeywords = useStorageValue<string[]>('user_blocked_keywords', []);
   const enableRegex = useStorageValue<boolean>('enable_regex_filter', false);
   const cloudRegexList = useStorageValue<string[]>('cloud_regex_list', []);
-  const autoDownloadVideos = useStorageValue<boolean>('auto_download_videos', false);
+  const scoringConfig = useStorageValue<any>('scoring_config', null);
+
+  // Calculate total rules count
+  const rulesCount = scoringConfig
+    ? (scoringConfig.rules?.length || 0) + (scoringConfig.negative_rules?.length || 0)
+    : cloudRegexList.length;
+
+  // Removed auto_download_videos toggle as per redesign requirements
   const [inputValue, setInputValue] = useState('');
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -44,6 +53,8 @@ function App() {
             name: user.name,
             email: user.email,
             avatar_url: user.avatarUrl || user.avatar_url || user.picture, // API uses camelCase
+            storage_usage: user.storageUsage || 0,
+            saved_posts_count: user.savedPostsCount || 0, // from backend
           });
           await browser.storage.local.set({ user_type: 'authenticated' });
         } else {
@@ -99,9 +110,7 @@ function App() {
     browser.storage.local.set({ enable_regex_filter: !enableRegex });
   };
 
-  const handleToggleAutoDownload = () => {
-    browser.storage.local.set({ auto_download_videos: !autoDownloadVideos });
-  };
+  // Auto-download toggle removed
 
   const handleAddKeyword = () => {
     const keyword = inputValue.trim();
@@ -142,7 +151,7 @@ function App() {
         </div>
         <div className="flex-1">
           <h1 className="text-lg font-bold text-white">TidyFeed</h1>
-          <p className="text-[10px] text-white/70 font-medium">Clean your timeline</p>
+          <p className="text-[10px] text-white/70 font-medium">Capture & Organize Knowledge</p>
         </div>
         {/* User Section in Header */}
         {isLoggedIn && userInfo && (
@@ -215,12 +224,34 @@ function App() {
                     {userInfo?.name?.charAt(0) || userInfo?.email?.charAt(0) || '?'}
                   </div>
                 )}
-                <div>
-                  <div className="text-sm font-medium text-white">{userInfo?.name || 'User'}</div>
-                  <div className="text-[10px] text-zinc-500">{userInfo?.email}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-white truncate">{userInfo?.name || 'User'}</div>
+                  <div className="text-[10px] text-zinc-500 truncate">{userInfo?.email}</div>
                 </div>
               </div>
             </div>
+
+            {/* Storage Progress Bar */}
+            <div className="mt-4 mb-2">
+              <div className="flex justify-between items-end mb-1">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-zinc-400">Storage Usage</span>
+                  <span className="text-[10px] text-zinc-500">{userInfo?.saved_posts_count || 0} items saved</span>
+                </div>
+                <span className="text-[10px] text-zinc-400">
+                  {((userInfo?.storage_usage || 0) / (1024 * 1024)).toFixed(1)} MB / 500 MB
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width: `${Math.min(100, ((userInfo?.storage_usage || 0) / (500 * 1024 * 1024)) * 100)}%`
+                  }}
+                />
+              </div>
+            </div>
+
             <div className="flex gap-2 mt-3">
               <button
                 onClick={handleGoToDashboard}
@@ -255,17 +286,20 @@ function App() {
           </div>
         </div>
 
-        {/* AI Smart Filter Toggle */}
+        {/* Smart Filter Toggle */}
         <div className="bg-zinc-800/60 rounded-lg p-4 border border-zinc-700/50">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 text-sm font-medium text-zinc-200">
                 <span>🤖</span>
-                <span>AI Smart Filter</span>
+                <span>Smart Filter</span>
+              </div>
+              <div className="text-[10px] text-zinc-500 mt-1">
+                Uses built-in regex to filter common ad tweets.
               </div>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-[10px] text-zinc-500">
-                  {cloudRegexList.length > 0 ? `${cloudRegexList.length} rules loaded` : 'Connecting...'}
+                  {rulesCount > 0 ? `${rulesCount} rules loaded` : 'Connecting...'}
                 </span>
                 <button
                   onClick={handleSyncRules}
@@ -281,27 +315,6 @@ function App() {
               className={`w-11 h-6 rounded-full relative transition-colors ${enableRegex ? 'bg-purple-600' : 'bg-zinc-700'}`}
             >
               <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${enableRegex ? 'translate-x-5' : 'translate-x-0'}`} />
-            </button>
-          </div>
-        </div>
-
-        {/* Auto-download Videos Toggle */}
-        <div className="bg-zinc-800/60 rounded-lg p-4 border border-zinc-700/50">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-                <span>☁️</span>
-                <span>Auto-download Videos</span>
-              </div>
-              <div className="text-[10px] text-zinc-500 mt-1">
-                Save videos to cloud when bookmarking
-              </div>
-            </div>
-            <button
-              onClick={handleToggleAutoDownload}
-              className={`w-11 h-6 rounded-full relative transition-colors ${autoDownloadVideos ? 'bg-purple-600' : 'bg-zinc-700'}`}
-            >
-              <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${autoDownloadVideos ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>
@@ -368,4 +381,3 @@ function App() {
 }
 
 export default App;
-

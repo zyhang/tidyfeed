@@ -24,8 +24,32 @@ export async function initIdentitySync() {
     try {
         const storageData = await browser.storage.local.get(lastSyncKey);
         const lastSync = storageData[lastSyncKey];
+        const now = Date.now();
 
-        if (lastSync && typeof lastSync === 'number' && Date.now() - lastSync < ONE_DAY_MS) {
+        // Default sync interval: 24 hours
+        let syncInterval = 24 * 60 * 60 * 1000;
+
+        // Check if we need to force update (incomplete profile)
+        try {
+            const authResponse = await browser.runtime.sendMessage({ type: 'GET_SOCIAL_ACCOUNTS' });
+            if (authResponse && authResponse.success && authResponse.accounts) {
+                const currentAccount = authResponse.accounts.find((acc: any) => acc.platform === platform);
+
+                // If account exists but has missing info (avatar or name), sync more successfully (e.g. every 5 mins)
+                // This allows auto-healing of imported/legacy accounts
+                if (currentAccount) {
+                    const isincomplete = !currentAccount.avatar_url || !currentAccount.display_name || !currentAccount.platform_username;
+                    if (isincomplete) {
+                        console.log(`[TidyFeed] Account for ${platform} is incomplete. Lowering sync interval.`);
+                        syncInterval = 5 * 60 * 1000; // 5 minutes
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[TidyFeed] Failed to check account status:', e);
+        }
+
+        if (lastSync && typeof lastSync === 'number' && now - lastSync < syncInterval) {
             console.log(`[TidyFeed] Identity for ${platform} already synced recently.`);
             return;
         }

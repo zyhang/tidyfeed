@@ -573,6 +573,26 @@ export default defineBackground(() => {
       return true;
     }
 
+    if (message.type === 'GET_SOCIAL_ACCOUNTS') {
+      (async () => {
+        try {
+          const response = await fetch(`${BACKEND_URL}/api/auth/social-accounts`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+          if (response.ok) {
+            const data = await response.json();
+            sendResponse({ success: true, accounts: data.accounts });
+          } else {
+            sendResponse({ success: false, error: 'Failed to fetch accounts' });
+          }
+        } catch (error) {
+          sendResponse({ success: false, error: String(error) });
+        }
+      })();
+      return true;
+    }
+
     // QUEUE_DOWNLOAD message handler removed: cloud download is disabled in this build.
 
   });
