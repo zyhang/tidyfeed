@@ -212,7 +212,7 @@ export class TikHubService {
         }
 
         return {
-            id: tweet.rest_id || tweet.id_str || tweet.id || '',
+            id: tweet.rest_id || tweet.id_str || tweet.id || tweet.tweet_id || '',
             text: legacy.full_text || legacy.text || tweet.text || '',
             created_at: legacy.created_at || tweet.created_at || '',
             author: {
@@ -228,7 +228,7 @@ export class TikHubService {
             // Check multiple locations for quoted tweet
             quoted_tweet: this.parseQuotedTweet(tweet, legacy),
             metrics: {
-                like_count: legacy.favorite_count || legacy.likes || 0,
+                like_count: legacy.favorite_count || legacy.likes || legacy.favorites || tweet.favorites || 0,
                 retweet_count: legacy.retweet_count || legacy.retweets || 0,
                 reply_count: legacy.reply_count || legacy.replies || 0,
                 view_count: tweet.views?.count ? parseInt(tweet.views.count) : (typeof tweet.views === 'string' ? parseInt(tweet.views) : (tweet.views || 0)),
@@ -271,19 +271,25 @@ export class TikHubService {
     private parseMedia(mediaArray: any[]): TikHubMedia[] {
         if (!Array.isArray(mediaArray)) return [];
 
-        return mediaArray.map((m) => ({
-            type: m.type === 'video' ? 'video'
-                : m.type === 'animated_gif' ? 'animated_gif'
-                    : 'photo',
-            url: m.media_url_https || m.url || '',
-            preview_url: m.preview_image_url_https || m.media_url_https || '',
-            width: m.original_info?.width || m.sizes?.large?.w,
-            height: m.original_info?.height || m.sizes?.large?.h,
-            video_info: m.video_info ? {
-                duration_millis: m.video_info.duration_millis,
-                variants: m.video_info.variants?.filter((v: any) => v.content_type === 'video/mp4'),
-            } : undefined,
-        }));
+        return mediaArray.map((m) => {
+            // Get variants - check multiple locations
+            const variants = m.video_info?.variants || m.variants || [];
+            const mp4Variants = variants.filter((v: any) => v.content_type === 'video/mp4');
+
+            return {
+                type: m.type === 'video' ? 'video'
+                    : m.type === 'animated_gif' ? 'animated_gif'
+                        : 'photo',
+                url: m.media_url_https || m.url || '',
+                preview_url: m.preview_image_url_https || m.media_url_https || '',
+                width: m.original_info?.width || m.sizes?.large?.w,
+                height: m.original_info?.height || m.sizes?.large?.h,
+                video_info: (m.video_info || mp4Variants.length > 0) ? {
+                    duration_millis: m.video_info?.duration_millis || m.duration,
+                    variants: mp4Variants,
+                } : undefined,
+            };
+        });
     }
 
     /**
