@@ -180,7 +180,7 @@ function renderQuotedTweet(quoted: TikHubTweetData): string {
 				<span class="quoted-handle">@${escapeHtml(screenName)}</span>
 			</div>
 			<div class="quoted-text">${escapeHtml(truncateText(stripTrailingTcoUrls(quoted.text || ''), 280))}</div>
-			${images.length > 0 && !hasVideo ? `<div class="quoted-media"><img src="${images[0].url}" alt="" loading="lazy"></div>` : ''}
+			${images.length > 0 && !hasVideo ? renderMediaGallery(images) : ''}
 			${video ? renderQuotedVideo(video) : ''}
 		</div>
 	`;
@@ -369,6 +369,15 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 		.media-item { display: block; background: var(--hover); }
 		.media-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 		.media-gallery.single .media-item img { max-height: 510px; object-fit: contain; background: var(--bg); }
+		
+		.quoted-tweet .media-gallery {
+			margin-top: 12px;
+			margin-bottom: 0;
+			border-radius: 12px;
+		}
+		.quoted-tweet .media-gallery.single .media-item img {
+			max-height: 300px;
+		}
 
 		.video-container {
 			border-radius: 16px;
