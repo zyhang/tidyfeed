@@ -473,32 +473,35 @@ downloads.post('/internal/complete', internalServiceAuth, async (c) => {
                         const tweetData = JSON.parse(cachedTweet.cached_data);
                         let updated = false;
 
-                        // Update video URLs in media array
-                        if (tweetData.media) {
-                            for (const m of tweetData.media) {
+                        // Helper function to update video URLs in media array
+                        const updateMediaVideoUrls = (mediaArray: any[]) => {
+                            for (const m of mediaArray) {
                                 if ((m.type === 'video' || m.type === 'animated_gif') && m.video_info?.variants) {
-                                    for (const variant of m.video_info.variants) {
-                                        if (variant.url === task.video_url) {
-                                            variant.url = cachedVideoUrl;
-                                            updated = true;
+                                    // Check if any variant URL matches the task video_url
+                                    const hasMatchingVariant = m.video_info.variants.some(
+                                        (v: any) => v.url === task.video_url
+                                    );
+                                    if (hasMatchingVariant) {
+                                        // Update ALL variants to use cached URL (replace high-quality one)
+                                        for (const variant of m.video_info.variants) {
+                                            if (variant.content_type === 'video/mp4') {
+                                                variant.url = cachedVideoUrl;
+                                                updated = true;
+                                            }
                                         }
                                     }
                                 }
                             }
+                        };
+
+                        // Update video URLs in main tweet media
+                        if (tweetData.media) {
+                            updateMediaVideoUrls(tweetData.media);
                         }
 
                         // Also check quoted_tweet media
                         if (tweetData.quoted_tweet?.media) {
-                            for (const m of tweetData.quoted_tweet.media) {
-                                if ((m.type === 'video' || m.type === 'animated_gif') && m.video_info?.variants) {
-                                    for (const variant of m.video_info.variants) {
-                                        if (variant.url === task.video_url) {
-                                            variant.url = cachedVideoUrl;
-                                            updated = true;
-                                        }
-                                    }
-                                }
-                            }
+                            updateMediaVideoUrls(tweetData.quoted_tweet.media);
                         }
 
                         if (updated) {

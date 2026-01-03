@@ -1113,7 +1113,7 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 
 				// Mark video_downloads as 'invalid' for this tweet
 				const videoUpdateResult = await c.env.DB.prepare(
-					`UPDATE video_downloads SET status = 'invalid' WHERE tweet_id = ? AND task_type = 'snapshot_video'`
+					`UPDATE video_downloads SET status = 'invalid' WHERE tweet_id = ?`
 				).bind(xId).run();
 				if (videoUpdateResult.meta.changes > 0) {
 					console.log(`[Cleanup] Marked ${videoUpdateResult.meta.changes} video_downloads as invalid for tweet ${xId}`);
