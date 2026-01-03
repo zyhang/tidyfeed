@@ -21,9 +21,9 @@ export async function GET(
     // --- Step 1: Try to fetch JSON data with retries ---
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            // Attempt 1: revalidate 60s (standard)
+            // Attempt 1: revalidate 0 (fresh)
             // Retry attempts: revalidate 0 (fresh)
-            const nextConfig = attempt > 1 ? { revalidate: 0 } : { revalidate: 60 };
+            const nextConfig = { revalidate: 0 };
 
             console.log(`[SnapshotProxy] Attempt ${attempt}: Fetching JSON from ${tweetsUrl}`);
             const response = await fetch(tweetsUrl, {

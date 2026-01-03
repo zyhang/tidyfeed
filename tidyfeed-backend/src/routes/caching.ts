@@ -286,6 +286,7 @@ caching.post('/cache', async (c) => {
                     mediaList.forEach(m => {
                         if ((m.type === 'video' || m.type === 'animated_gif') && m.video_info?.variants) {
                             const hasMatchingVariant = m.video_info.variants.some((v: any) => v.url === videoUrl);
+
                             if (hasMatchingVariant) {
                                 m.video_info.variants.forEach((v: any) => {
                                     if (v.content_type === 'video/mp4') {
@@ -320,22 +321,31 @@ caching.post('/cache', async (c) => {
                     httpMetadata: { contentType: 'text/html; charset=utf-8' },
                 });
                 console.log(`[Caching] Regenerated snapshot with predicted video URLs for ${cleanTweetId}`);
+            } else {
+                // debugLogs.push removed
             }
 
             for (const { videoUrl, key } of videosToQueue) {
                 try {
                     // Check if task already exists
                     const existingTask = await c.env.DB.prepare(
-                        `SELECT id FROM video_downloads WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' LIMIT 1`
-                    ).bind(cleanTweetId, videoUrl).first();
+                        `SELECT id, metadata, status FROM video_downloads WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' LIMIT 1`
+                    ).bind(cleanTweetId, videoUrl).first<{ id: number; metadata: string | null; status: string }>();
+
+                    const metadata = { video_key: key };
+                    const metadataStr = JSON.stringify(metadata);
 
                     if (!existingTask) {
-                        const metadata = { video_key: key };
                         await c.env.DB.prepare(
                             `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status, metadata)
                              VALUES (?, ?, 'snapshot_video', ?, ?, 'pending', ?)`
-                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, JSON.stringify(metadata)).run();
+                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, metadataStr).run();
                         console.log(`[Caching] Queued video download for tweet ${cleanTweetId} (key ${key})`);
+                    } else {
+                        await c.env.DB.prepare(
+                            `UPDATE video_downloads SET metadata = ? WHERE id = ?`
+                        ).bind(metadataStr, existingTask.id).run();
+                        console.log(`[Caching] Updated metadata for existing task ${existingTask.id} (key ${key})`);
                     }
                 } catch (err) {
                     console.error(`[Caching] Failed to queue video:`, err);
