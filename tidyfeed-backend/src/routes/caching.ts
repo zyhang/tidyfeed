@@ -249,7 +249,7 @@ caching.post('/cache', async (c) => {
 
         // Queue video downloads for Python worker (if any videos detected)
         if (hasVideo || hasQuotedVideo) {
-            const videosToQueue: { videoUrl: string; index: number; type: 'main' | 'quoted' }[] = [];
+            const videosToQueue: { videoUrl: string; key: string }[] = [];
 
             // Main tweet videos
             const mainMedia = tweetData.media || [];
@@ -257,7 +257,7 @@ caching.post('/cache', async (c) => {
                 if (media.type === 'video' || media.type === 'animated_gif') {
                     const videoUrl = TikHubService.getBestVideoUrl(media);
                     if (videoUrl) {
-                        videosToQueue.push({ videoUrl, index, type: 'main' });
+                        videosToQueue.push({ videoUrl, key: `main_${index}` });
                     }
                 }
             });
@@ -268,10 +268,7 @@ caching.post('/cache', async (c) => {
                 if (media.type === 'video' || media.type === 'animated_gif') {
                     const videoUrl = TikHubService.getBestVideoUrl(media);
                     if (videoUrl) {
-                        // Use a distinct index offset or identifier for quoted videos if needed
-                        // For simplicity, we can use a string index for R2 key or a large offset
-                        // Let's use a large offset for quoted videos: 100 + index
-                        videosToQueue.push({ videoUrl, index: 100 + index, type: 'quoted' });
+                        videosToQueue.push({ videoUrl, key: `quoted_${index}` });
                     }
                 }
             });
@@ -281,8 +278,8 @@ caching.post('/cache', async (c) => {
             const apiUrl = webAppUrl.replace('tidyfeed.app', 'api.tidyfeed.app'); // Heuristic for API URL
             let dataUpdated = false;
 
-            videosToQueue.forEach(({ videoUrl, index }) => {
-                const predictedUrl = `${apiUrl}/api/videos/${cleanTweetId}/${index}.mp4`;
+            videosToQueue.forEach(({ videoUrl, key }) => {
+                const predictedUrl = `${apiUrl}/api/videos/${cleanTweetId}/${key}.mp4`;
 
                 // Helper to update media URL
                 const updateMedia = (mediaList: any[]) => {
@@ -325,7 +322,7 @@ caching.post('/cache', async (c) => {
                 console.log(`[Caching] Regenerated snapshot with predicted video URLs for ${cleanTweetId}`);
             }
 
-            for (const { videoUrl, index } of videosToQueue) {
+            for (const { videoUrl, key } of videosToQueue) {
                 try {
                     // Check if task already exists
                     const existingTask = await c.env.DB.prepare(
@@ -333,12 +330,12 @@ caching.post('/cache', async (c) => {
                     ).bind(cleanTweetId, videoUrl).first();
 
                     if (!existingTask) {
-                        const metadata = { video_index: index };
+                        const metadata = { video_key: key };
                         await c.env.DB.prepare(
                             `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status, metadata)
                              VALUES (?, ?, 'snapshot_video', ?, ?, 'pending', ?)`
                         ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, JSON.stringify(metadata)).run();
-                        console.log(`[Caching] Queued video download for tweet ${cleanTweetId} (index ${index})`);
+                        console.log(`[Caching] Queued video download for tweet ${cleanTweetId} (key ${key})`);
                     }
                 } catch (err) {
                     console.error(`[Caching] Failed to queue video:`, err);
