@@ -31,22 +31,42 @@ const PROGRESS_POPUP_ID = 'tidyfeed-sync-popup';
  */
 export async function injectSyncButton(): Promise<void> {
     // Only run on bookmarks page
-    if (!window.location.pathname.includes('/i/bookmarks')) return;
+    if (!window.location.pathname.includes('/i/bookmarks')) {
+        return;
+    }
+
+    console.log('[TidyFeed] Checker: on bookmarks page');
 
     // Remove existing button if any (renavigation case)
     const existing = document.getElementById('tidyfeed-sync-btn');
-    if (existing) return;
+    if (existing) {
+        console.log('[TidyFeed] Button already exists');
+        return;
+    }
 
-    // Find header - the "Bookmarks"/"书签" title area
-    // Strategy: Look for the primary column header
-    // The header usually has a back button and the title
-    const findHeader = () => {
-        const headings = document.querySelectorAll('h2[role="heading"]');
+    // Improved Header Finder
+    const findHeader = (): Element | null => {
+        // 1. Look for the "Bookmarks" title
+        // In most languages, we trust the `h2[role="heading"]` is the main title on this page
+        // because it is the primary column.
+        const headings = document.querySelectorAll('main h2[role="heading"]');
         for (const h of headings) {
-            // Check if it's the main header (usually in a div with some specific structure)
-            // But simplest is just finding the "Bookmarks" text or the main timeline header
-            // Since we are on /i/bookmarks, the first h2 is usually the page title
-            return h.closest('div[style*="align-items: center"]')?.parentElement;
+            // The header bar is usually the parent's parent or similar. 
+            // We look for a container that has `align-items: center` or `flex-direction: row`
+            const parent = h.closest('div[style*="flex-direction: row"]') ||
+                h.parentElement?.parentElement; // Fallback
+
+            if (parent) return parent;
+        }
+
+        // 2. Fallback: specific testid for primary column header
+        const primaryCol = document.querySelector('[data-testid="primaryColumn"]');
+        if (primaryCol) {
+            // Usually the first div is the header
+            const header = primaryCol.querySelector('div > div > div > div[role="banner"] h2');
+            if (header) {
+                return header.closest('div[style*="flex-direction: row"]');
+            }
         }
         return null;
     };
@@ -55,15 +75,17 @@ export async function injectSyncButton(): Promise<void> {
     let attempts = 0;
     const interval = setInterval(() => {
         attempts++;
-        if (attempts > 20) {
+        if (attempts > 40) { // 20s timeout
             clearInterval(interval);
+            console.log('[TidyFeed] Failed to find header for Sync Button');
             return;
         }
 
-        const headerContainer = document.querySelector('div[data-testid="primaryColumn"] h2[role="heading"]')?.closest('div[style*="flex-direction: row"]');
+        const headerContainer = findHeader();
 
         if (headerContainer) {
             clearInterval(interval);
+            console.log('[TidyFeed] Found header, injecting button...');
 
             // Create Button
             const btn = document.createElement('button');
@@ -103,6 +125,7 @@ export async function injectSyncButton(): Promise<void> {
 
             // Insert
             headerContainer.appendChild(btn);
+            console.log('[TidyFeed] Button injected successfully');
         }
     }, 500);
 }
@@ -338,13 +361,30 @@ export function initBookmarksSync() {
     injectSyncButton();
 
     // Observer for navigation (SPA)
+    // X uses pushState, so we need to poll or observe body
     let lastUrl = window.location.href;
+
+    // Also interval check for safety
+    setInterval(() => {
+        if (window.location.href !== lastUrl) {
+            lastUrl = window.location.href;
+            console.log('[TidyFeed] URL changed detected via poll:', lastUrl);
+            setTimeout(injectSyncButton, 1000);
+        }
+    }, 2000);
+
     const observer = new MutationObserver(() => {
         const url = window.location.href;
         if (url !== lastUrl) {
             lastUrl = url;
-            // Debounce injection
+            console.log('[TidyFeed] URL changed detected via observer:', lastUrl);
             setTimeout(injectSyncButton, 1000);
+        } else {
+            // If we are on the page but button is missing (React re-render), inject again
+            if (url.includes('/i/bookmarks') && !document.getElementById('tidyfeed-sync-btn')) {
+                // Debounce this slightly
+                injectSyncButton();
+            }
         }
     });
     observer.observe(document.body, { childList: true, subtree: true });
