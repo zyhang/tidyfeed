@@ -306,19 +306,19 @@ caching.post('/cache', async (c) => {
                     });
                 };
 
-                if (tweetData.media) updateMedia(tweetData.media);
-                if (tweetData.quoted_tweet?.media) updateMedia(tweetData.quoted_tweet.media);
+                if (cachedTweetData.media) updateMedia(cachedTweetData.media);
+                if (cachedTweetData.quoted_tweet?.media) updateMedia(cachedTweetData.quoted_tweet.media);
             });
 
             // If we updated URLs, re-generate snapshot IMMEDIATELY with predicted URLs
             if (dataUpdated) {
-                // Update cached_data in DB
+                // Update cached_data in DB with the updated cachedTweetData
                 await c.env.DB.prepare(
                     `UPDATE cached_tweets SET cached_data = ?, updated_at = CURRENT_TIMESTAMP WHERE tweet_id = ?`
-                ).bind(JSON.stringify(tweetData), cleanTweetId).run();
+                ).bind(JSON.stringify(cachedTweetData), cleanTweetId).run();
 
-                // Regenerate snapshot
-                const snapshotHtml = generateTweetSnapshot(tweetData, comments, {
+                // Regenerate snapshot with cachedTweetData (has both cached image URLs and predicted video URLs)
+                const snapshotHtml = generateTweetSnapshot(cachedTweetData, comments, {
                     includeComments: include_comments,
                     theme: 'auto',
                 });

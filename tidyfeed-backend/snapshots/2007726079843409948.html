@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Elon Musk on X: "One day …"</title>
+	<meta name="description" content="One day …">
+	<meta property="og:title" content="Elon Musk (@elonmusk)">
+	<meta property="og:description" content="One day …">
+	<meta property="og:type" content="article">
+	
+	<style>
+
+		:root {
+			--bg: #ffffff;
+			--text: #0f1419;
+			--text-secondary: #536471;
+			--border: #eff3f4;
+			--link: #1d9bf0;
+			--card-bg: #ffffff;
+			--quote-bg: #ffffff;
+			--quote-border: #cfd9de;
+			--hover: #f7f9f9;
+		}
+		
+		@media (prefers-color-scheme: dark) {
+			:root {
+				--bg: #000000;
+				--text: #e7e9ea;
+				--text-secondary: #71767b;
+				--border: #2f3336;
+				--link: #1d9bf0;
+				--card-bg: #000000;
+				--quote-bg: #000000;
+				--quote-border: #536471;
+				--hover: #080808;
+			}
+		}
+
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+			background: var(--bg);
+			color: var(--text);
+			line-height: 1.5;
+			-webkit-font-smoothing: antialiased;
+		}
+
+		a { color: inherit; text-decoration: none; }
+
+		.container {
+			max-width: 600px;
+			margin: 0 auto;
+			padding: 16px;
+		}
+
+		.tweet {
+			padding-bottom: 12px;
+		}
+
+		.tweet-header {
+			display: flex;
+			align-items: flex-start;
+			gap: 12px;
+			margin-bottom: 12px;
+		}
+
+		.author-avatar img, .avatar-placeholder {
+			width: 48px;
+			height: 48px;
+			border-radius: 50%;
+			object-fit: cover;
+		}
+		
+		.avatar-placeholder {
+			background: var(--text-secondary);
+			color: var(--bg);
+			display: flex; align-items: center; justify-content: center;
+			font-weight: 700;
+			font-size: 20px;
+		}
+
+		.author-info { flex: 1; }
+
+		.author-name-row {
+			display: flex;
+			align-items: center;
+			gap: 4px;
+		}
+
+		.author-name {
+			font-weight: 700;
+			font-size: 15px;
+			color: var(--text);
+		}
+		.author-name:hover { text-decoration: underline; }
+		
+		.verified-badge { color: var(--link); width: 18px; height: 18px; }
+		.verified-badge-sm { color: var(--link); width: 14px; height: 14px; flex-shrink: 0; }
+
+		.author-handle {
+			color: var(--text-secondary);
+			font-size: 15px;
+		}
+
+		.x-logo {
+			width: 24px;
+			height: 24px;
+			color: var(--text);
+			flex-shrink: 0;
+		}
+		.x-logo:hover { color: var(--text-secondary); }
+
+		.tweet-text {
+			font-size: 17px;
+			line-height: 1.5;
+			margin-bottom: 12px;
+			white-space: pre-wrap;
+			word-wrap: break-word;
+		}
+
+		.tweet-text a {
+			color: var(--link);
+		}
+		.tweet-text a:hover { text-decoration: underline; }
+
+		.media-gallery {
+			display: grid;
+			gap: 2px;
+			border-radius: 16px;
+			overflow: hidden;
+			margin-bottom: 12px;
+		}
+		.media-gallery.single { grid-template-columns: 1fr; }
+		.media-gallery.double { grid-template-columns: 1fr 1fr; }
+		.media-gallery.triple { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+		.media-gallery.triple .media-item:first-child { grid-row: span 2; }
+		.media-gallery.quad { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+		
+		.media-item { display: block; background: var(--hover); }
+		.media-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+		.media-gallery.single .media-item img { max-height: 510px; object-fit: contain; background: var(--bg); }
+
+		.video-container {
+			border-radius: 16px;
+			overflow: hidden;
+			margin-bottom: 12px;
+			background: #000;
+		}
+		.video-container video { width: 100%; display: block; }
+
+		.quoted-tweet {
+			display: block;
+			border: 1px solid var(--quote-border);
+			background: var(--quote-bg);
+			border-radius: 16px;
+			padding: 12px;
+			margin-bottom: 12px;
+			transition: background 0.2s;
+		}
+		.quoted-tweet:hover { background: var(--hover); }
+
+		.quoted-header {
+			display: flex;
+			align-items: center;
+			gap: 4px;
+			margin-bottom: 4px;
+		}
+
+		.quoted-avatar { width: 20px; height: 20px; border-radius: 50%; }
+		.quoted-name { font-weight: 700; font-size: 13px; color: var(--text); }
+		.quoted-handle { color: var(--text-secondary); font-size: 13px; }
+
+		.quoted-text {
+			font-size: 15px;
+			line-height: 1.4;
+			color: var(--text);
+		}
+		
+		.quoted-media {
+			margin-top: 12px;
+			border-radius: 12px;
+			overflow: hidden;
+		}
+		.quoted-media img { width: 100%; max-height: 200px; object-fit: cover; display: block; }
+		
+		.quoted-video {
+			margin-top: 12px;
+			border-radius: 12px;
+			overflow: hidden;
+			background: #000;
+		}
+		.quoted-video video { width: 100%; max-height: 200px; display: block; }
+		
+		.quoted-avatar-placeholder {
+			width: 20px;
+			height: 20px;
+			border-radius: 50%;
+			background: var(--text-secondary);
+			color: var(--bg);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-weight: 700;
+			font-size: 10px;
+			flex-shrink: 0;
+		}
+
+		.tweet-time {
+			padding-top: 12px;
+		}
+		.tweet-time a {
+			color: var(--text-secondary);
+			font-size: 15px;
+		}
+		.tweet-time a:hover { text-decoration: underline; }
+		
+		.comments-section {
+			margin-top: 16px;
+			padding-top: 16px;
+			border-top: 1px solid var(--border);
+		}
+		
+		.comments-title {
+			font-size: 20px;
+			font-weight: 800;
+			margin-bottom: 16px;
+		}
+
+		.comment {
+			display: flex;
+			gap: 12px;
+			padding: 12px 0;
+			border-bottom: 1px solid var(--border);
+		}
+		.comment:last-child { border-bottom: none; }
+		
+		.comment-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
+		.comment-content { flex: 1; min-width: 0; }
+		.comment-header { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 2px; font-size: 14px; }
+		.comment-name { font-weight: 700; color: var(--text); }
+		.comment-handle, .comment-dot, .comment-time { color: var(--text-secondary); }
+		.comment-text { font-size: 15px; line-height: 1.4; }
+
+		.watermark {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
+			margin-top: 32px;
+			padding-top: 16px;
+			border-top: 1px solid var(--border);
+			color: var(--text-secondary);
+			font-size: 13px;
+		}
+		.watermark a { color: var(--text); font-weight: 500; }
+		.watermark a:hover { text-decoration: underline; }
+
+		/* Video click-to-play overlay */
+		.video-overlay {
+			position: relative;
+			cursor: pointer;
+		}
+		.video-poster {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			display: block;
+		}
+		.play-button {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			width: 68px;
+			height: 68px;
+			background: rgba(0, 0, 0, 0.65);
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: white;
+			transition: all 0.2s ease;
+			backdrop-filter: blur(4px);
+			-webkit-backdrop-filter: blur(4px);
+			border: 3px solid rgba(255, 255, 255, 0.9);
+			box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+		}
+		.play-button svg {
+			width: 32px;
+			height: 32px;
+			margin-left: 4px;
+		}
+		.video-overlay:hover .play-button {
+			background: rgba(29, 155, 240, 0.85);
+			transform: translate(-50%, -50%) scale(1.08);
+			box-shadow: 0 6px 32px rgba(29, 155, 240, 0.4);
+		}
+		.play-button-sm {
+			width: 48px;
+			height: 48px;
+			border-width: 2px;
+		}
+		.play-button-sm svg {
+			width: 22px;
+			height: 22px;
+			margin-left: 3px;
+		}
+	
+	</style>
+</head>
+<body>
+	<div class="container">
+		<article class="tweet">
+			
+		<header class="tweet-header">
+			<a href="https://x.com/elonmusk" class="author-avatar" target="_blank" rel="noopener">
+				<img src="https://pbs.twimg.com/profile_images/2007510077561769984/T_jMhUj9_bigger.jpg" alt="Elon Musk" loading="lazy">
+			</a>
+			<div class="author-info">
+				<a href="https://x.com/elonmusk" class="author-name-row" target="_blank" rel="noopener">
+					<span class="author-name">Elon Musk</span>
+					<svg class="verified-badge" viewBox="0 0 22 22" aria-label="Verified account"><path fill="currentColor" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568s-.969.854-1.24 1.44c-.608-.223-1.267-.272-1.902-.14-.635.13-1.22.436-1.69.882-.445.47-.749 1.055-.878 1.688-.13.633-.08 1.29.144 1.896-.587.274-1.087.705-1.443 1.245-.356.54-.555 1.17-.574 1.817.02.647.218 1.276.574 1.817.356.54.856.972 1.443 1.245-.224.606-.274 1.263-.144 1.896.13.634.433 1.218.877 1.688.47.443 1.054.747 1.687.878.633.132 1.29.084 1.897-.136.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.647-.016 1.276-.213 1.817-.567s.972-.854 1.245-1.44c.604.239 1.266.296 1.903.164.636-.132 1.22-.447 1.68-.907.46-.46.776-1.044.908-1.681s.075-1.299-.165-1.903c.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z"/></svg>
+				</a>
+				<span class="author-handle">@elonmusk</span>
+			</div>
+			<a href="https://x.com/elonmusk/status/2007726079843409948" class="x-logo" target="_blank" rel="noopener" title="View on X">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+			</a>
+		</header>
+
+		<div class="tweet-text">One day …</div>
+
+		
+		
+		
+		<div class="quoted-tweet">
+			<div class="quoted-header">
+				<img src="https://pbs.twimg.com/profile_images/1333505995566411782/Qd8AZOnm_bigger.jpg" alt="" class="quoted-avatar">
+				<span class="quoted-name">Curiosity</span>
+				<svg class="verified-badge-sm" viewBox="0 0 22 22"><path fill="currentColor" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568s-.969.854-1.24 1.44c-.608-.223-1.267-.272-1.902-.14-.635.13-1.22.436-1.69.882-.445.47-.749 1.055-.878 1.688-.13.633-.08 1.29.144 1.896-.587.274-1.087.705-1.443 1.245-.356.54-.555 1.17-.574 1.817.02.647.218 1.276.574 1.817.356.54.856.972 1.443 1.245-.224.606-.274 1.263-.144 1.896.13.634.433 1.218.877 1.688.47.443 1.054.747 1.687.878.633.132 1.29.084 1.897-.136.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.647-.016 1.276-.213 1.817-.567s.972-.854 1.245-1.44c.604.239 1.266.296 1.903.164.636-.132 1.22-.447 1.68-.907.46-.46.776-1.044.908-1.681s.075-1.299-.165-1.903c.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z"/></svg>
+				<span class="quoted-handle">@MAstronomers</span>
+			</div>
+			<div class="quoted-text">This is Mars! 🪐🤯
+
+It’s honestly terrifying how much this looks like a random desert on Earth. 
+
+Just a casual 225 million miles away. 
+
+The clarity is unreal. https://t.co/M0Ih5njRjx</div>
+			
+			
+		<div class="quoted-video video-overlay" onclick="playVideo(this, 'https://api.tidyfeed.app/api/videos/2007726079843409948/quoted_0.mp4')">
+			<img src="https://pbs.twimg.com/amplify_video_thumb/2007464969701408769/img/GRUzcdxatYfVmQ6w.jpg" alt="Video thumbnail" class="video-poster" loading="lazy">
+			<div class="play-button play-button-sm">
+				<svg viewBox="0 0 24 24" fill="currentColor">
+					<path d="M8 5v14l11-7z"/>
+				</svg>
+			</div>
+		</div>
+	
+		</div>
+	
+
+		<div class="tweet-time">
+			<a href="https://x.com/elonmusk/status/2007726079843409948" target="_blank" rel="noopener">
+				<time datetime="Sun Jan 04 08:09:33 +0000 2026">Jan 4, 2026, 8:09 AM</time>
+			</a>
+		</div>
+	
+		</article>
+		
+		<footer class="watermark">
+			<span>Cached by</span>
+			<a href="https://tidyfeed.app" target="_blank" rel="noopener">TidyFeed</a>
+			<span class="dot">·</span>
+			<span>Jan 4, 2026</span>
+		</footer>
+	</div>
+	<script>
+		function playVideo(container, videoUrl) {
+			const video = document.createElement('video');
+			video.controls = true;
+			video.autoplay = true;
+			video.style.width = '100%';
+			video.style.display = 'block';
+			
+			const source = document.createElement('source');
+			source.src = videoUrl;
+			source.type = 'video/mp4';
+			video.appendChild(source);
+			
+			container.innerHTML = '';
+			container.style.cursor = 'default';
+			container.onclick = null;
+			container.classList.remove('video-overlay');
+			container.appendChild(video);
+		}
+	</script>
+</body>
+</html>

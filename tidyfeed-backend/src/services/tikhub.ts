@@ -293,10 +293,7 @@ export class TikHubService {
             const variants = m.video_info?.variants || m.variants || [];
             const mp4Variants = variants.filter((v: any) => v.content_type === 'video/mp4');
 
-            // Debug logging for video thumbnails
-            if (m.type === 'video' || m.type === 'animated_gif' || m.video_info) {
-                console.log(`[TikHub] Media parsing: type=${m.type}, preview_image_url_https=${m.preview_image_url_https?.substring(0, 60)}, media_url_https=${m.media_url_https?.substring(0, 60)}`);
-            }
+            // Debug logging for video thumbnails removed
 
             return {
                 type: m.type === 'video' ? 'video'
