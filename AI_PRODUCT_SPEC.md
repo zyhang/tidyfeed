@@ -319,19 +319,19 @@ A Python worker that processes video download tasks queued by the extension.
 
 ### Environment Variables
 
-**Backend (Cloudflare Worker Secrets):**
-- `JWT_SECRET`: For session signing.
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: For OAuth.
-- `INTERNAL_SERVICE_KEY`: For worker-to-backend auth.
+**Backend (Cloudflare Worker bindings + secrets):**
+- Bindings: `DB` (D1), `MEDIA_BUCKET` (R2 tidyfeed-media).
+- Secrets: `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `INTERNAL_SERVICE_KEY`, `TIKHUB_API_KEY` (TikHub fetch), `BIGMODEL_API_KEY` (AI summary), `WEB_APP_URL` (e.g. `https://tidyfeed.app`).
 
-**Web/Admin:**
-- `NEXT_PUBLIC_API_URL`: Backend API URL (e.g., `https://api.tidyfeed.app`).
+**Web/Admin (Cloudflare Pages build):**
+- `NEXT_PUBLIC_API_URL` (e.g. `https://api.tidyfeed.app`).
+- Build command: `npm run build`, output `.next` (handled by Pages).
 
-**Bot Worker (Fly.io Secrets):**
-- `API_BASE_URL`, `INTERNAL_SERVICE_KEY`, `BOT_USERNAME`, `BOT_COOKIES_PATH`.
+**Bot Worker (Fly.io Docker):**
+- `API_BASE_URL`, `INTERNAL_SERVICE_KEY`, `BOT_USERNAME`, `BOT_COOKIES_PATH`, `POLL_MIN_SECONDS`, `POLL_MAX_SECONDS`.
 
-**Python Worker (Fly.io Secrets):**
-- `API_BASE_URL`, `INTERNAL_SERVICE_KEY`, `R2_*` credentials.
+**Python Worker (Fly.io Docker):**
+- `API_BASE_URL`, `INTERNAL_SERVICE_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `POLL_INTERVAL`.
 
 ### Commands
 - **Extension**: `npm run dev` (WXT)
@@ -339,6 +339,14 @@ A Python worker that processes video download tasks queued by the extension.
 - **Web/Admin**: `npm run dev` (Next.js)
 - **Bot Worker**: `python bot.py` (local) or `fly deploy` (production)
 - **Python Worker**: `python worker.py` (local) or `fly deploy` (production)
+
+### Deployment Targets
+- **Backend**: Cloudflare Workers (`wrangler publish`) with D1+R2 bindings.
+- **Web**: Cloudflare Pages (`npm run build`), deploy from `/tidyfeed-web`.
+- **Admin**: Cloudflare Pages (`npm run build`) from `/tidyfeed-admin`.
+- **Bot Worker**: Fly.io app `tidyfeed-bot-worker` (Dockerfile in `/tidyfeed-bot-worker`).
+- **Python Worker**: Fly.io app `tidyfeed-python-worker` (Dockerfile in `/tidyfeed-python-worker`).
+- **Extension**: Package via WXT/Vite (`npm run build`), submit to Chrome/Firefox stores.
 
 ### Production URLs
 - **Backend**: `https://api.tidyfeed.app`

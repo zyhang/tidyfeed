@@ -2,7 +2,7 @@
 
 export const runtime = 'edge';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Sparkles, X, Loader2, ChevronLeft, StickyNote, Plus, MessageSquarePlus } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
@@ -312,8 +312,8 @@ export default function SnapshotViewerPage() {
         }, 300);
     };
 
-    // Apply highlighting to snapshot content
-    const getHighlightedHtml = useCallback(() => {
+    // Apply highlighting to snapshot content - memoized to prevent re-computation on unrelated state changes
+    const highlightedHtml = useMemo(() => {
         if (notes.length === 0 || !snapshotHtml) return snapshotHtml;
 
         // Create a temporary DOM to manipulate
@@ -566,15 +566,11 @@ export default function SnapshotViewerPage() {
                 </div>
             )}
 
-            {/* Snapshot Content Container */}
-            <div
+            {/* Snapshot Content Container - memoized to prevent selection loss */}
+            <SnapshotContent
                 ref={contentRef}
-                className={`
-                    transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
-                    ${showSidebar ? 'mr-[440px] opacity-100' : 'mr-0'}
-                    min-h-screen
-                `}
-                dangerouslySetInnerHTML={{ __html: getHighlightedHtml() }}
+                html={highlightedHtml}
+                showSidebar={showSidebar}
             />
 
             {/* Sidebar Panel */}

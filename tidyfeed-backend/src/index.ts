@@ -605,17 +605,19 @@ app.post('/api/auth/link-social', cookieAuthMiddleware, async (c) => {
 			return c.json({ error: 'Account already linked to another user' }, 409);
 		}
 
-		// Atomic Upsert
+		// Atomic Upsert (include platform_username_lower for case-insensitive lookups)
+		const normalizedUsername = platform_username ? platform_username.toLowerCase() : null;
 		await c.env.DB.prepare(
-			`INSERT INTO social_accounts (user_id, platform, platform_user_id, platform_username, display_name, avatar_url, updated_at, last_synced_at)
-			 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			`INSERT INTO social_accounts (user_id, platform, platform_user_id, platform_username, platform_username_lower, display_name, avatar_url, updated_at, last_synced_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 			 ON CONFLICT(platform, platform_user_id) DO UPDATE SET
 				platform_username = COALESCE(excluded.platform_username, social_accounts.platform_username),
+				platform_username_lower = COALESCE(excluded.platform_username_lower, social_accounts.platform_username_lower),
 				display_name = COALESCE(excluded.display_name, social_accounts.display_name),
 				avatar_url = COALESCE(excluded.avatar_url, social_accounts.avatar_url),
 				updated_at = CURRENT_TIMESTAMP,
 				last_synced_at = CURRENT_TIMESTAMP`
-		).bind(userId, platform, String(platform_user_id), platform_username || null, display_name || null, avatar_url || null).run();
+		).bind(userId, platform, String(platform_user_id), platform_username || null, normalizedUsername, display_name || null, avatar_url || null).run();
 
 		console.log('Link social success:', { userId, platform, platform_user_id });
 		return c.json({ success: true, message: 'Social account linked' });

@@ -86,10 +86,10 @@ internal.post('/bot-save', async (c) => {
 
         console.log(`[Bot] Save request: @${normalizedHandle} -> ${tweet_url}`);
 
-        // Look up user by X account in social_accounts table
+        // Look up user by X account in social_accounts table (using indexed normalized column)
         const socialAccount = await c.env.DB.prepare(
             `SELECT user_id FROM social_accounts 
-             WHERE platform = 'x' AND LOWER(platform_username) = ?`
+             WHERE platform = 'x' AND platform_username_lower = ?`
         ).bind(normalizedHandle).first<{ user_id: string }>();
 
         // Mark mention as processed regardless of outcome (if mention_id provided)
