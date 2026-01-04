@@ -933,33 +933,37 @@ async function triggerCacheInBackground(
 
 		// Queue video downloads for Python worker (if any videos detected)
 		if (hasVideo || hasQuotedVideo) {
-			const videosToQueue: { tweetId: string; videoUrl: string }[] = [];
+			const videosToQueue: { tweetId: string; videoUrl: string; videoIndex: string }[] = [];
 
 			// Check main tweet for videos
+			let mainVideoIndex = 0;
 			for (const media of (tweetData.media || [])) {
 				if (media.type === 'video' || media.type === 'animated_gif') {
 					const videoUrl = TikHubService.getBestVideoUrl(media);
 					if (videoUrl) {
-						videosToQueue.push({ tweetId, videoUrl });
+						videosToQueue.push({ tweetId, videoUrl, videoIndex: `${mainVideoIndex}` });
+						mainVideoIndex++;
 					}
 				}
 			}
 
 			// Check quoted tweet for videos
 			if (tweetData.quoted_tweet?.media) {
+				let quotedVideoIndex = 0;
 				for (const media of tweetData.quoted_tweet.media) {
 					if (media.type === 'video' || media.type === 'animated_gif') {
 						const videoUrl = TikHubService.getBestVideoUrl(media);
 						if (videoUrl) {
 							// Use main tweetId so video is associated with the snapshot
-							videosToQueue.push({ tweetId, videoUrl });
+							videosToQueue.push({ tweetId, videoUrl, videoIndex: `quoted_${quotedVideoIndex}` });
+							quotedVideoIndex++;
 						}
 					}
 				}
 			}
 
 			// Queue each video for Python worker (with duplicate check)
-			for (const { tweetId: tid, videoUrl } of videosToQueue) {
+			for (const { tweetId: tid, videoUrl, videoIndex } of videosToQueue) {
 				try {
 					// Check if a task already exists for this tweet_id and video_url
 					const existingTask = await env.DB.prepare(
@@ -974,15 +978,16 @@ async function triggerCacheInBackground(
 					}
 
 					await env.DB.prepare(
-						`INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status)
-						 VALUES (?, ?, 'snapshot_video', ?, ?, 'pending')`
+						`INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status, metadata)
+						 VALUES (?, ?, 'snapshot_video', ?, ?, 'pending', ?)`
 					).bind(
 						userId || 'system',
 						`https://x.com/i/status/${tid}`,
 						tid,
-						videoUrl
+						videoUrl,
+						videoIndex
 					).run();
-					console.log(`[AutoCache] Queued video download for tweet ${tid}`);
+					console.log(`[AutoCache] Queued video download for tweet ${tid} (index ${videoIndex})`);
 				} catch (err) {
 					console.error(`[AutoCache] Failed to queue video for tweet ${tid}:`, err);
 				}

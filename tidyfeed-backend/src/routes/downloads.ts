@@ -578,7 +578,7 @@ downloads.post('/internal/complete', internalServiceAuth, async (c) => {
  */
 downloads.post('/internal/queue-snapshot-video', internalServiceAuth, async (c) => {
     try {
-        const { tweet_id, video_url, user_id } = await c.req.json();
+        const { tweet_id, video_url, user_id, video_index } = await c.req.json();
 
         if (!tweet_id) {
             return c.json({ error: 'tweet_id is required' }, 400);
@@ -613,19 +613,23 @@ downloads.post('/internal/queue-snapshot-video', internalServiceAuth, async (c) 
             }
         }
 
+        // Default to "0" if no video_index provided
+        const metadata = video_index || '0';
+
         // Create new snapshot video task
         const result = await c.env.DB.prepare(
-            `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status)
-             VALUES (?, ?, 'snapshot_video', ?, ?, 'pending')`
+            `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status, metadata)
+             VALUES (?, ?, 'snapshot_video', ?, ?, 'pending', ?)`
         ).bind(
             user_id || 'system',
             `https://x.com/i/status/${tweet_id}`,  // Placeholder URL
             tweet_id,
-            video_url
+            video_url,
+            metadata
         ).run();
 
         const taskId = result.meta.last_row_id;
-        console.log(`[SnapshotVideo] Queued task ${taskId} for tweet ${tweet_id}`);
+        console.log(`[SnapshotVideo] Queued task ${taskId} for tweet ${tweet_id} (index ${metadata})`);
 
         return c.json({
             success: true,
