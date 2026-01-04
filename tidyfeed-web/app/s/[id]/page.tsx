@@ -2,7 +2,7 @@
 
 export const runtime = 'edge';
 
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo, forwardRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Sparkles, X, Loader2, ChevronLeft, StickyNote, Plus, MessageSquarePlus } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
@@ -27,6 +27,25 @@ interface SelectionInfo {
     offsetEnd: number;
     rect: DOMRect;
 }
+
+// Memoized snapshot content component - only re-renders when html or showSidebar changes
+// This prevents the selection from being lost when other state (like selection) changes
+const SnapshotContent = memo(
+    React.forwardRef<HTMLDivElement, { html: string; showSidebar: boolean }>(
+        ({ html, showSidebar }, ref) => (
+            <div
+                ref={ref}
+                className={`
+                    transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
+                    ${showSidebar ? 'mr-[440px] opacity-100' : 'mr-0'}
+                    min-h-screen
+                `}
+                dangerouslySetInnerHTML={{ __html: html }}
+            />
+        )
+    )
+);
+SnapshotContent.displayName = 'SnapshotContent';
 
 export default function SnapshotViewerPage() {
     const params = useParams();
