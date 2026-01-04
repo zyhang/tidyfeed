@@ -87,6 +87,9 @@ export function StorageIndicator({ isCollapsed, className, ...props }: StorageIn
                     STORAGE
                     {percentage >= 100 && <AlertCircle className="w-3 h-3 text-destructive animate-pulse" />}
                 </span>
+                <span className="text-[10px] font-mono opacity-80">
+                    {formatBytes(usage)} / {formatBytes(limit)}
+                </span>
             </div>
 
             <TooltipProvider>

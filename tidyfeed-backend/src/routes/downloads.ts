@@ -99,9 +99,16 @@ downloads.post('/queue', cookieAuthMiddleware, async (c) => {
         }
 
         // Check Storage Quota (1GB)
-        const user = await c.env.DB.prepare('SELECT storage_usage FROM users WHERE id = ?').bind(userId).first<{ storage_usage: number }>();
+        const usageResult = await c.env.DB.prepare(
+            `SELECT SUM(file_size) as usage 
+             FROM video_downloads 
+             WHERE user_id = ? 
+               AND status = 'completed'`
+        ).bind(userId).first<{ usage: number }>();
+        const currentUsage = usageResult?.usage || 0;
         const STORAGE_LIMIT = 1073741824; // 1 GB
-        if ((user?.storage_usage || 0) >= STORAGE_LIMIT) {
+
+        if (currentUsage >= STORAGE_LIMIT) {
             return c.json({ error: 'Storage quota exceeded (1GB limit). Please delete some videos to free up space.' }, 403);
         }
 
@@ -275,11 +282,17 @@ downloads.get('/usage', cookieAuthMiddleware, async (c) => {
         const payload = c.get('jwtPayload') as { sub: string };
         const userId = payload.sub;
 
-        const user = await c.env.DB.prepare('SELECT storage_usage FROM users WHERE id = ?').bind(userId).first<{ storage_usage: number }>();
+        const usageResult = await c.env.DB.prepare(
+            `SELECT SUM(file_size) as usage 
+             FROM video_downloads 
+             WHERE user_id = ? 
+               AND status = 'completed'`
+        ).bind(userId).first<{ usage: number }>();
+
         const STORAGE_LIMIT = 1073741824; // 1 GB
 
         return c.json({
-            usage: user?.storage_usage || 0,
+            usage: usageResult?.usage || 0,
             limit: STORAGE_LIMIT
         });
     } catch (error) {
