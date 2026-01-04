@@ -985,7 +985,7 @@ async function triggerCacheInBackground(
 						`https://x.com/i/status/${tid}`,
 						tid,
 						videoUrl,
-						videoIndex
+						JSON.stringify({ video_index: videoIndex })
 					).run();
 					console.log(`[AutoCache] Queued video download for tweet ${tid} (index ${videoIndex})`);
 				} catch (err) {

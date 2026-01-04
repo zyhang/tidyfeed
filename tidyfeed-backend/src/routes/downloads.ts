@@ -371,9 +371,17 @@ downloads.put('/internal/upload-url', internalServiceAuth, async (c) => {
         let key: string;
 
         if (task.task_type === 'snapshot_video' && task.tweet_id) {
-            // Metadata is stored as plain string: "0", "1", "quoted_0", "quoted_1", etc.
-            // Use it directly as the filename base
-            const videoIndex = task.metadata || '0';
+            // Metadata is stored as JSON: {"video_index": "0"} or {"video_index": "quoted_0"}
+            let videoIndex = '0';
+            if (task.metadata) {
+                try {
+                    const parsed = JSON.parse(task.metadata);
+                    videoIndex = parsed.video_index || '0';
+                } catch {
+                    // If parsing fails, use metadata directly as fallback (legacy format)
+                    videoIndex = task.metadata;
+                }
+            }
             // For snapshot videos, use deterministic path: videos/{tweet_id}/{index}.{ext}
             key = `videos/${task.tweet_id}/${videoIndex}.${extension}`;
         } else {
@@ -614,7 +622,7 @@ downloads.post('/internal/queue-snapshot-video', internalServiceAuth, async (c) 
         }
 
         // Default to "0" if no video_index provided
-        const metadata = video_index || '0';
+        const metadata = JSON.stringify({ video_index: video_index || '0' });
 
         // Create new snapshot video task
         const result = await c.env.DB.prepare(
@@ -629,7 +637,7 @@ downloads.post('/internal/queue-snapshot-video', internalServiceAuth, async (c) 
         ).run();
 
         const taskId = result.meta.last_row_id;
-        console.log(`[SnapshotVideo] Queued task ${taskId} for tweet ${tweet_id} (index ${metadata})`);
+        console.log(`[SnapshotVideo] Queued task ${taskId} for tweet ${tweet_id} (index ${video_index || '0'})`);
 
         return c.json({
             success: true,
