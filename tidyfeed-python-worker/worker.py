@@ -285,7 +285,7 @@ def process_snapshot_video_task(task: dict):
             logger.info(f'Downloaded {file_size / 1024 / 1024:.2f} MB')
             
             # Check size limit (50MB for snapshot videos)
-            max_size = 500 * 1024 * 1024
+            max_size = 50 * 1024 * 1024
             if file_size > max_size:
                 logger.warning(f'Video too large ({file_size / 1024 / 1024:.2f} MB), skipping')
                 complete_task(task_id, 'failed', error_message=f'Video too large ({file_size / 1024 / 1024:.0f}MB > 50MB limit)')

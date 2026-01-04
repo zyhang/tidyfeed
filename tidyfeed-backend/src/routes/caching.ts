@@ -278,8 +278,11 @@ caching.post('/cache', async (c) => {
             });
 
             // Update tweetData with predicted URLs immediately
+            // For tidyfeed.app, use api.tidyfeed.app; otherwise prepend 'api.' to domain
             const webAppUrl = c.env.WEB_APP_URL || 'https://tidyfeed.app';
-            const apiUrl = webAppUrl.replace('tidyfeed.app', 'api.tidyfeed.app'); // Heuristic for API URL
+            const apiUrl = webAppUrl.includes('tidyfeed.app')
+                ? 'https://api.tidyfeed.app'
+                : webAppUrl.replace(/^(https?:\/\/)([^/]+)/, '$1api.$2');
             let dataUpdated = false;
 
             videosToQueue.forEach(({ videoUrl, key }) => {

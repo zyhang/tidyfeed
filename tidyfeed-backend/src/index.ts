@@ -478,8 +478,8 @@ app.get('/auth/callback/google', async (c) => {
 			cookieOptions.push('Domain=.tidyfeed.app');
 			cookieOptions.push('SameSite=None'); // Required for cross-origin requests
 		} else {
-			cookieOptions.push('SameSite=None');
-			cookieOptions.push('Secure');
+			// Dev environment: use Lax without Secure for localhost HTTP
+			cookieOptions.push('SameSite=Lax');
 		}
 
 		const response = new Response(null, {

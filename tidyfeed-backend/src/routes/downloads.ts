@@ -114,25 +114,25 @@ downloads.post('/queue', cookieAuthMiddleware, async (c) => {
 
         // Check if this video has already been downloaded (completed)
         const existingDownload = await c.env.DB.prepare(
-            `SELECT r2_key, metadata FROM video_downloads 
+            `SELECT r2_key, metadata, file_size FROM video_downloads 
              WHERE tweet_url = ? AND status = 'completed' 
              ORDER BY id DESC LIMIT 1`
-        ).bind(tweet_url).first<{ r2_key: string; metadata: string }>();
+        ).bind(tweet_url).first<{ r2_key: string; metadata: string; file_size: number | null }>();
 
         let result;
 
         if (existingDownload && existingDownload.r2_key) {
-            // Reuse existing download
+            // Reuse existing download - set cookies to NULL (security) and copy file_size for quota
             result = await c.env.DB.prepare(
-                `INSERT INTO video_downloads (user_id, tweet_url, twitter_cookies, status, saved_post_id, r2_key, metadata)
-                 VALUES (?, ?, ?, 'completed', ?, ?, ?)`
+                `INSERT INTO video_downloads (user_id, tweet_url, twitter_cookies, status, saved_post_id, r2_key, metadata, file_size)
+                 VALUES (?, ?, NULL, 'completed', ?, ?, ?, ?)`
             ).bind(
                 userId,
                 tweet_url,
-                cookies, // Still keeping cookies for record, or could be null if schema allows
                 saved_post_id || null,
                 existingDownload.r2_key,
-                existingDownload.metadata
+                existingDownload.metadata,
+                existingDownload.file_size
             ).run();
         } else {
             // New download task
