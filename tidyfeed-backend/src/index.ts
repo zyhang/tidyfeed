@@ -13,6 +13,7 @@ import internal from './routes/internal';
 import caching from './routes/caching';
 import admin from './routes/admin';
 import ai from './routes/ai';
+import library from './routes/library';
 
 // Google OAuth JWKS endpoint for ID token verification
 const GOOGLE_JWKS = createRemoteJWKSet(
@@ -1716,6 +1717,9 @@ app.route('/api/admin', admin);
 
 // Mount AI routes
 app.route('/api/ai', ai);
+
+// Mount library routes
+app.route('/api/library', library);
 
 export default app;
 

@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Tag, Settings, ChevronLeft, Menu, Hash, ChevronDown, ChevronRight, Loader2, LogOut } from "lucide-react"
+import { Home, Tag, Settings, ChevronLeft, Menu, Hash, ChevronDown, ChevronRight, Loader2, LogOut, FolderOpen, Video, Image } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { StorageIndicator } from "./StorageIndicator"
@@ -20,16 +20,11 @@ interface SidebarProps extends React.HTMLAttributes<HTMLElement> { }
 
 export function Sidebar({ className, ...props }: SidebarProps) {
     const [isCollapsed, setIsCollapsed] = React.useState(false)
+    const [libraryExpanded, setLibraryExpanded] = React.useState(false)
     const [tagsExpanded, setTagsExpanded] = React.useState(false)
     const [tags, setTags] = React.useState<TagItem[]>([])
     const [loadingTags, setLoadingTags] = React.useState(false)
     const pathname = usePathname()
-
-    const navItems = [
-        { title: "My Feed", icon: Home, href: "/dashboard" },
-        { title: "Tags", icon: Tag, href: "/dashboard/tags", hasSubmenu: true },
-        { title: "Settings", icon: Settings, href: "/dashboard/settings" },
-    ]
 
     // Fetch tags when Tags menu is expanded
     React.useEffect(() => {
@@ -44,6 +39,12 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                 .finally(() => setLoadingTags(false))
         }
     }, [tagsExpanded, tags.length])
+
+    // Library sub-menu items
+    const libraryItems = [
+        { title: "Video", icon: Video, href: "/dashboard/library/videos" },
+        { title: "Image", icon: Image, href: "/dashboard/library/images" },
+    ]
 
     return (
         <aside
@@ -67,85 +68,136 @@ export function Sidebar({ className, ...props }: SidebarProps) {
             </div>
 
             <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-                {navItems.map((item) => (
-                    <div key={item.href}>
-                        {item.hasSubmenu ? (
+                {/* My Feed */}
+                <Link
+                    href="/dashboard"
+                    className={cn(
+                        "flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
+                        pathname === '/dashboard' && "bg-accent text-accent-foreground",
+                        isCollapsed && "justify-center px-2"
+                    )}
+                >
+                    <Home className="h-5 w-5" />
+                    {!isCollapsed && <span>My Feed</span>}
+                </Link>
+
+                {/* Library Menu */}
+                <div>
+                    <button
+                        onClick={() => !isCollapsed && setLibraryExpanded(!libraryExpanded)}
+                        className={cn(
+                            "w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
+                            pathname.startsWith('/dashboard/library') && "bg-accent text-accent-foreground",
+                            isCollapsed && "justify-center px-2"
+                        )}
+                    >
+                        <FolderOpen className="h-5 w-5" />
+                        {!isCollapsed && (
                             <>
-                                {/* Tags with expandable submenu */}
-                                <button
-                                    onClick={() => !isCollapsed && setTagsExpanded(!tagsExpanded)}
-                                    className={cn(
-                                        "w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
-                                        pathname.startsWith('/dashboard/tags') && "bg-accent text-accent-foreground",
-                                        isCollapsed && "justify-center px-2"
-                                    )}
-                                >
-                                    <item.icon className="h-5 w-5" />
-                                    {!isCollapsed && (
-                                        <>
-                                            <span className="flex-1 text-left">{item.title}</span>
-                                            {tagsExpanded ? (
-                                                <ChevronDown className="h-4 w-4" />
-                                            ) : (
-                                                <ChevronRight className="h-4 w-4" />
-                                            )}
-                                        </>
-                                    )}
-                                </button>
-
-                                {/* Tags submenu */}
-                                {!isCollapsed && tagsExpanded && (
-                                    <div className="ml-4 mt-1 space-y-1">
-                                        <Link
-                                            href="/dashboard/tags"
-                                            className={cn(
-                                                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm hover:bg-accent hover:text-accent-foreground transition-colors",
-                                                pathname === '/dashboard/tags' && "bg-accent/50"
-                                            )}
-                                        >
-                                            <Tag className="h-4 w-4" />
-                                            <span>All Tags</span>
-                                        </Link>
-
-                                        {loadingTags && (
-                                            <div className="flex items-center gap-2 px-3 py-1.5">
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                <span className="text-sm text-muted-foreground">Loading...</span>
-                                            </div>
-                                        )}
-
-                                        {tags.map((tag) => (
-                                            <Link
-                                                key={tag.id}
-                                                href={`/dashboard/tags/${tag.id}`}
-                                                className={cn(
-                                                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm hover:bg-accent hover:text-accent-foreground transition-colors",
-                                                    pathname === `/dashboard/tags/${tag.id}` && "bg-accent/50"
-                                                )}
-                                            >
-                                                <Hash className="h-4 w-4 text-muted-foreground" />
-                                                <span className="truncate flex-1">{tag.name}</span>
-                                                <span className="text-xs text-muted-foreground">{tag.tweet_count}</span>
-                                            </Link>
-                                        ))}
-                                    </div>
+                                <span className="flex-1 text-left">Library</span>
+                                {libraryExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                    <ChevronRight className="h-4 w-4" />
                                 )}
                             </>
-                        ) : (
+                        )}
+                    </button>
+
+                    {/* Library submenu */}
+                    {!isCollapsed && libraryExpanded && (
+                        <div className="ml-4 mt-1 space-y-1">
+                            {libraryItems.map((item) => (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={cn(
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm hover:bg-accent hover:text-accent-foreground transition-colors",
+                                        pathname === item.href && "bg-accent/50"
+                                    )}
+                                >
+                                    <item.icon className="h-4 w-4 text-muted-foreground" />
+                                    <span>{item.title}</span>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Tags Menu */}
+                <div>
+                    <button
+                        onClick={() => !isCollapsed && setTagsExpanded(!tagsExpanded)}
+                        className={cn(
+                            "w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
+                            pathname.startsWith('/dashboard/tags') && "bg-accent text-accent-foreground",
+                            isCollapsed && "justify-center px-2"
+                        )}
+                    >
+                        <Tag className="h-5 w-5" />
+                        {!isCollapsed && (
+                            <>
+                                <span className="flex-1 text-left">Tags</span>
+                                {tagsExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                )}
+                            </>
+                        )}
+                    </button>
+
+                    {/* Tags submenu */}
+                    {!isCollapsed && tagsExpanded && (
+                        <div className="ml-4 mt-1 space-y-1">
                             <Link
-                                href={item.href}
+                                href="/dashboard/tags"
                                 className={cn(
-                                    "flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
-                                    pathname === item.href && "bg-accent text-accent-foreground",
-                                    isCollapsed && "justify-center px-2"
+                                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm hover:bg-accent hover:text-accent-foreground transition-colors",
+                                    pathname === '/dashboard/tags' && "bg-accent/50"
                                 )}
                             >
-                                <item.icon className="h-5 w-5" />
-                                {!isCollapsed && <span>{item.title}</span>}
+                                <Tag className="h-4 w-4" />
+                                <span>All Tags</span>
                             </Link>
-                        )}
-                    </div>
-                ))}
+
+                            {loadingTags && (
+                                <div className="flex items-center gap-2 px-3 py-1.5">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span className="text-sm text-muted-foreground">Loading...</span>
+                                </div>
+                            )}
+
+                            {tags.map((tag) => (
+                                <Link
+                                    key={tag.id}
+                                    href={`/dashboard/tags/${tag.id}`}
+                                    className={cn(
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm hover:bg-accent hover:text-accent-foreground transition-colors",
+                                        pathname === `/dashboard/tags/${tag.id}` && "bg-accent/50"
+                                    )}
+                                >
+                                    <Hash className="h-4 w-4 text-muted-foreground" />
+                                    <span className="truncate flex-1">{tag.name}</span>
+                                    <span className="text-xs text-muted-foreground">{tag.tweet_count}</span>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Settings */}
+                <Link
+                    href="/dashboard/settings"
+                    className={cn(
+                        "flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
+                        pathname === '/dashboard/settings' && "bg-accent text-accent-foreground",
+                        isCollapsed && "justify-center px-2"
+                    )}
+                >
+                    <Settings className="h-5 w-5" />
+                    {!isCollapsed && <span>Settings</span>}
+                </Link>
             </nav>
 
             <div className="border-t bg-background z-10">
