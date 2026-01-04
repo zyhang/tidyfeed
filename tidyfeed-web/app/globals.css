@@ -123,3 +123,90 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* AI Summary Sidebar Animations */
+@keyframes sparkle-bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.92); }
+}
+
+@keyframes sparkle-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+  50% { box-shadow: 0 0 20px 4px rgba(139, 92, 246, 0.3); }
+}
+
+@keyframes panel-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes panel-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0.5;
+  }
+}
+
+@keyframes content-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* AI Summary custom scrollbar */
+.ai-summary-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ai-summary-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ai-summary-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+}
+
+.ai-summary-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* Button active state */
+.sparkle-btn-active {
+  animation: sparkle-bounce 0.3s ease-out;
+}
+
+.sparkle-btn-glow {
+  animation: sparkle-glow 2s ease-in-out infinite;
+}
+
+/* Panel animations */
+.panel-enter {
+  animation: panel-slide-in 0.4s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.panel-exit {
+  animation: panel-slide-out 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+/* Content animation */
+.content-appear {
+  animation: content-fade-up 0.5s ease-out forwards;
+  animation-delay: 0.15s;
+  opacity: 0;
+}

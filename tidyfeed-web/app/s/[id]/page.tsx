@@ -100,28 +100,39 @@ export default function SnapshotViewerPage() {
 
     return (
         <div className="min-h-screen bg-[#f7f9f9] relative overflow-hidden">
-            {/* AI Summary Trigger Button */}
+            {/* AI Summary Trigger Button - Enhanced Animation */}
             <button
-                onClick={handleGenerateSummary}
+                onClick={() => {
+                    if (!summary && !summaryLoading) {
+                        handleGenerateSummary();
+                    } else if (summary) {
+                        setShowSummary(!showSummary);
+                    }
+                }}
                 disabled={summaryLoading}
-                title="AI Summary"
+                title={summary ? (showSummary ? "Close Summary" : "View Summary") : "AI Summary"}
                 className={`
                     fixed top-6 right-6 z-50
-                    h-12 w-12 rounded-full shadow-lg
+                    h-14 w-14 rounded-2xl shadow-lg
                     flex items-center justify-center
                     transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]
-                    border border-white/50
+                    border
                     ${summary
-                        ? 'bg-violet-600 text-white hover:bg-violet-700 hover:scale-105 shadow-violet-500/20'
-                        : 'bg-white text-zinc-600 hover:text-zinc-900 hover:scale-105'
+                        ? showSummary
+                            ? 'bg-zinc-900 text-white border-zinc-800 hover:bg-zinc-800 shadow-zinc-900/20'
+                            : 'bg-violet-600 text-white border-violet-500 hover:bg-violet-700 shadow-violet-500/30 sparkle-btn-glow'
+                        : 'bg-white/90 backdrop-blur-sm text-zinc-600 border-zinc-200/80 hover:text-violet-600 hover:border-violet-200 hover:shadow-xl'
                     }
-                    ${summaryLoading ? 'cursor-wait scale-95 opacity-80' : 'cursor-pointer'}
+                    ${summaryLoading ? 'cursor-wait opacity-90' : 'cursor-pointer active:scale-95'}
+                    ${!summaryLoading && !summary ? 'hover:scale-105' : ''}
                 `}
             >
                 {summaryLoading ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
+                ) : showSummary ? (
+                    <X className="h-5 w-5 transition-transform duration-200" />
                 ) : (
-                    <Sparkles className={`h-5 w-5 ${summary ? 'fill-current' : ''}`} />
+                    <Sparkles className={`h-5 w-5 transition-all duration-300 ${summary ? 'fill-current' : ''}`} />
                 )}
             </button>
 
@@ -129,21 +140,20 @@ export default function SnapshotViewerPage() {
             <div
                 className={`
                     transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
-                    ${showSummary ? 'mr-[420px] opacity-100' : 'mr-0'}
+                    ${showSummary ? 'mr-[440px] opacity-100' : 'mr-0'}
                     min-h-screen
                 `}
                 dangerouslySetInnerHTML={{ __html: snapshotHtml }}
             />
 
-            {/* AI Summary Panel - Premium Drawer Design */}
+            {/* AI Summary Panel - Premium Drawer Design with Enhanced Animation */}
             <div
                 className={`
-                    fixed top-0 right-0 h-full w-[420px] z-40
-                    bg-white/95 backdrop-blur-xl border-l border-zinc-200/50
-                    shadow-2xl shadow-zinc-500/10
-                    transform transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
+                    fixed top-0 right-0 h-full w-[440px] z-40
+                    bg-white/98 backdrop-blur-2xl border-l border-zinc-200/40
+                    shadow-2xl shadow-zinc-900/8
                     flex flex-col
-                    ${showSummary ? 'translate-x-0' : 'translate-x-full'}
+                    ${showSummary ? 'panel-enter' : 'translate-x-full'}
                 `}
             >
                 {/* Header */}
@@ -165,8 +175,8 @@ export default function SnapshotViewerPage() {
                     </button>
                 </div>
 
-                {/* Content Area */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-8 py-8 pb-32">
+                {/* Content Area - Enhanced Typography */}
+                <div className="flex-1 overflow-y-auto ai-summary-scrollbar px-10 py-10 pb-36">
 
                     {/* Loading State - Thinking Animation */}
                     {summaryLoading && (
@@ -199,55 +209,58 @@ export default function SnapshotViewerPage() {
                         </div>
                     )}
 
-                    {/* Summary Content - Rich Typography */}
+                    {/* Summary Content - Optimized Reading Experience */}
                     {summary && !summaryLoading && (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="content-appear">
                             <ReactMarkdown
                                 components={{
                                     p: ({ children }) => (
-                                        <p className="text-[16px] leading-[1.8] text-zinc-800 mb-6 last:mb-0 font-normal tracking-wide">{children}</p>
+                                        <p className="text-[17px] leading-[1.85] text-zinc-700 mb-7 last:mb-0 font-normal tracking-[0.01em]">{children}</p>
                                     ),
                                     strong: ({ children }) => (
                                         <strong className="font-semibold text-zinc-900">{children}</strong>
                                     ),
+                                    em: ({ children }) => (
+                                        <em className="text-zinc-600 not-italic font-medium">{children}</em>
+                                    ),
                                     ul: ({ children }) => (
-                                        <ul className="space-y-4 mb-8 pl-1">{children}</ul>
+                                        <ul className="space-y-5 mb-8 pl-0">{children}</ul>
                                     ),
                                     ol: ({ children }) => (
-                                        <ol className="space-y-4 mb-8 list-decimal list-outside ml-5 text-zinc-800 font-medium">{children}</ol>
+                                        <ol className="space-y-5 mb-8 list-none ml-0 counter-reset-item">{children}</ol>
                                     ),
                                     li: ({ children }) => (
-                                        <li className="flex gap-3 text-[16px] leading-[1.7] text-zinc-700">
-                                            <span className="flex-shrink-0 mt-[10px] w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
+                                        <li className="flex gap-4 text-[17px] leading-[1.8] text-zinc-700 tracking-[0.01em]">
+                                            <span className="flex-shrink-0 mt-[11px] w-1.5 h-1.5 rounded-full bg-violet-400/60"></span>
                                             <span className="flex-1">{children}</span>
                                         </li>
                                     ),
                                     h1: ({ children }) => (
-                                        <h1 className="text-xl font-bold text-zinc-900 mb-6 pb-3 border-b border-zinc-100 tracking-tight">{children}</h1>
+                                        <h1 className="text-[22px] font-bold text-zinc-900 mb-7 pb-4 border-b border-zinc-100 tracking-tight">{children}</h1>
                                     ),
                                     h2: ({ children }) => (
-                                        <h2 className="text-[17px] font-bold text-zinc-900 mt-10 mb-4 flex items-center gap-2 tracking-tight">
+                                        <h2 className="text-[18px] font-bold text-zinc-900 mt-12 mb-5 flex items-center gap-2 tracking-tight">
                                             {children}
                                         </h2>
                                     ),
                                     h3: ({ children }) => (
-                                        <h3 className="text-[16px] font-semibold text-zinc-900 mt-8 mb-3">{children}</h3>
+                                        <h3 className="text-[17px] font-semibold text-zinc-900 mt-10 mb-4">{children}</h3>
                                     ),
                                     blockquote: ({ children }) => (
-                                        <blockquote className="border-l-4 border-zinc-200 pl-5 py-2 my-8 italic text-zinc-600 text-[17px] leading-loose bg-zinc-50/50 rounded-r-lg">
+                                        <blockquote className="border-l-[3px] border-violet-300 pl-6 py-3 my-8 text-zinc-600 text-[17px] leading-[1.85] bg-violet-50/30 rounded-r-xl">
                                             {children}
                                         </blockquote>
                                     ),
                                     a: ({ href, children }) => (
-                                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-700 hover:underline underline-offset-4 decoration-violet-200 font-medium">
+                                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-700 underline underline-offset-4 decoration-violet-200/80 hover:decoration-violet-400 transition-colors font-medium">
                                             {children}
                                         </a>
                                     ),
                                     code: ({ children }) => (
-                                        <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-[14px] font-mono text-zinc-800 border border-zinc-200/50">{children}</code>
+                                        <code className="bg-zinc-100/80 px-2 py-1 rounded-md text-[14px] font-mono text-zinc-800 border border-zinc-200/40">{children}</code>
                                     ),
                                     hr: () => (
-                                        <hr className="my-10 border-zinc-100" />
+                                        <hr className="my-12 border-zinc-100" />
                                     ),
                                 }}
                             >{summary}</ReactMarkdown>
