@@ -494,6 +494,7 @@ export default function SnapshotViewerPage() {
             {/* Floating Action Button for Text Selection */}
             {selection && currentUserId && (
                 <button
+                    onMouseDown={(e) => e.preventDefault()} // Prevent losing text selection
                     onClick={() => setShowNoteInput(true)}
                     className="note-action-btn fixed z-[70] h-10 w-10 bg-violet-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-violet-700 hover:scale-110 transition-all duration-200 animate-in fade-in zoom-in-50"
                     style={{
@@ -528,12 +529,6 @@ export default function SnapshotViewerPage() {
                         <X className="h-3.5 w-3.5" />
                     </button>
 
-                    <div className="mb-3 pb-3 border-b border-zinc-100">
-                        <p className="text-[11px] text-zinc-400 font-medium uppercase tracking-wide mb-1.5">Selected Text</p>
-                        <p className="text-[13px] text-zinc-700 line-clamp-3 leading-relaxed bg-zinc-50 rounded-lg p-2.5 border border-zinc-100">
-                            "{selection.text}"
-                        </p>
-                    </div>
                     <textarea
                         value={noteInput}
                         onChange={(e) => setNoteInput(e.target.value)}
