@@ -14,6 +14,7 @@ import caching from './routes/caching';
 import admin from './routes/admin';
 import ai from './routes/ai';
 import library from './routes/library';
+import notes from './routes/notes';
 
 // Google OAuth JWKS endpoint for ID token verification
 const GOOGLE_JWKS = createRemoteJWKSet(
@@ -1720,6 +1721,9 @@ app.route('/api/ai', ai);
 
 // Mount library routes
 app.route('/api/library', library);
+
+// Mount notes routes
+app.route('/api/notes', notes);
 
 export default app;
 
