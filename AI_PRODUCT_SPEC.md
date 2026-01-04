@@ -110,6 +110,10 @@ The central nervous system handling auth, data storage, and API logic.
 - **Resource Management**: CRUD for `saved_posts` and `tags`.
 - **Tagging System**: Multi-user tagging system ensuring correct data isolation.
 - **Cloud Video Downloader**: Task queue for video downloads, R2 storage, usage tracking.
+- **Tweet Caching Pipeline**: Fetches tweet detail & comments via TikHub, caches media to R2, generates HTML snapshots (`cached_tweets`).
+- **Snapshot Video Caching**: Background video downloads (no cookies) for cached tweets, written to R2 with predicted URLs.
+- **AI Summaries**: Generates & caches summaries for saved tweets via `AIService` (BIGMODEL/GLM), stored in `saved_posts.summary`.
+- **Library APIs**: Browse/download user media via `/api/library/videos|images`.
 - **Social Account Linking**: Links X/Twitter accounts to TidyFeed users for bot functionality.
 - **Storage Quota**: Tracks per-user storage usage for video downloads.
 - **Internal Service APIs**: Protected endpoints for bot-worker and python-worker.
@@ -126,10 +130,16 @@ The central nervous system handling auth, data storage, and API logic.
 - `bot_processed_mentions`: Deduplication table for @tidyfeedapp mentions.
 - `admins`: For internal dashboard access.
 - `reports`: User-submitted block reports.
+- `cached_tweets`: Cached TikHub payload + HTML snapshot key + flags/media size.
+- `system_settings`: Runtime flags and AI prompt/model config.
+- `snapshot_notes`: User notes on cached snapshots.
 
 #### Route Modules
 - `src/routes/downloads.ts`: Cloud video downloader user & internal endpoints.
 - `src/routes/internal.ts`: Internal service APIs (bot-save, health check).
+- `src/routes/caching.ts`: Tweet caching + snapshot serving.
+- `src/routes/ai.ts`: AI summary API using cached snapshots.
+- `src/routes/library.ts`: Media browser APIs for saved assets.
 
 ---
 
@@ -156,8 +166,10 @@ The user-facing SaaS dashboard where users view and manage their saved content.
 - **Tagging Interface**: Create, assign, and filter content by tags.
 - **Search**: Full-text search over saved content.
 - **Downloads Page**: View cloud-downloaded videos, storage usage.
+- **Snapshot Viewer**: Serve cached tweet snapshots via `/s/:id` (proxy of `cached_tweets` HTML).
 - **Settings Page**: User preferences and account management.
 - **Auth Flow**: Handles the frontend side of Google OAuth redirect.
+- **AI Summary UI**: Uses `/api/ai/summarize` to generate/serve cached summaries.
 - **Privacy & Terms**: Static legal pages.
 - **Visuals**: Modern, responsive design with dark mode support.
 
@@ -356,6 +368,10 @@ A Python worker that processes video download tasks queued by the extension.
 - [x] Backend: Social Account Linking APIs
 - [x] Backend: Storage Quota Tracking
 - [x] Backend: Internal Service APIs (bot-save)
+- [x] Backend: Tweet Caching & Snapshot Generation (TikHub → R2)
+- [x] Backend: Snapshot Video Caching (Python worker, predicted URLs)
+- [x] Backend: AI Summaries API (GLM/BIGMODEL)
+- [x] Backend: Media Library APIs (videos/images)
 - [x] Bot Worker: Twitter Mention Monitoring (@tidyfeedapp)
 - [x] Bot Worker: Trigger Word Detection & Reply Parsing
 - [x] Bot Worker: Database-based Deduplication

@@ -26,7 +26,6 @@ interface SelectionInfo {
     offsetStart: number;
     offsetEnd: number;
     rect: DOMRect;
-    range: Range; // Store the actual Range for restoring highlight
 }
 
 export default function SnapshotViewerPage() {
@@ -155,19 +154,17 @@ export default function SnapshotViewerPage() {
 
     // Handle text selection - show floating action button
     const handleMouseUp = useCallback((e: MouseEvent) => {
-        // Ignore if clicking on our UI elements
+        // Ignore if clicking on our UI elements - preserve existing selection
         const target = e.target as HTMLElement;
         if (target.closest('.note-action-btn') || target.closest('.note-input-popup') || target.closest('.sidebar-panel')) {
-            return;
+            return; // Don't touch selection state at all
         }
 
         const sel = window.getSelection();
         if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-            // Don't clear if clicking on the action button
-            if (!target.closest('.note-action-btn')) {
-                setSelection(null);
-                setShowNoteInput(false);
-            }
+            // Only clear selection if not clicking on note UI
+            setSelection(null);
+            setShowNoteInput(false);
             return;
         }
 
@@ -197,7 +194,6 @@ export default function SnapshotViewerPage() {
             offsetStart,
             offsetEnd,
             rect,
-            range: range.cloneRange(), // Clone to preserve
         });
         setShowNoteInput(false); // Reset input state when new selection
         setNoteInput('');
@@ -498,6 +494,7 @@ export default function SnapshotViewerPage() {
                 <button
                     onMouseDown={(e) => e.preventDefault()} // Prevent losing text selection
                     onClick={() => setShowNoteInput(true)}
+                    tabIndex={-1} // Prevent focus from stealing selection
                     className="note-action-btn fixed z-[70] h-10 w-10 bg-violet-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-violet-700 hover:scale-110 transition-all duration-200 animate-in fade-in zoom-in-50"
                     style={{
                         top: selection.rect.top + window.scrollY - 48,
@@ -544,18 +541,6 @@ export default function SnapshotViewerPage() {
                                 setSelection(null);
                                 setNoteInput('');
                                 window.getSelection()?.removeAllRanges();
-                            }
-                        }}
-                        onFocus={() => {
-                            // Restore selection highlight after focus
-                            if (selection?.range) {
-                                setTimeout(() => {
-                                    const sel = window.getSelection();
-                                    if (sel) {
-                                        sel.removeAllRanges();
-                                        sel.addRange(selection.range);
-                                    }
-                                }, 0);
                             }
                         }}
                         autoFocus
