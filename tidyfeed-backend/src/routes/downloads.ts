@@ -371,11 +371,9 @@ downloads.put('/internal/upload-url', internalServiceAuth, async (c) => {
         let key: string;
 
         if (task.task_type === 'snapshot_video' && task.tweet_id) {
-            // Check metadata for video_index to enable deterministic filenames
-            let videoIndex = task.metadata ? JSON.parse(task.metadata).video_index : '0';
-            if (videoIndex === undefined) {
-                videoIndex = '0';
-            }
+            // Metadata is stored as plain string: "0", "1", "quoted_0", "quoted_1", etc.
+            // Use it directly as the filename base
+            const videoIndex = task.metadata || '0';
             // For snapshot videos, use deterministic path: videos/{tweet_id}/{index}.{ext}
             key = `videos/${task.tweet_id}/${videoIndex}.${extension}`;
         } else {
