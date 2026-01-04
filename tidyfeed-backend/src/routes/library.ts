@@ -64,7 +64,7 @@ library.get('/videos', cookieAuthMiddleware, async (c) => {
         const limit = Math.min(50, parseInt(c.req.query('limit') || '50', 10));
         const offset = (page - 1) * limit;
 
-        // Get completed user downloads
+        // Get completed user downloads (include NULL task_type for older records)
         const videos = await c.env.DB.prepare(
             `SELECT 
                 id, 
@@ -76,7 +76,7 @@ library.get('/videos', cookieAuthMiddleware, async (c) => {
              FROM video_downloads
              WHERE user_id = ? 
                AND status = 'completed' 
-               AND task_type = 'user_download'
+               AND (task_type IS NULL OR task_type = 'user_download')
                AND r2_key IS NOT NULL
              ORDER BY created_at ${sort}
              LIMIT ? OFFSET ?`
@@ -87,7 +87,7 @@ library.get('/videos', cookieAuthMiddleware, async (c) => {
             `SELECT COUNT(*) as total FROM video_downloads
              WHERE user_id = ? 
                AND status = 'completed' 
-               AND task_type = 'user_download'
+               AND (task_type IS NULL OR task_type = 'user_download')
                AND r2_key IS NOT NULL`
         ).bind(userId).first<{ total: number }>();
 
