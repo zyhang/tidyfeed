@@ -74,6 +74,26 @@ ${getStyles(theme)}
 			<span>${formatDate(new Date().toISOString())}</span>
 		</footer>
 	</div>
+	<script>
+		function playVideo(container, videoUrl) {
+			const video = document.createElement('video');
+			video.controls = true;
+			video.autoplay = true;
+			video.style.width = '100%';
+			video.style.display = 'block';
+			
+			const source = document.createElement('source');
+			source.src = videoUrl;
+			source.type = 'video/mp4';
+			video.appendChild(source);
+			
+			container.innerHTML = '';
+			container.style.cursor = 'default';
+			container.onclick = null;
+			container.classList.remove('video-overlay');
+			container.appendChild(video);
+		}
+	</script>
 </body>
 </html>`;
 	} catch (error) {
@@ -143,23 +163,36 @@ function renderMediaGallery(images: TikHubMedia[]): string {
 }
 
 /**
- * Render video with poster
+ * Render video with poster and play button overlay (click-to-play)
  */
 function renderVideo(video: TikHubMedia): string {
 	const videoUrl = TikHubService.getBestVideoUrl(video);
 	const posterUrl = video.preview_url || video.url;
+	const isGif = video.type === 'animated_gif';
 
-	return `
+	// For GIFs, autoplay silently
+	if (isGif) {
+		return `
 		<div class="video-container">
 			<video 
-				controls 
-				preload="metadata" 
+				autoplay loop muted playsinline
 				poster="${posterUrl}"
-				${video.type === 'animated_gif' ? 'autoplay loop muted playsinline' : ''}
 			>
 				${videoUrl ? `<source src="${videoUrl}" type="video/mp4">` : ''}
-				Your browser does not support video playback.
 			</video>
+		</div>
+	`;
+	}
+
+	// For videos, show thumbnail with play button overlay
+	return `
+		<div class="video-container video-overlay" onclick="playVideo(this, '${videoUrl}')">
+			<img src="${posterUrl}" alt="Video thumbnail" class="video-poster" loading="lazy">
+			<div class="play-button">
+				<svg viewBox="0 0 24 24" fill="currentColor">
+					<path d="M8 5v14l11-7z"/>
+				</svg>
+			</div>
 		</div>
 	`;
 }
@@ -200,22 +233,33 @@ function renderQuotedTweet(quoted: TikHubTweetData): string {
 }
 
 /**
- * Render video in quoted tweet (smaller, inline)
+ * Render video in quoted tweet (smaller, inline, click-to-play)
  */
 function renderQuotedVideo(video: TikHubMedia): string {
 	const videoUrl = TikHubService.getBestVideoUrl(video);
 	const posterUrl = video.preview_url || video.url || '';
+	const isGif = video.type === 'animated_gif';
 
-	return `
+	// For GIFs, autoplay silently
+	if (isGif) {
+		return `
 		<div class="quoted-video">
-			<video 
-				controls 
-				preload="metadata" 
-				poster="${posterUrl}"
-				${video.type === 'animated_gif' ? 'autoplay loop muted playsinline' : ''}
-			>
+			<video autoplay loop muted playsinline poster="${posterUrl}">
 				${videoUrl ? `<source src="${videoUrl}" type="video/mp4">` : ''}
 			</video>
+		</div>
+	`;
+	}
+
+	// For videos, show thumbnail with play button overlay
+	return `
+		<div class="quoted-video video-overlay" onclick="playVideo(this, '${videoUrl}')">
+			<img src="${posterUrl}" alt="Video thumbnail" class="video-poster" loading="lazy">
+			<div class="play-button play-button-sm">
+				<svg viewBox="0 0 24 24" fill="currentColor">
+					<path d="M8 5v14l11-7z"/>
+				</svg>
+			</div>
 		</div>
 	`;
 }
@@ -497,6 +541,57 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 		}
 		.watermark a { color: var(--text); font-weight: 500; }
 		.watermark a:hover { text-decoration: underline; }
+
+		/* Video click-to-play overlay */
+		.video-overlay {
+			position: relative;
+			cursor: pointer;
+		}
+		.video-poster {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			display: block;
+		}
+		.play-button {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			width: 68px;
+			height: 68px;
+			background: rgba(0, 0, 0, 0.65);
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: white;
+			transition: all 0.2s ease;
+			backdrop-filter: blur(4px);
+			-webkit-backdrop-filter: blur(4px);
+			border: 3px solid rgba(255, 255, 255, 0.9);
+			box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+		}
+		.play-button svg {
+			width: 32px;
+			height: 32px;
+			margin-left: 4px;
+		}
+		.video-overlay:hover .play-button {
+			background: rgba(29, 155, 240, 0.85);
+			transform: translate(-50%, -50%) scale(1.08);
+			box-shadow: 0 6px 32px rgba(29, 155, 240, 0.4);
+		}
+		.play-button-sm {
+			width: 48px;
+			height: 48px;
+			border-width: 2px;
+		}
+		.play-button-sm svg {
+			width: 22px;
+			height: 22px;
+			margin-left: 3px;
+		}
 	`;
 }
 

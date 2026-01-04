@@ -37,7 +37,10 @@ export async function cacheMediaToR2(
         }
         // Cache video poster/preview images (the video itself is handled by Python worker)
         if ((m.type === 'video' || m.type === 'animated_gif') && m.preview_url) {
+            console.log(`[MediaCache] Queueing video thumbnail: ${m.preview_url.substring(0, 80)}...`);
             urlsToCache.push({ url: m.preview_url, type: 'media' });
+        } else if ((m.type === 'video' || m.type === 'animated_gif') && !m.preview_url) {
+            console.log(`[MediaCache] WARNING: Video has no preview_url, url=${m.url?.substring(0, 80)}`);
         }
     }
 
