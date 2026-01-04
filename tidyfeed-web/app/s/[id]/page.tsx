@@ -26,6 +26,7 @@ interface SelectionInfo {
     offsetStart: number;
     offsetEnd: number;
     rect: DOMRect;
+    range: Range; // Store the actual Range for restoring highlight
 }
 
 export default function SnapshotViewerPage() {
@@ -196,6 +197,7 @@ export default function SnapshotViewerPage() {
             offsetStart,
             offsetEnd,
             rect,
+            range: range.cloneRange(), // Clone to preserve
         });
         setShowNoteInput(false); // Reset input state when new selection
         setNoteInput('');
@@ -542,6 +544,18 @@ export default function SnapshotViewerPage() {
                                 setSelection(null);
                                 setNoteInput('');
                                 window.getSelection()?.removeAllRanges();
+                            }
+                        }}
+                        onFocus={() => {
+                            // Restore selection highlight after focus
+                            if (selection?.range) {
+                                setTimeout(() => {
+                                    const sel = window.getSelection();
+                                    if (sel) {
+                                        sel.removeAllRanges();
+                                        sel.addRange(selection.range);
+                                    }
+                                }, 0);
                             }
                         }}
                         autoFocus
