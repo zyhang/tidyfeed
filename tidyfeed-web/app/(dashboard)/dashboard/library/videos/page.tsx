@@ -14,7 +14,9 @@ interface VideoItem {
     metadata: {
         title?: string
         duration?: string
+        thumbnail_url?: string
     } | null
+    thumbnailUrl: string | null
     fileSize: number
     createdAt: number
 }
@@ -133,6 +135,15 @@ export default function LibraryVideosPage() {
                     <Card key={video.id} className="overflow-hidden group">
                         <CardContent className="p-0">
                             <div className="relative aspect-video bg-muted">
+                                {/* Thumbnail background */}
+                                {video.thumbnailUrl && playingId !== video.id && (
+                                    <img
+                                        src={video.thumbnailUrl}
+                                        alt=""
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                        loading="lazy"
+                                    />
+                                )}
                                 {playingId === video.id ? (
                                     <video
                                         src={`${API_URL}/api/downloads/media/${video.id}`}

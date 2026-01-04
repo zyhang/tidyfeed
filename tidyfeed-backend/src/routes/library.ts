@@ -92,14 +92,18 @@ library.get('/videos', cookieAuthMiddleware, async (c) => {
         ).bind(userId).first<{ total: number }>();
 
         return c.json({
-            videos: videos.results?.map((v: any) => ({
-                id: v.id,
-                tweetUrl: v.tweet_url,
-                r2Key: v.r2_key,
-                metadata: v.metadata ? JSON.parse(v.metadata) : null,
-                fileSize: v.file_size || 0,
-                createdAt: v.created_at,
-            })) || [],
+            videos: videos.results?.map((v: any) => {
+                const parsedMetadata = v.metadata ? JSON.parse(v.metadata) : null;
+                return {
+                    id: v.id,
+                    tweetUrl: v.tweet_url,
+                    r2Key: v.r2_key,
+                    metadata: parsedMetadata,
+                    thumbnailUrl: parsedMetadata?.thumbnail_url || null,
+                    fileSize: v.file_size || 0,
+                    createdAt: v.created_at,
+                };
+            }) || [],
             pagination: {
                 page,
                 limit,

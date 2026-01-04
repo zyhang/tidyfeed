@@ -249,7 +249,7 @@ caching.post('/cache', async (c) => {
 
         // Queue video downloads for Python worker (if any videos detected)
         if (hasVideo || hasQuotedVideo) {
-            const videosToQueue: { videoUrl: string; key: string }[] = [];
+            const videosToQueue: { videoUrl: string; key: string; thumbnailUrl?: string }[] = [];
 
             // Main tweet videos
             const mainMedia = tweetData.media || [];
@@ -257,7 +257,9 @@ caching.post('/cache', async (c) => {
                 if (media.type === 'video' || media.type === 'animated_gif') {
                     const videoUrl = TikHubService.getBestVideoUrl(media);
                     if (videoUrl) {
-                        videosToQueue.push({ videoUrl, key: `${index}` });
+                        // Get cached thumbnail URL from urlMap
+                        const thumbnailUrl = media.preview_url ? (urlMap.get(media.preview_url) || media.preview_url) : undefined;
+                        videosToQueue.push({ videoUrl, key: `${index}`, thumbnailUrl });
                     }
                 }
             });
@@ -268,7 +270,9 @@ caching.post('/cache', async (c) => {
                 if (media.type === 'video' || media.type === 'animated_gif') {
                     const videoUrl = TikHubService.getBestVideoUrl(media);
                     if (videoUrl) {
-                        videosToQueue.push({ videoUrl, key: `quoted_${index}` });
+                        // Get cached thumbnail URL from urlMap
+                        const thumbnailUrl = media.preview_url ? (urlMap.get(media.preview_url) || media.preview_url) : undefined;
+                        videosToQueue.push({ videoUrl, key: `quoted_${index}`, thumbnailUrl });
                     }
                 }
             });
@@ -328,8 +332,11 @@ caching.post('/cache', async (c) => {
                 // debugLogs.push removed
             }
 
-            for (const { videoUrl, key } of videosToQueue) {
+            for (const { videoUrl, key, thumbnailUrl } of videosToQueue) {
                 try {
+                    // Build metadata with video_index and optional thumbnail_url
+                    const metadata = { video_index: key, ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }) };
+
                     // Check if task already exists
                     const existingTask = await c.env.DB.prepare(
                         `SELECT id, metadata, status, r2_key FROM video_downloads WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' AND status != 'invalid' LIMIT 1`
@@ -339,7 +346,7 @@ caching.post('/cache', async (c) => {
                         await c.env.DB.prepare(
                             `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status, metadata)
                              VALUES (?, ?, 'snapshot_video', ?, ?, 'pending', ?)`
-                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, JSON.stringify({ video_index: key })).run();
+                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, JSON.stringify(metadata)).run();
                         console.log(`[Caching] Queued video download for tweet ${cleanTweetId} (index ${key})`);
                     } else {
                         // Check if R2 key matches expected key
@@ -356,12 +363,12 @@ caching.post('/cache', async (c) => {
                             console.log(`[Caching] Existing video has wrong filename (${existingTask.r2_key}), forcing re-download as ${key}`);
                             await c.env.DB.prepare(
                                 `UPDATE video_downloads SET metadata = ?, status = 'pending', r2_key = NULL WHERE id = ?`
-                            ).bind(JSON.stringify({ video_index: key }), existingTask.id).run();
+                            ).bind(JSON.stringify(metadata), existingTask.id).run();
                         } else {
                             // Key matches, just update metadata (idempotent)
                             await c.env.DB.prepare(
                                 `UPDATE video_downloads SET metadata = ? WHERE id = ?`
-                            ).bind(JSON.stringify({ video_index: key }), existingTask.id).run();
+                            ).bind(JSON.stringify(metadata), existingTask.id).run();
                             console.log(`[Caching] Updated metadata for existing task ${existingTask.id} (index ${key})`);
                         }
                     }
