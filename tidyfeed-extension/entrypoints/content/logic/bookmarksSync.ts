@@ -29,103 +29,183 @@ const PROGRESS_POPUP_ID = 'tidyfeed-sync-popup';
 /**
  * Inject the Sync Button into the Bookmarks header
  */
+// Singleton lock for injection process
+let isInjecting = false;
+
+/**
+ * Inject the Sync Button into the Bookmarks header
+ */
 export async function injectSyncButton(): Promise<void> {
     // Only run on bookmarks page
     if (!window.location.pathname.includes('/i/bookmarks')) {
         return;
     }
 
-    console.log('[TidyFeed] Checker: on bookmarks page');
-
-    // Remove existing button if any (renavigation case)
-    const existing = document.getElementById('tidyfeed-sync-btn');
-    if (existing) {
-        console.log('[TidyFeed] Button already exists');
+    // Check if already exists (fast check)
+    if (document.getElementById('tidyfeed-sync-btn')) {
         return;
     }
 
+    // Prevent concurrent injection loops
+    if (isInjecting) return;
+    isInjecting = true;
+
+    console.log('[TidyFeed] Starting injection process...');
+
     // Improved Header Finder
     const findHeader = (): Element | null => {
-        // 1. Look for the "Bookmarks" title
-        // In most languages, we trust the `h2[role="heading"]` is the main title on this page
-        // because it is the primary column.
-        const headings = document.querySelectorAll('main h2[role="heading"]');
-        for (const h of headings) {
-            // The header bar is usually the parent's parent or similar. 
-            // We look for a container that has `align-items: center` or `flex-direction: row`
-            const parent = h.closest('div[style*="flex-direction: row"]') ||
-                h.parentElement?.parentElement; // Fallback
-
-            if (parent) return parent;
+        const primaryCol = document.querySelector('[data-testid="primaryColumn"]');
+        if (!primaryCol) {
+            console.log('[TidyFeed] primaryColumn not found');
+            return null;
         }
 
-        // 2. Fallback: specific testid for primary column header
-        const primaryCol = document.querySelector('[data-testid="primaryColumn"]');
-        if (primaryCol) {
-            // Usually the first div is the header
-            const header = primaryCol.querySelector('div > div > div > div[role="banner"] h2');
-            if (header) {
-                return header.closest('div[style*="flex-direction: row"]');
+        const headings = primaryCol.querySelectorAll('h2[role="heading"]');
+        const targetTitle = getLocaleString('x_bookmarks_title');
+
+        for (const h of headings) {
+            const hText = (h as HTMLElement).innerText || '';
+            if (hText.includes(targetTitle)) {
+                console.log(`[TidyFeed] Found heading with text: "${hText}"`);
+
+                // The header row is usually a few levels up.
+                // We want the container that has flex row to append our button.
+                // It typically contains the title and maybe a "back" button or "more" menu.
+                let current = h.parentElement;
+                while (current && current !== primaryCol) {
+                    // X uses specific classes for these things, but they change.
+                    // However, the header row usually has a specific height or flex behavior.
+                    // We look for a div that has more than just the heading as a child (e.g. back button)
+                    if (current.tagName === 'DIV' && current.children.length >= 1) {
+                        // Check if it's a flex row - simplified check
+                        const style = window.getComputedStyle(current);
+                        if (style.display === 'flex' && style.flexDirection === 'row') {
+                            // This is likely the row container
+                            return current;
+                        }
+                    }
+                    current = current.parentElement;
+                }
+
+                // Fallback to parent if no flex row found
+                return h.parentElement;
             }
         }
+
         return null;
     };
 
-    // Retry finding header a few times as page loads
+    // Retry finding header a few times
     let attempts = 0;
     const interval = setInterval(() => {
-        attempts++;
-        if (attempts > 40) { // 20s timeout
+        try {
+            attempts++;
+
+            // Safety Break
+            if (attempts > 60) { // 30s timeout
+                clearInterval(interval);
+                isInjecting = false;
+                console.log('[TidyFeed] Timeout waiting for header. Last attempted at: ' + window.location.href);
+                return;
+            }
+
+            // 1. Double check existence inside loop (Critical for race conditions)
+            if (document.getElementById('tidyfeed-sync-btn')) {
+                clearInterval(interval);
+                isInjecting = false;
+                return;
+            }
+
+            const headerContainer = findHeader();
+
+            if (headerContainer) {
+                clearInterval(interval);
+
+                // Create Button
+                const btn = document.createElement('button');
+                btn.id = 'tidyfeed-sync-btn';
+                btn.className = 'tidyfeed-sync-btn';
+
+                // Minimalist Sync Icon (Circular arrows)
+                btn.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M12 3.75c-4.55 0-8.25 3.69-8.25 8.25 0 1.28.29 2.51.8 3.61l1.53-1.02c-.21-.8-.33-1.63-.33-2.59 0-3.73 3.02-6.75 6.75-6.75 1.51 0 2.89.5 4.02 1.33l-2.02 2.02H21V3l-2.35 2.35c-1.74-1.6-4.07-2.6-6.65-2.6zM21.2 8.39l-1.53 1.02c.21.8.33 1.63.33 2.59 0 3.73-3.02 6.75-6.75 6.75-1.51 0-2.89-.5-4.02-1.33l2.02-2.02H3V21l2.35-2.35c1.74 1.6 4.07 2.6 6.65 2.6 4.55 0 8.25-3.69 8.25-8.25 0-1.28-.29-2.51-.8-3.61z"/>
+                    </svg>
+                    <div class="tf-sync-tooltip" style="
+                        position: absolute;
+                        bottom: -32px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background: rgba(0, 0, 0, 0.8);
+                        color: white;
+                        padding: 4px 10px;
+                        border-radius: 44px;
+                        font-size: 12px;
+                        font-weight: 500;
+                        white-space: nowrap;
+                        pointer-events: none;
+                        opacity: 0;
+                        transition: opacity 0.2s;
+                        z-index: 1000;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                    ">
+                        ${getLocaleString('sync_btn')}
+                    </div>
+                `;
+
+                Object.assign(btn.style, {
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '36px',
+                    height: '36px',
+                    padding: '0',
+                    borderRadius: '50%',
+                    backgroundColor: 'transparent',
+                    color: '#0f1419', // Default X color
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    marginLeft: '16px', // Comfortable padding to the right of the title
+                    zIndex: '10'
+                });
+
+                // Hover effects
+                btn.onmouseenter = () => {
+                    btn.style.backgroundColor = 'rgba(15, 20, 25, 0.1)';
+                    const tooltip = btn.querySelector('.tf-sync-tooltip') as HTMLElement;
+                    if (tooltip) tooltip.style.opacity = '1';
+                };
+                btn.onmouseleave = () => {
+                    btn.style.backgroundColor = 'transparent';
+                    const tooltip = btn.querySelector('.tf-sync-tooltip') as HTMLElement;
+                    if (tooltip) tooltip.style.opacity = '0';
+                };
+
+                btn.onclick = startSyncProcess;
+
+                // Insert: Find the title and insert AFTER it for precise placement
+                const titleHeading = headerContainer.querySelector('h2[role="heading"]');
+                if (titleHeading && titleHeading.parentElement) {
+                    // Ensure the parent is a row flex container to keep it "next to" rather than "on top"
+                    titleHeading.parentElement.style.display = 'flex';
+                    titleHeading.parentElement.style.flexDirection = 'row';
+                    titleHeading.parentElement.style.alignItems = 'center';
+
+                    titleHeading.parentElement.appendChild(btn);
+                    console.log('[TidyFeed] Button injected after title heading');
+                } else {
+                    headerContainer.appendChild(btn);
+                    console.log('[TidyFeed] Button appended to header container');
+                }
+
+                isInjecting = false;
+            }
+        } catch (e) {
+            console.error('[TidyFeed] Error in injection loop:', e);
             clearInterval(interval);
-            console.log('[TidyFeed] Failed to find header for Sync Button');
-            return;
-        }
-
-        const headerContainer = findHeader();
-
-        if (headerContainer) {
-            clearInterval(interval);
-            console.log('[TidyFeed] Found header, injecting button...');
-
-            // Create Button
-            const btn = document.createElement('button');
-            btn.id = 'tidyfeed-sync-btn';
-            btn.className = 'tidyfeed-sync-btn';
-            btn.innerHTML = `
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-                    <polyline points="9 11 12 14 22 4" />
-                </svg>
-                <span>${getLocaleString('sync_btn')}</span>
-            `;
-
-            Object.assign(btn.style, {
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 16px',
-                borderRadius: '9999px',
-                backgroundColor: 'rgb(239, 243, 244)', // Light gray
-                color: '#0f1419',
-                border: '1px solid rgba(0,0,0,0.1)',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                marginLeft: 'auto', // Push to right
-                marginRight: '16px',
-                zIndex: '10'
-            });
-
-            // Hover logs
-            btn.onmouseenter = () => btn.style.backgroundColor = 'rgb(231, 235, 236)';
-            btn.onmouseleave = () => btn.style.backgroundColor = 'rgb(239, 243, 244)';
-
-            btn.onclick = startSyncProcess;
-
-            // Insert
-            headerContainer.appendChild(btn);
-            console.log('[TidyFeed] Button injected successfully');
+            isInjecting = false;
         }
     }, 500);
 }
@@ -357,6 +437,7 @@ async function getSavedIds(): Promise<string[]> {
  * Handle route changes to re-inject button
  */
 export function initBookmarksSync() {
+    console.log('[TidyFeed] Initializing Bookmarks Sync Logic...');
     // Initial check
     injectSyncButton();
 
@@ -364,28 +445,27 @@ export function initBookmarksSync() {
     // X uses pushState, so we need to poll or observe body
     let lastUrl = window.location.href;
 
-    // Also interval check for safety
+    // Also interval check for safety (catch URL changes that don't trigger mutation immediately)
     setInterval(() => {
         if (window.location.href !== lastUrl) {
             lastUrl = window.location.href;
-            console.log('[TidyFeed] URL changed detected via poll:', lastUrl);
-            setTimeout(injectSyncButton, 1000);
-        }
-    }, 2000);
-
-    const observer = new MutationObserver(() => {
-        const url = window.location.href;
-        if (url !== lastUrl) {
-            lastUrl = url;
-            console.log('[TidyFeed] URL changed detected via observer:', lastUrl);
-            setTimeout(injectSyncButton, 1000);
+            injectSyncButton();
         } else {
-            // If we are on the page but button is missing (React re-render), inject again
-            if (url.includes('/i/bookmarks') && !document.getElementById('tidyfeed-sync-btn')) {
-                // Debounce this slightly
+            // Periodically ensure button exists if we are on the page
+            // This handles cases where X completely re-renders the DOM (e.g. back button)
+            if (window.location.pathname.includes('/i/bookmarks')) {
                 injectSyncButton();
             }
         }
+    }, 1000);
+
+    // Observer is still useful for immediate reaction to DOM changes (unmounting/remounting header)
+    const observer = new MutationObserver(() => {
+        if (window.location.pathname.includes('/i/bookmarks')) {
+            injectSyncButton();
+        }
     });
+
+    // Use a lighter observation target if possible, but body is safest for full SPA route changes
     observer.observe(document.body, { childList: true, subtree: true });
 }

@@ -78,6 +78,12 @@ export const LOCALE_STRINGS: Record<string, Record<Locale, string>> = {
         zh: '请先登录 TidyFeed。',
         ja: '先にTidyFeedにログインしてください。',
         es: 'Por favor, inicie sesión en TidyFeed primero.'
+    },
+    x_bookmarks_title: {
+        en: 'Bookmarks',
+        zh: '书签',
+        ja: 'ブックマーク',
+        es: 'Marcadores'
     }
 };
 
