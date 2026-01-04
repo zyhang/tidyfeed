@@ -13,6 +13,9 @@ export default defineBackground(() => {
   const FEATURE_CLOUD_DOWNLOAD_ENABLED = false; // cloud download queue via extension
   const FEATURE_REPORTING_ENABLED = false; // report/block-report to backend
 
+  // X API Bearer Token (public, same as used by web client)
+  const X_BEARER_TOKEN = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs=1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
+
   // Cloud Regex Sync Logic
   const REMOTE_REGEX_URL = 'https://tidyfeed.app/regex_rules.json';
   const REGEX_SYNC_ALARM = 'tidyfeed_regex_sync';
@@ -98,7 +101,7 @@ export default defineBackground(() => {
   async function handleToggleSave(
     action: 'save' | 'unsave',
     postData: { x_id: string; content?: string; author?: any; media?: any; url?: string }
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; needs_login?: boolean }> {
     try {
       if (action === 'save') {
         // POST to save the post
