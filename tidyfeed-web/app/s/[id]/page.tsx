@@ -4,7 +4,7 @@ export const runtime = 'edge';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, X, Loader2, ChevronLeft, StickyNote, Plus, MessageSquare } from 'lucide-react';
+import { Sparkles, X, Loader2, ChevronLeft, StickyNote, Plus, MessageSquarePlus } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import NoteItem from '@/components/NoteItem';
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
@@ -51,9 +51,11 @@ export default function SnapshotViewerPage() {
     const [notes, setNotes] = useState<Note[]>([]);
     const [notesLoading, setNotesLoading] = useState(false);
     const [isOwner, setIsOwner] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
     // Text selection state
     const [selection, setSelection] = useState<SelectionInfo | null>(null);
+    const [showNoteInput, setShowNoteInput] = useState(false);
     const [noteInput, setNoteInput] = useState('');
     const [isCreatingNote, setIsCreatingNote] = useState(false);
 
@@ -61,6 +63,9 @@ export default function SnapshotViewerPage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [noteToDelete, setNoteToDelete] = useState<number | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Highlighted note state
+    const [highlightedNoteId, setHighlightedNoteId] = useState<number | null>(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app';
 
@@ -103,6 +108,7 @@ export default function SnapshotViewerPage() {
                 const data = await response.json();
                 setNotes(data.notes || []);
                 setIsOwner(data.isOwner || false);
+                setCurrentUserId(data.userId || null);
             }
         } catch (err) {
             console.error('Failed to fetch notes:', err);
@@ -146,13 +152,21 @@ export default function SnapshotViewerPage() {
         }
     };
 
-    // Handle text selection
-    const handleMouseUp = useCallback(() => {
-        if (!isOwner) return;
+    // Handle text selection - show floating action button
+    const handleMouseUp = useCallback((e: MouseEvent) => {
+        // Ignore if clicking on our UI elements
+        const target = e.target as HTMLElement;
+        if (target.closest('.note-action-btn') || target.closest('.note-input-popup') || target.closest('.sidebar-panel')) {
+            return;
+        }
 
         const sel = window.getSelection();
         if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-            setSelection(null);
+            // Don't clear if clicking on the action button
+            if (!target.closest('.note-action-btn')) {
+                setSelection(null);
+                setShowNoteInput(false);
+            }
             return;
         }
 
@@ -183,25 +197,17 @@ export default function SnapshotViewerPage() {
             offsetEnd,
             rect,
         });
-    }, [isOwner]);
-
-    // Clear selection when clicking outside
-    const handleClickOutside = useCallback((e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (target.closest('.note-input-popup')) return;
-        if (!window.getSelection()?.toString().trim()) {
-            setSelection(null);
-        }
+        setShowNoteInput(false); // Reset input state when new selection
+        setNoteInput('');
     }, []);
 
+    // Add event listeners
     useEffect(() => {
         document.addEventListener('mouseup', handleMouseUp);
-        document.addEventListener('click', handleClickOutside);
         return () => {
             document.removeEventListener('mouseup', handleMouseUp);
-            document.removeEventListener('click', handleClickOutside);
         };
-    }, [handleMouseUp, handleClickOutside]);
+    }, [handleMouseUp]);
 
     // Create note
     const handleCreateNote = async () => {
@@ -228,11 +234,19 @@ export default function SnapshotViewerPage() {
                 const data = await response.json();
                 setNotes(prev => [data.note, ...prev]);
                 setSelection(null);
+                setShowNoteInput(false);
                 setNoteInput('');
                 setShowSidebar(true);
                 setActiveTab('notes');
+                // Clear browser selection
+                window.getSelection()?.removeAllRanges();
+                // Re-fetch to update isOwner status
+                fetchNotes();
             } else if (response.status === 401) {
                 router.push('/login');
+            } else if (response.status === 403) {
+                // User is not the owner
+                alert('You can only add notes to your own saved posts.');
             }
         } catch (err) {
             console.error('Failed to create note:', err);
@@ -288,20 +302,137 @@ export default function SnapshotViewerPage() {
         }
     };
 
+    // Handle clicking on a highlighted note
+    const handleHighlightClick = (note: Note) => {
+        setHighlightedNoteId(note.id);
+        setShowSidebar(true);
+        setActiveTab('notes');
+        // Scroll to note in sidebar after a short delay
+        setTimeout(() => {
+            const noteElement = document.getElementById(`note-${note.id}`);
+            noteElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+    };
+
     // Apply highlighting to snapshot content
     const getHighlightedHtml = useCallback(() => {
-        if (notes.length === 0) return snapshotHtml;
+        if (notes.length === 0 || !snapshotHtml) return snapshotHtml;
 
-        let html = snapshotHtml;
-        // Sort notes by offset to apply highlights in order (reverse to not break offsets)
+        // Create a temporary DOM to manipulate
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(snapshotHtml, 'text/html');
+        const body = doc.body;
+
+        // Get text content and find positions
+        const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
+        const textNodes: Text[] = [];
+        let node: Node | null;
+        while ((node = walker.nextNode())) {
+            textNodes.push(node as Text);
+        }
+
+        // Build full text content with node mapping
+        let fullText = '';
+        const nodeMapping: { node: Text; start: number; end: number }[] = [];
+        for (const textNode of textNodes) {
+            const start = fullText.length;
+            fullText += textNode.textContent || '';
+            nodeMapping.push({ node: textNode, start, end: fullText.length });
+        }
+
+        // Apply highlights in reverse order to not mess up offsets
         const sortedNotes = [...notes]
-            .filter(n => n.text_offset_start !== null && n.text_offset_end !== null)
-            .sort((a, b) => (b.text_offset_start || 0) - (a.text_offset_start || 0));
+            .filter(n => n.selected_text && n.selected_text.length > 0)
+            .sort((a, b) => {
+                // Find position of selected text in full text
+                const posA = fullText.indexOf(a.selected_text);
+                const posB = fullText.indexOf(b.selected_text);
+                return posB - posA; // Reverse order
+            });
 
-        // For now, we'll use a simple CSS class approach
-        // The actual highlighting would require DOM manipulation after render
-        return html;
+        for (const note of sortedNotes) {
+            const textToFind = note.selected_text;
+            const pos = fullText.indexOf(textToFind);
+            if (pos === -1) continue;
+
+            // Find which text nodes contain this range
+            const startPos = pos;
+            const endPos = pos + textToFind.length;
+
+            for (const mapping of nodeMapping) {
+                if (mapping.end <= startPos || mapping.start >= endPos) continue;
+
+                // This node contains part of the highlight
+                const nodeText = mapping.node.textContent || '';
+                const localStart = Math.max(0, startPos - mapping.start);
+                const localEnd = Math.min(nodeText.length, endPos - mapping.start);
+
+                if (localStart >= localEnd) continue;
+
+                // Split the text node and wrap the highlighted part
+                const before = nodeText.slice(0, localStart);
+                const highlighted = nodeText.slice(localStart, localEnd);
+                const after = nodeText.slice(localEnd);
+
+                const wrapper = doc.createElement('span');
+                wrapper.className = 'note-highlight';
+                wrapper.setAttribute('data-note-id', note.id.toString());
+                wrapper.textContent = highlighted;
+
+                const parent = mapping.node.parentNode;
+                if (!parent) continue;
+
+                const fragment = doc.createDocumentFragment();
+                if (before) fragment.appendChild(doc.createTextNode(before));
+                fragment.appendChild(wrapper);
+                if (after) fragment.appendChild(doc.createTextNode(after));
+
+                parent.replaceChild(fragment, mapping.node);
+                break; // Only highlight first occurrence
+            }
+        }
+
+        // Add highlight styles
+        const style = doc.createElement('style');
+        style.textContent = `
+            .note-highlight {
+                background: linear-gradient(to bottom, rgba(147, 51, 234, 0.15) 0%, rgba(147, 51, 234, 0.25) 100%);
+                border-bottom: 2px solid rgba(147, 51, 234, 0.4);
+                cursor: pointer;
+                transition: all 0.2s ease;
+                padding: 1px 0;
+            }
+            .note-highlight:hover {
+                background: linear-gradient(to bottom, rgba(147, 51, 234, 0.25) 0%, rgba(147, 51, 234, 0.35) 100%);
+                border-bottom-color: rgba(147, 51, 234, 0.6);
+            }
+        `;
+        doc.head.appendChild(style);
+
+        return doc.documentElement.outerHTML;
     }, [snapshotHtml, notes]);
+
+    // Handle clicks on highlighted text
+    useEffect(() => {
+        const handleHighlightClicks = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.classList.contains('note-highlight')) {
+                const noteId = target.getAttribute('data-note-id');
+                if (noteId) {
+                    const note = notes.find(n => n.id === parseInt(noteId));
+                    if (note) {
+                        handleHighlightClick(note);
+                    }
+                }
+            }
+        };
+
+        const container = contentRef.current;
+        if (container) {
+            container.addEventListener('click', handleHighlightClicks);
+            return () => container.removeEventListener('click', handleHighlightClicks);
+        }
+    }, [notes]);
 
     if (loading) {
         return (
@@ -344,7 +475,7 @@ export default function SnapshotViewerPage() {
                     ${showSidebar
                         ? 'bg-zinc-900 text-white border-zinc-800 hover:bg-zinc-800 shadow-zinc-900/20'
                         : summary || notes.length > 0
-                            ? 'bg-violet-600 text-white border-violet-500 hover:bg-violet-700 shadow-violet-500/30 sparkle-btn-glow'
+                            ? 'bg-violet-600 text-white border-violet-500 hover:bg-violet-700 shadow-violet-500/30'
                             : 'bg-white/90 backdrop-blur-sm text-zinc-600 border-zinc-200/80 hover:text-violet-600 hover:border-violet-200 hover:shadow-xl'
                     }
                     ${summaryLoading ? 'cursor-wait opacity-90' : 'cursor-pointer active:scale-95'}
@@ -360,18 +491,48 @@ export default function SnapshotViewerPage() {
                 )}
             </button>
 
-            {/* Text Selection Note Input Popup */}
-            {selection && isOwner && (
-                <div
-                    className="note-input-popup fixed z-[60] bg-white rounded-xl shadow-2xl border border-zinc-200 p-3 w-[320px] animate-in fade-in zoom-in-95 duration-150"
+            {/* Floating Action Button for Text Selection */}
+            {selection && currentUserId && (
+                <button
+                    onClick={() => setShowNoteInput(true)}
+                    className="note-action-btn fixed z-[70] h-10 w-10 bg-violet-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-violet-700 hover:scale-110 transition-all duration-200 animate-in fade-in zoom-in-50"
                     style={{
-                        top: selection.rect.bottom + window.scrollY + 8,
-                        left: Math.max(12, Math.min(selection.rect.left + selection.rect.width / 2 - 160, window.innerWidth - 332)),
+                        top: selection.rect.top + window.scrollY - 48,
+                        left: selection.rect.left + selection.rect.width / 2 - 20,
+                    }}
+                    title="Add a note"
+                >
+                    <MessageSquarePlus className="h-5 w-5" />
+                </button>
+            )}
+
+            {/* Note Input Popup (shown after clicking action button) */}
+            {selection && showNoteInput && currentUserId && (
+                <div
+                    className="note-input-popup fixed z-[80] bg-white rounded-xl shadow-2xl border border-zinc-200 p-4 w-[340px] animate-in fade-in slide-in-from-top-2 duration-200"
+                    style={{
+                        top: selection.rect.bottom + window.scrollY + 12,
+                        left: Math.max(12, Math.min(selection.rect.left + selection.rect.width / 2 - 170, window.innerWidth - 352)),
                     }}
                 >
-                    <div className="mb-2 pb-2 border-b border-zinc-100">
-                        <p className="text-[11px] text-zinc-400 font-medium uppercase tracking-wide mb-1">Selected Text</p>
-                        <p className="text-[13px] text-zinc-600 line-clamp-2 italic">"{selection.text}"</p>
+                    {/* Close button */}
+                    <button
+                        onClick={() => {
+                            setShowNoteInput(false);
+                            setSelection(null);
+                            setNoteInput('');
+                            window.getSelection()?.removeAllRanges();
+                        }}
+                        className="absolute top-3 right-3 h-6 w-6 rounded-full flex items-center justify-center hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors"
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </button>
+
+                    <div className="mb-3 pb-3 border-b border-zinc-100">
+                        <p className="text-[11px] text-zinc-400 font-medium uppercase tracking-wide mb-1.5">Selected Text</p>
+                        <p className="text-[13px] text-zinc-700 line-clamp-3 leading-relaxed bg-zinc-50 rounded-lg p-2.5 border border-zinc-100">
+                            "{selection.text}"
+                        </p>
                     </div>
                     <textarea
                         value={noteInput}
@@ -382,26 +543,28 @@ export default function SnapshotViewerPage() {
                                 handleCreateNote();
                             }
                             if (e.key === 'Escape') {
+                                setShowNoteInput(false);
                                 setSelection(null);
                                 setNoteInput('');
+                                window.getSelection()?.removeAllRanges();
                             }
                         }}
                         autoFocus
-                        rows={2}
-                        placeholder="Add your note..."
-                        className="w-full px-3 py-2 text-[14px] text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-300"
+                        rows={3}
+                        placeholder="Write your note..."
+                        className="w-full px-3 py-2.5 text-[14px] text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-300 placeholder:text-zinc-400"
                     />
-                    <div className="mt-2 flex items-center justify-between">
-                        <span className="text-[11px] text-zinc-400">Press Enter to save</span>
+                    <div className="mt-3 flex items-center justify-between">
+                        <span className="text-[11px] text-zinc-400">Press Enter to save, Esc to cancel</span>
                         <button
                             onClick={handleCreateNote}
                             disabled={!noteInput.trim() || isCreatingNote}
-                            className="h-7 px-3 text-xs font-medium bg-violet-600 text-white rounded-md hover:bg-violet-700 disabled:opacity-50 transition-colors flex items-center gap-1"
+                            className="h-8 px-4 text-[13px] font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
                         >
                             {isCreatingNote ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
-                                <Plus className="h-3 w-3" />
+                                <Plus className="h-3.5 w-3.5" />
                             )}
                             Add Note
                         </button>
@@ -423,11 +586,12 @@ export default function SnapshotViewerPage() {
             {/* Sidebar Panel */}
             <div
                 className={`
-                    fixed top-0 right-0 h-full w-[440px] z-40
+                    sidebar-panel fixed top-0 right-0 h-full w-[440px] z-40
                     bg-white/98 backdrop-blur-2xl border-l border-zinc-200/40
                     shadow-2xl shadow-zinc-900/8
                     flex flex-col
-                    ${showSidebar ? 'panel-enter' : 'translate-x-full'}
+                    transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
+                    ${showSidebar ? 'translate-x-0' : 'translate-x-full'}
                 `}
             >
                 {/* Header with Tabs */}
@@ -622,13 +786,19 @@ export default function SnapshotViewerPage() {
                             {!notesLoading && notes.length > 0 && (
                                 <div className="space-y-3">
                                     {notes.map(note => (
-                                        <NoteItem
+                                        <div
                                             key={note.id}
-                                            note={note}
-                                            isOwner={isOwner}
-                                            onEdit={handleEditNote}
-                                            onDelete={handleDeleteNote}
-                                        />
+                                            id={`note-${note.id}`}
+                                            className={`transition-all duration-300 ${highlightedNoteId === note.id ? 'ring-2 ring-violet-400 ring-offset-2 rounded-xl' : ''}`}
+                                        >
+                                            <NoteItem
+                                                note={note}
+                                                isOwner={isOwner}
+                                                onEdit={handleEditNote}
+                                                onDelete={handleDeleteNote}
+                                                onHighlightClick={handleHighlightClick}
+                                            />
+                                        </div>
                                     ))}
                                 </div>
                             )}
@@ -637,13 +807,13 @@ export default function SnapshotViewerPage() {
                             {!notesLoading && notes.length === 0 && (
                                 <div className="h-full flex flex-col items-center justify-center text-center opacity-60 mt-12 pb-32">
                                     <div className="h-16 w-16 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center mb-4 -rotate-3">
-                                        <MessageSquare className="h-8 w-8 text-zinc-300" />
+                                        <MessageSquarePlus className="h-8 w-8 text-zinc-300" />
                                     </div>
                                     <p className="text-sm font-medium text-zinc-900 mb-1">No Notes Yet</p>
-                                    <p className="text-xs text-zinc-500 max-w-[200px] leading-relaxed">
-                                        {isOwner
-                                            ? 'Select text in the content to add your first note.'
-                                            : 'No notes have been added to this snapshot yet.'}
+                                    <p className="text-xs text-zinc-500 max-w-[220px] leading-relaxed">
+                                        {currentUserId
+                                            ? 'Select any text in the snapshot to add your first note.'
+                                            : 'Log in to add notes to this snapshot.'}
                                     </p>
                                 </div>
                             )}
