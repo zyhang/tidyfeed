@@ -50,20 +50,24 @@ export async function cacheMediaToR2(
 
     console.log(`[MediaCache] Built urlsToCache: ${urlsToCache.length} items (media: ${media.length}, avatars: ${avatarUrls.length})`);
 
-    // Process each image URL
-    const imageCachePromises = urlsToCache.map(async ({ url, type }) => {
-        try {
-            const result = await cacheImageToR2(mediaBucket, tweetId, url, type);
-            if (result) {
-                urlMap.set(result.originalUrl, result.cachedUrl);
-                totalSize += result.fileSize || 0;
-            }
-        } catch (error) {
-            console.error(`[MediaCache] Failed to cache image ${url}:`, error);
-        }
-    });
+    // Process images with concurrency limit to avoid overwhelming the worker
+    const CONCURRENCY_LIMIT = 5;
 
-    await Promise.all(imageCachePromises);
+    for (let i = 0; i < urlsToCache.length; i += CONCURRENCY_LIMIT) {
+        const batch = urlsToCache.slice(i, i + CONCURRENCY_LIMIT);
+        const batchPromises = batch.map(async ({ url, type }) => {
+            try {
+                const result = await cacheImageToR2(mediaBucket, tweetId, url, type);
+                if (result) {
+                    urlMap.set(result.originalUrl, result.cachedUrl);
+                    totalSize += result.fileSize || 0;
+                }
+            } catch (error) {
+                console.error(`[MediaCache] Failed to cache image ${url}:`, error);
+            }
+        });
+        await Promise.all(batchPromises);
+    }
 
     console.log(`[MediaCache] Cached ${urlMap.size} images for tweet ${tweetId}, total size: ${totalSize} bytes`);
     return { urlMap, totalSize };

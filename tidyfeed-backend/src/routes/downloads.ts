@@ -242,13 +242,43 @@ downloads.get('/media/:id', cookieAuthMiddleware, async (c) => {
             return c.json({ error: 'No media file available' }, 404);
         }
 
-        // Get object from R2 and redirect or stream
-        // For simplicity, we'll use a signed URL approach via R2 public bucket or direct streaming
+        const rangeHeader = c.req.header('Range');
 
-        // Option 1: If bucket is public, return direct URL
-        // Option 2: Stream the file through the worker
+        // For range requests, use head() first to get size, then single ranged get()
+        if (rangeHeader) {
+            const headObject = await c.env.MEDIA_BUCKET.head(task.r2_key);
+            if (!headObject) {
+                return c.json({ error: 'Video file not found in storage' }, 404);
+            }
 
-        // For now, let's stream directly through the worker
+            const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+            if (match && headObject.size) {
+                const start = parseInt(match[1], 10);
+                const end = match[2] ? parseInt(match[2], 10) : headObject.size - 1;
+                const contentLength = end - start + 1;
+
+                // Single ranged get - no double-fetch
+                const rangeObject = await c.env.MEDIA_BUCKET.get(task.r2_key, {
+                    range: { offset: start, length: contentLength }
+                });
+
+                if (rangeObject) {
+                    const headers = new Headers();
+                    headers.set('Content-Type', 'video/mp4');
+                    headers.set('Accept-Ranges', 'bytes');
+                    headers.set('Cache-Control', 'private, max-age=3600');
+                    headers.set('Content-Range', `bytes ${start}-${end}/${headObject.size}`);
+                    headers.set('Content-Length', contentLength.toString());
+
+                    return new Response(rangeObject.body, {
+                        status: 206,
+                        headers,
+                    });
+                }
+            }
+        }
+
+        // Full request - single get
         const object = await c.env.MEDIA_BUCKET.get(task.r2_key);
 
         if (!object) {

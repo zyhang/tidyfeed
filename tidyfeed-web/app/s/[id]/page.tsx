@@ -85,6 +85,7 @@ export default function SnapshotViewerPage() {
 
     // Highlighted note state
     const [highlightedNoteId, setHighlightedNoteId] = useState<number | null>(null);
+    const selectionRangeRef = useRef<Range | null>(null); // Keep the live DOM range for temporary highlight
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app';
 
@@ -184,6 +185,7 @@ export default function SnapshotViewerPage() {
             // Only clear selection if not clicking on note UI
             setSelection(null);
             setShowNoteInput(false);
+            selectionRangeRef.current = null;
             return;
         }
 
@@ -200,6 +202,9 @@ export default function SnapshotViewerPage() {
             setSelection(null);
             return;
         }
+
+        // Persist the DOM range so we can re-apply a highlight even after focus moves
+        selectionRangeRef.current = range.cloneRange();
 
         const rect = range.getBoundingClientRect();
 
@@ -251,6 +256,7 @@ export default function SnapshotViewerPage() {
                 const data = await response.json();
                 setNotes(prev => [data.note, ...prev]);
                 setSelection(null);
+                selectionRangeRef.current = null;
                 setShowNoteInput(false);
                 setNoteInput('');
                 setShowSidebar(true);
@@ -450,6 +456,64 @@ export default function SnapshotViewerPage() {
             return () => container.removeEventListener('click', handleHighlightClicks);
         }
     }, [notes]);
+
+    // Keep the user's selection visually highlighted even after focus moves to the note UI
+    useEffect(() => {
+        const container = contentRef.current;
+        if (!container) return;
+
+        // Ensure highlight styles exist once
+        const STYLE_ID = 'active-selection-style';
+        if (!document.getElementById(STYLE_ID)) {
+            const styleEl = document.createElement('style');
+            styleEl.id = STYLE_ID;
+            styleEl.textContent = `
+                .active-selection {
+                    background: linear-gradient(to bottom, rgba(104, 117, 245, 0.12) 0%, rgba(104, 117, 245, 0.24) 100%);
+                    border-bottom: 2px solid rgba(104, 117, 245, 0.4);
+                    border-radius: 2px;
+                    padding: 1px 0;
+                    transition: background 0.2s ease;
+                }
+            `;
+            document.head.appendChild(styleEl);
+        }
+
+        // Cleanup any existing active selection spans
+        const clearActiveSelection = () => {
+            const existing = container.querySelectorAll('.active-selection');
+            existing.forEach((el) => {
+                const parent = el.parentNode;
+                if (!parent) return;
+                while (el.firstChild) {
+                    parent.insertBefore(el.firstChild, el);
+                }
+                parent.removeChild(el);
+            });
+        };
+
+        clearActiveSelection();
+
+        if (!selection || !selectionRangeRef.current) {
+            return;
+        }
+
+        // Apply a persistent wrapper around the selected range
+        try {
+            const range = selectionRangeRef.current.cloneRange();
+            const wrapper = document.createElement('span');
+            wrapper.className = 'active-selection';
+            wrapper.setAttribute('data-active-selection', 'true');
+            wrapper.appendChild(range.extractContents());
+            range.insertNode(wrapper);
+        } catch (err) {
+            console.warn('Failed to apply active selection highlight:', err);
+        }
+
+        return () => {
+            clearActiveSelection();
+        };
+    }, [selection, highlightedHtml]);
 
     if (loading) {
         return (

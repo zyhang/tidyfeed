@@ -110,34 +110,32 @@ app.get('/api/videos/:tweetId/:filename', async (c) => {
 	const r2Key = `videos/${tweetId}/${filename}`;
 
 	try {
-		const object = await c.env.MEDIA_BUCKET.get(r2Key);
-
-		if (!object) {
-			return c.json({ error: 'Video not found' }, 404);
-		}
-
-		const headers = new Headers();
-		headers.set('Content-Type', object.httpMetadata?.contentType || 'video/mp4');
-		headers.set('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year cache
-		headers.set('ETag', object.etag);
-		headers.set('Accept-Ranges', 'bytes');
-
-		// Handle range requests for video seeking
 		const rangeHeader = c.req.header('Range');
-		if (rangeHeader && object.size) {
+
+		// For range requests, use head() first to get size, then single ranged get()
+		if (rangeHeader) {
+			const headObject = await c.env.MEDIA_BUCKET.head(r2Key);
+			if (!headObject) {
+				return c.json({ error: 'Video not found' }, 404);
+			}
+
 			const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
-			if (match) {
+			if (match && headObject.size) {
 				const start = parseInt(match[1], 10);
-				const end = match[2] ? parseInt(match[2], 10) : object.size - 1;
+				const end = match[2] ? parseInt(match[2], 10) : headObject.size - 1;
 				const contentLength = end - start + 1;
 
-				// Get the range from R2
+				// Single ranged get - no double-fetch
 				const rangeObject = await c.env.MEDIA_BUCKET.get(r2Key, {
 					range: { offset: start, length: contentLength }
 				});
 
 				if (rangeObject) {
-					headers.set('Content-Range', `bytes ${start}-${end}/${object.size}`);
+					const headers = new Headers();
+					headers.set('Content-Type', headObject.httpMetadata?.contentType || 'video/mp4');
+					headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+					headers.set('Accept-Ranges', 'bytes');
+					headers.set('Content-Range', `bytes ${start}-${end}/${headObject.size}`);
 					headers.set('Content-Length', contentLength.toString());
 
 					return new Response(rangeObject.body, {
@@ -148,7 +146,18 @@ app.get('/api/videos/:tweetId/:filename', async (c) => {
 			}
 		}
 
-		// Full video response
+		// Full request - single get
+		const object = await c.env.MEDIA_BUCKET.get(r2Key);
+
+		if (!object) {
+			return c.json({ error: 'Video not found' }, 404);
+		}
+
+		const headers = new Headers();
+		headers.set('Content-Type', object.httpMetadata?.contentType || 'video/mp4');
+		headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+		headers.set('ETag', object.etag);
+		headers.set('Accept-Ranges', 'bytes');
 		headers.set('Content-Length', (object.size || 0).toString());
 
 		return new Response(object.body, {
