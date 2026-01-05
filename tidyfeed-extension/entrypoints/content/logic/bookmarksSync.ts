@@ -383,6 +383,23 @@ async function startSyncProcess(e: MouseEvent) {
 
 async function saveTweetToTidyFeed(tweet: any): Promise<boolean> {
     try {
+        // Data validation: Ensure author info is complete before saving
+        const authorName = tweet.authorName || '';
+        const authorHandle = tweet.authorHandle || '';
+        const authorAvatar = tweet.authorAvatar || '';
+
+        // Check if we have minimal required author info
+        if (!authorName || !authorHandle) {
+            console.warn(`[TidyFeed] Skipping tweet ${tweet.id} due to missing author info:`, {
+                hasName: !!authorName,
+                hasHandle: !!authorHandle,
+                hasAvatar: !!authorAvatar
+            });
+            return false; // Skip this tweet, don't save incomplete data
+        }
+
+        // Even if avatar is missing, we can still save with name/handle
+        // The UI will show initials instead of avatar
         const result = await browser.runtime.sendMessage({
             type: 'TOGGLE_SAVE',
             action: 'save',
@@ -390,12 +407,12 @@ async function saveTweetToTidyFeed(tweet: any): Promise<boolean> {
                 x_id: tweet.id,
                 content: tweet.fullText,
                 author: {
-                    name: tweet.authorName || '',
-                    handle: tweet.authorHandle || '',
-                    avatar: tweet.authorAvatar || ''
+                    name: authorName,
+                    handle: authorHandle,
+                    avatar: authorAvatar // Will be empty string if not available
                 },
                 media: [], // Interceptor might not parse media URLs deeply yet?
-                url: `https://x.com/${tweet.authorHandle}/status/${tweet.id}`
+                url: `https://x.com/${authorHandle}/status/${tweet.id}`
             }
         });
         return result?.success || false;

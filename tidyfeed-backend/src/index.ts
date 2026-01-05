@@ -15,6 +15,7 @@ import admin from './routes/admin';
 import ai from './routes/ai';
 import library from './routes/library';
 import notes from './routes/notes';
+import { TikHubService } from './services/tikhub';
 
 // Google OAuth JWKS endpoint for ID token verification
 const GOOGLE_JWKS = createRemoteJWKSet(
@@ -1024,8 +1025,35 @@ app.post('/api/posts', cookieAuthMiddleware, async (c) => {
 			return c.json({ error: 'x_id is required' }, 400);
 		}
 
+		// Check if author info is complete, if not, fetch from TikHub API
+		let finalAuthor = author;
+		if (!author || !author.name || !author.handle) {
+			console.log(`[SavePost] Author info incomplete for ${x_id}, fetching from TikHub...`);
+			try {
+				const tikhubService = new TikHubService(c.env.TIKHUB_API_KEY);
+				const tweetData = await tikhubService.fetchTweetDetail(x_id);
+
+				if (tweetData && tweetData.author) {
+					finalAuthor = {
+						name: tweetData.author.name,
+						handle: tweetData.author.screen_name,
+						avatar: tweetData.author.profile_image_url || author?.avatar || ''
+					};
+					console.log(`[SavePost] Fetched author info from TikHub: ${finalAuthor.name} (@${finalAuthor.handle})`);
+				} else {
+					console.warn(`[SavePost] Failed to fetch author info from TikHub for ${x_id}`);
+					// Keep the original author data even if incomplete
+					finalAuthor = author || { name: '', handle: '', avatar: '' };
+				}
+			} catch (tikhubError) {
+				console.error(`[SavePost] TikHub API error for ${x_id}:`, tikhubError);
+				// Keep the original author data even if incomplete
+				finalAuthor = author || { name: '', handle: '', avatar: '' };
+			}
+		}
+
 		// Serialize author and media to JSON strings
-		const authorInfo = author ? JSON.stringify(author) : null;
+		const authorInfo = finalAuthor ? JSON.stringify(finalAuthor) : null;
 		const mediaUrls = media ? JSON.stringify(media) : null;
 
 		try {
