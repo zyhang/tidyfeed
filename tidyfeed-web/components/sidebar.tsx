@@ -187,7 +187,10 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                     )}
                 </div>
 
-                {/* Settings */}
+            </nav>
+
+            {/* Settings */}
+            <div className="px-2 mb-2">
                 <Link
                     href="/dashboard/settings"
                     className={cn(
@@ -199,7 +202,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                     <Settings className="h-5 w-5" />
                     {!isCollapsed && <span>Settings</span>}
                 </Link>
-            </nav>
+            </div>
 
             <div className="border-t bg-background z-10">
                 <StorageIndicator isCollapsed={isCollapsed} />

@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import { Sparkles, X, Loader2, StickyNote, Plus, MessageSquarePlus, Brain, BookMarked, ChevronRight, PanelRightClose, PanelRightOpen, Lightbulb, Quote, MoreVertical, Pencil, Trash2, Wand2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
+import { toast } from 'sonner';
 
 interface Note {
     id: number;
@@ -962,144 +963,272 @@ export default function SnapshotViewerPage() {
                 <div className="flex-1 overflow-y-auto">
                     {/* AI Insights Tab */}
                     {activeTab === 'insights' && (
-                        <div className="p-5">
+                        <div className="p-4">
                             {!summary && !summaryLoading && !summaryError && (
-                                <div className="flex flex-col items-center justify-center text-center py-12">
-                                    {/* Hero-style Generate Button */}
+                                // Empty State - New Interactive Design
+                                <div className="flex flex-col items-center justify-center text-center py-10 px-4">
+                                    {/* Animated AI Orb */}
                                     <button
                                         onClick={handleGenerateSummary}
-                                        className="group relative h-20 w-20 mb-6"
+                                        className="group relative mb-6"
                                     >
-                                        <div className="absolute inset-0 bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 rounded-3xl opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
-                                        <div className="absolute inset-0 bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 rounded-3xl blur-xl opacity-50 group-hover:opacity-70 group-hover:blur-2xl transition-all duration-500" />
-                                        <div className="relative h-full w-full rounded-3xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-xl shadow-violet-500/30 group-hover:shadow-2xl group-hover:shadow-violet-500/40 group-hover:scale-105 transition-all duration-300">
-                                            <Wand2 className="h-9 w-9 text-white" />
+                                        {/* Outer glow ring */}
+                                        <div className="absolute inset-0 -m-4 rounded-full bg-gradient-to-r from-violet-500/20 via-purple-500/30 to-fuchsia-500/20 blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse" />
+                                        {/* Spinning dashed ring */}
+                                        <div className="absolute inset-0 -m-2 rounded-full border-2 border-dashed border-violet-300/50 group-hover:border-violet-400/70 transition-all duration-500 animate-[spin_8s_linear_infinite]" />
+                                        {/* Main button */}
+                                        <div className="relative h-24 w-24 rounded-full bg-gradient-to-br from-violet-500 via-purple-600 to-fuchsia-600 flex items-center justify-center shadow-2xl shadow-violet-500/40 group-hover:shadow-violet-500/60 group-hover:scale-110 transition-all duration-300">
+                                            <Brain className="h-10 w-10 text-white group-hover:scale-110 transition-transform duration-300" />
                                         </div>
-                                        {/* Shine effect */}
-                                        <div className="absolute inset-0 rounded-3xl overflow-hidden">
-                                            <div className="absolute -top-full left-1/2 -translate-x-1/2 w-1/2 h-full bg-gradient-to-b from-white/30 to-transparent rotate-45 group-hover:animate-[shine_1s_ease-in-out]" />
-                                        </div>
+                                        {/* Floating particles */}
+                                        <div className="absolute -top-2 -right-2 h-3 w-3 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0s' }} />
+                                        <div className="absolute -bottom-1 -left-3 h-2 w-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0.2s' }} />
+                                        <div className="absolute top-1/2 -right-4 h-2.5 w-2.5 rounded-full bg-fuchsia-400 animate-bounce" style={{ animationDelay: '0.4s' }} />
                                     </button>
-                                    <h3 className="text-base font-bold text-zinc-900 mb-2">
-                                        Generate AI Insights
+
+                                    <h3 className="text-lg font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                                        Unlock AI Insights
                                     </h3>
-                                    <p className="text-sm text-zinc-500 max-w-[220px] leading-relaxed">
-                                        Get an AI-powered summary and key takeaways from this tweet
+                                    <p className="text-sm text-zinc-500 max-w-[240px] leading-relaxed mb-4">
+                                        Get an intelligent analysis with summaries, key points, and takeaways
                                     </p>
+
+                                    {/* Feature hints */}
+                                    <div className="flex flex-wrap justify-center gap-2 mt-4">
+                                        {['Summary', 'Key Points', 'Topics', 'Sentiment'].map((feature, i) => (
+                                            <span
+                                                key={feature}
+                                                className="px-2.5 py-1 text-[10px] font-medium bg-zinc-100 text-zinc-600 rounded-full animate-in fade-in slide-in-from-bottom-2"
+                                                style={{ animationDelay: `${i * 100}ms` }}
+                                            >
+                                                {feature}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
 
                             {summaryLoading && (
-                                <div className="flex flex-col items-center justify-center py-16">
-                                    <div className="relative mb-6">
-                                        {/* Animated gradient ring */}
-                                        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center">
-                                            <Brain className="h-8 w-8 text-violet-500 animate-pulse" />
+                                // Loading State - New Skeleton Design
+                                <div className="space-y-4 py-4">
+                                    {/* Header skeleton */}
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                                            <Brain className="h-5 w-5 text-white animate-pulse" />
                                         </div>
-                                        <div className="absolute inset-0 h-16 w-16 rounded-2xl border-2 border-violet-200 animate-spin" style={{ animationDuration: '3s' }} />
-                                        <div className="absolute -inset-2 h-20 w-20 rounded-2xl border border-violet-100 animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
+                                        <div className="flex-1">
+                                            <div className="h-4 w-24 bg-zinc-200 rounded animate-pulse mb-1" />
+                                            <div className="h-3 w-32 bg-zinc-100 rounded animate-pulse" />
+                                        </div>
                                     </div>
-                                    <p className="text-sm font-semibold text-zinc-800 animate-pulse">
-                                        Analyzing content...
-                                    </p>
+
+                                    {/* Insight card skeletons */}
+                                    {[
+                                        { title: 'Summary', lines: 3, icon: '📝' },
+                                        { title: 'Key Points', lines: 4, icon: '🎯' },
+                                        { title: 'Topics', lines: 3, icon: '🏷️' },
+                                    ].map((card, i) => (
+                                        <div
+                                            key={card.title}
+                                            className="bg-white rounded-2xl border border-zinc-200 p-4 animate-in fade-in slide-in-from-right-4"
+                                            style={{ animationDelay: `${i * 100}ms` }}
+                                        >
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <span className="text-sm">{card.icon}</span>
+                                                <div className="h-4 w-20 bg-zinc-200 rounded animate-pulse" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                {Array.from({ length: card.lines }).map((_, j) => (
+                                                    <div
+                                                        key={j}
+                                                        className="h-3 bg-zinc-100 rounded animate-pulse"
+                                                        style={{ width: `${60 + Math.random() * 40}%`, animationDelay: `${j * 150}ms` }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {/* Loading text */}
+                                    <div className="text-center mt-6">
+                                        <p className="text-sm text-zinc-500 animate-pulse">
+                                            AI is analyzing the content...
+                                        </p>
+                                    </div>
                                 </div>
                             )}
 
                             {summaryError && !summaryLoading && (
-                                <div className="bg-red-50/80 backdrop-blur-sm rounded-2xl border border-red-100 p-5">
-                                    <div className="flex items-start gap-3">
-                                        <div className="h-10 w-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
-                                            <X className="h-5 w-5 text-red-600" />
+                                // Error State - New Design
+                                <div className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 rounded-3xl border border-red-100 dark:border-red-900/30 p-6">
+                                    <div className="text-center">
+                                        <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-orange-500 text-white shadow-lg mb-4">
+                                            <X className="h-7 w-7" />
                                         </div>
-                                        <div className="flex-1">
-                                            <h3 className="text-sm font-bold text-red-900 mb-1">Analysis Failed</h3>
-                                            <p className="text-xs text-red-600 leading-relaxed">{summaryError}</p>
-                                        </div>
+                                        <h3 className="text-base font-bold text-red-900 dark:text-red-100 mb-2">
+                                            Analysis Failed
+                                        </h3>
+                                        <p className="text-sm text-red-600 dark:text-red-300 mb-6 max-w-[280px] mx-auto leading-relaxed">
+                                            {summaryError}
+                                        </p>
                                         <button
                                             onClick={handleGenerateSummary}
-                                            className="px-3 py-1.5 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                                            className="h-10 px-6 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white rounded-xl font-medium text-sm shadow-lg shadow-red-500/30 transition-all flex items-center gap-2 mx-auto"
                                         >
-                                            Retry
+                                            <Loader2 className="h-4 w-4" />
+                                            Try Again
                                         </button>
                                     </div>
                                 </div>
                             )}
 
                             {summary && !summaryLoading && (
-                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    {/* Summary Header */}
-                                    <div className="flex items-center justify-between mb-5">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/25">
+                                // New Insight Cards Design
+                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    {/* Header with actions */}
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
                                                 <Sparkles className="h-5 w-5 text-white" />
                                             </div>
                                             <div>
-                                                <h3 className="text-sm font-bold text-zinc-900">AI Analysis</h3>
-                                                <p className="text-xs text-zinc-500">Generated insights</p>
+                                                <h3 className="text-sm font-bold text-zinc-900">AI Insights</h3>
+                                                <p className="text-[10px] text-zinc-500">Generated by Claude</p>
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={handleGenerateSummary}
-                                            className="h-8 w-8 rounded-lg bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center text-zinc-500 hover:text-zinc-700 transition-colors"
-                                            title="Regenerate"
-                                        >
-                                            <Loader2 className="h-4 w-4" />
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(summary)
+                                                    toast.success('Copied to clipboard')
+                                                }}
+                                                className="h-8 w-8 rounded-lg hover:bg-zinc-100 flex items-center justify-center text-zinc-400 hover:text-zinc-600 transition-colors"
+                                                title="Copy all"
+                                            >
+                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                onClick={handleGenerateSummary}
+                                                className="h-8 w-8 rounded-lg hover:bg-zinc-100 flex items-center justify-center text-zinc-400 hover:text-zinc-600 transition-colors"
+                                                title="Regenerate"
+                                            >
+                                                <Loader2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    {/* Summary Content */}
-                                    <div className="bg-white rounded-2xl border border-zinc-200/60 shadow-sm p-5">
-                                        <ReactMarkdown
-                                            components={{
-                                                p: ({ children }) => (
-                                                    <p className="text-sm leading-[1.8] text-zinc-700 mb-4 last:mb-0">{children}</p>
-                                                ),
-                                                strong: ({ children }) => (
-                                                    <strong className="font-bold text-zinc-900">{children}</strong>
-                                                ),
-                                                em: ({ children }) => (
-                                                    <em className="text-violet-700 font-medium">{children}</em>
-                                                ),
-                                                ul: ({ children }) => (
-                                                    <ul className="space-y-3 mb-4 pl-0">{children}</ul>
-                                                ),
-                                                ol: ({ children }) => (
-                                                                                    <ol className="space-y-3 mb-4 pl-0">{children}</ol>
-                                                                                ),
-                                                                                li: ({ children }) => (
-                                                                                    <li className="flex gap-3 text-sm leading-[1.75] text-zinc-700">
-                                                                                        <span className="flex-shrink-0 mt-2 w-1.5 h-1.5 rounded-full bg-violet-400"></span>
-                                                                                        <span className="flex-1">{children}</span>
-                                                                                    </li>
-                                                                                ),
-                                                                                h2: ({ children }) => (
-                                                                                    <h2 className="text-base font-bold text-zinc-900 mt-6 mb-4 flex items-center gap-2">
-                                                                                        {children}
-                                                                                    </h2>
-                                                                                ),
-                                                                                h3: ({ children }) => (
-                                                                                    <h3 className="text-sm font-bold text-zinc-900 mt-5 mb-3">{children}</h3>
-                                                                                ),
-                                                                                blockquote: ({ children }) => (
-                                                                                    <blockquote className="border-l-2 border-violet-300 pl-4 py-3 my-4 text-zinc-600 text-sm leading-[1.75] bg-violet-50/50 rounded-r-xl">
-                                                                                        {children}
-                                                                                    </blockquote>
-                                                                                ),
-                                                                                a: ({ href, children }) => (
-                                                                                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-700 underline underline-offset-2 decoration-violet-200 hover:decoration-violet-400 transition-colors font-medium">
-                                                                                        {children}
-                                                                                    </a>
-                                                                                ),
-                                                                                code: ({ children }) => (
-                                                                                    <code className="bg-zinc-100 px-2 py-1 rounded-lg text-xs font-mono text-zinc-800 border border-zinc-200">{children}</code>
-                                                                                ),
-                                                                            }}
-                                                                        >{summary}</ReactMarkdown>
-                                                                    </div>
-                                                                </div>
-                                                            )}
+                                    {/* Insight Cards */}
+                                    <div className="space-y-3">
+                                        {/* Summary Card */}
+                                        <div className="group bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 rounded-2xl border border-violet-100 dark:border-violet-900/30 overflow-hidden transition-all hover:shadow-lg hover:shadow-violet-500/10">
+                                            <div className="p-4">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-7 w-7 rounded-lg bg-violet-500 flex items-center justify-center">
+                                                            <span className="text-white text-sm">📝</span>
                                                         </div>
-                                                    )}
+                                                        <span className="text-sm font-semibold text-violet-900 dark:text-violet-100">Summary</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            // Extract summary paragraph (first paragraph before list or heading)
+                                                            const firstParagraph = summary.split(/\n\n|\n#|\n-/)[0]?.trim() || summary
+                                                            navigator.clipboard.writeText(firstParagraph)
+                                                            toast.success('Summary copied')
+                                                        }}
+                                                        className="h-7 w-7 rounded-lg hover:bg-violet-200/50 flex items-center justify-center text-violet-400 hover:text-violet-600 opacity-0 group-hover:opacity-100 transition-all"
+                                                    >
+                                                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                                <div className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed prose prose-sm prose-violet dark:prose-invert">
+                                                    {summary.split('\n\n')[0]?.replace(/^#+\s.*$/gm, '').trim() || summary}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Key Points Card */}
+                                        {summary.includes('-') && (
+                                            <div className="group bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 overflow-hidden transition-all hover:shadow-lg hover:shadow-emerald-500/10">
+                                                <div className="p-4">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-7 w-7 rounded-lg bg-emerald-500 flex items-center justify-center">
+                                                                <span className="text-white text-sm">🎯</span>
+                                                            </div>
+                                                            <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">Key Points</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                // Extract list items
+                                                                const listMatch = summary.match(/(?:^|\n)(?:-\s+(.+?)$|\d+\.\s+(.+?)$)/gm)
+                                                                const points = listMatch ? listMatch.map(m => m.replace(/^[-\d.]+\s+/, '')).join('\n') : ''
+                                                                navigator.clipboard.writeText(points)
+                                                                toast.success('Key points copied')
+                                                            }}
+                                                            className="h-7 w-7 rounded-lg hover:bg-emerald-200/50 flex items-center justify-center text-emerald-400 hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition-all"
+                                                        >
+                                                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                    <ul className="space-y-2">
+                                                        {summary.match(/(?:^|\n)(?:-\s+(.+?)$|\d+\.\s+(.+?)$)/gm)?.slice(0, 5).map((point, i) => (
+                                                            <li key={i} className="flex items-start gap-2 text-sm text-emerald-800 dark:text-emerald-200">
+                                                                <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5" />
+                                                                <span className="flex-1">{point.replace(/^[-\d.]+\s+/, '')}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Topics/Sentiment Card */}
+                                        <div className="group bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-2xl border border-amber-100 dark:border-amber-900/30 overflow-hidden transition-all hover:shadow-lg hover:shadow-amber-500/10">
+                                            <div className="p-4">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="h-7 w-7 rounded-lg bg-amber-500 flex items-center justify-center">
+                                                        <span className="text-white text-sm">💡</span>
+                                                    </div>
+                                                    <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">Quick Actions</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            handleGenerateSummary()
+                                                            toast.info('Regenerating insights...')
+                                                        }}
+                                                        className="h-10 px-3 rounded-xl bg-white dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors flex items-center justify-center gap-1.5"
+                                                    >
+                                                        <Loader2 className="h-3 w-3" />
+                                                        Regenerate
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(summary)
+                                                            toast.success('All insights copied')
+                                                        }}
+                                                        className="h-10 px-3 rounded-xl bg-white dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors flex items-center justify-center gap-1.5"
+                                                    >
+                                                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                        </svg>
+                                                        Copy All
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                                                     {/* Notes Tab */}
                                                     {activeTab === 'notes' && (
