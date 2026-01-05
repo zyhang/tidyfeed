@@ -43,6 +43,9 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
 
             toast.success('Profile updated')
             onUpdate(name)
+
+            // Dispatch event to update UserNav component in sidebar
+            window.dispatchEvent(new CustomEvent('user-profile-updated'))
         } catch (error) {
             console.error(error)
             toast.error('Failed to update profile')

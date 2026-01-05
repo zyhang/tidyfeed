@@ -26,7 +26,7 @@ export function UserNav({ isCollapsed }: UserNavProps) {
     const [user, setUser] = React.useState<{ name: string; email: string; avatarUrl: string } | null>(null)
     const [loading, setLoading] = React.useState(true)
 
-    React.useEffect(() => {
+    const fetchUser = React.useCallback(() => {
         fetch(`${API_URL}/auth/me`, { credentials: 'include' })
             .then(res => {
                 if (res.ok) return res.json()
@@ -42,6 +42,21 @@ export function UserNav({ isCollapsed }: UserNavProps) {
             })
             .finally(() => setLoading(false))
     }, [])
+
+    React.useEffect(() => {
+        fetchUser()
+    }, [fetchUser])
+
+    // Listen for profile updates from settings page
+    React.useEffect(() => {
+        const handleProfileUpdate = () => {
+            fetchUser()
+        }
+        window.addEventListener('user-profile-updated', handleProfileUpdate)
+        return () => {
+            window.removeEventListener('user-profile-updated', handleProfileUpdate)
+        }
+    }, [fetchUser])
 
     if (loading) {
         return (
