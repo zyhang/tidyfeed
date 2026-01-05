@@ -25,28 +25,37 @@ export function StorageIndicator({ isCollapsed, className, ...props }: StorageIn
     const [limit, setLimit] = React.useState(1073741824) // Default 1GB
     const [loading, setLoading] = React.useState(true)
 
-    React.useEffect(() => {
-        const fetchUsage = async () => {
-            try {
-                // Fetch from /auth/me for efficiency as it includes storageUsage now
-                // Or /api/downloads/usage. Let's use /api/downloads/usage for clarity and limit
-                const res = await fetch(`${API_URL}/api/downloads/usage`, {
-                    credentials: 'include'
-                })
-                if (res.ok) {
-                    const data = await res.json()
-                    setUsage(data.usage || 0)
-                    if (data.limit) setLimit(data.limit)
-                }
-            } catch (error) {
-                console.error("Failed to fetch storage usage", error)
-            } finally {
-                setLoading(false)
+    const fetchUsage = React.useCallback(async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/downloads/usage`, {
+                credentials: 'include'
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setUsage(data.usage || 0)
+                if (data.limit) setLimit(data.limit)
             }
+        } catch (error) {
+            console.error("Failed to fetch storage usage", error)
+        } finally {
+            setLoading(false)
         }
-
-        fetchUsage()
     }, [])
+
+    React.useEffect(() => {
+        fetchUsage()
+    }, [fetchUsage])
+
+    // Listen for refresh events
+    React.useEffect(() => {
+        const handleRefresh = () => {
+            fetchUsage()
+        }
+        window.addEventListener('storage-usage-refresh', handleRefresh)
+        return () => {
+            window.removeEventListener('storage-usage-refresh', handleRefresh)
+        }
+    }, [fetchUsage])
 
     const percentage = Math.min(100, Math.max(0, (usage / limit) * 100))
 

@@ -194,6 +194,9 @@ function DashboardContent() {
             // Remove from local state
             setPosts(prev => prev.filter(p => p.xId !== xId))
             toast.success('Post deleted')
+
+            // Trigger storage usage refresh
+            window.dispatchEvent(new CustomEvent('storage-usage-refresh'))
         } catch (error) {
             console.error('Delete error:', error)
             toast.error('Failed to delete post')

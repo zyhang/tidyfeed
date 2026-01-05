@@ -165,6 +165,8 @@ export default function TagDetailPage({ params }: { params: Promise<{ id: string
                                         try {
                                             await fetch(`${API_URL}/api/posts/x/${xId}`, { method: 'DELETE', credentials: 'include' })
                                             setTweets(prev => prev.filter(t => t.tweetId !== xId))
+                                            // Trigger storage usage refresh
+                                            window.dispatchEvent(new CustomEvent('storage-usage-refresh'))
                                         } catch (e) { console.error(e) }
                                     }
                                 }}
