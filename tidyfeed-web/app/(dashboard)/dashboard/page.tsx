@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense } from 'react'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { TweetCard } from '@/components/TweetCard'
@@ -49,12 +49,30 @@ function DashboardContent() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
-    const fetchPosts = useCallback(async (searchQuery: string = '') => {
-        setLoading(true)
+    // Pagination state
+    const [offset, setOffset] = useState(0)
+    const [hasMore, setHasMore] = useState(true)
+    const [loadingMore, setLoadingMore] = useState(false)
+    const [total, setTotal] = useState(0)
+    const loadMoreRef = useRef<HTMLDivElement>(null)
+    const PAGE_SIZE = 20
+
+    const fetchPosts = useCallback(async (searchQuery: string = '', isLoadMore: boolean = false) => {
+        if (isLoadMore) {
+            setLoadingMore(true)
+        } else {
+            setLoading(true)
+            setOffset(0)
+            setHasMore(true)
+        }
         setError(null)
+
         try {
+            const currentOffset = isLoadMore ? offset : 0
             const params = new URLSearchParams()
             if (searchQuery) params.append('search', searchQuery)
+            params.append('limit', PAGE_SIZE.toString())
+            params.append('offset', currentOffset.toString())
 
             const response = await fetch(`${API_URL}/api/posts?${params.toString()}`, {
                 credentials: 'include',
@@ -69,18 +87,67 @@ function DashboardContent() {
             }
 
             const data = await response.json()
-            setPosts(data.posts || [])
+            const newPosts = data.posts || []
+            const totalCount = data.total || 0
+
+            setTotal(totalCount)
+
+            if (isLoadMore) {
+                setPosts(prev => [...prev, ...newPosts])
+                setOffset(prev => prev + newPosts.length)
+            } else {
+                setPosts(newPosts)
+                setOffset(newPosts.length)
+            }
+
+            // Check if there are more posts to load
+            const loadedCount = isLoadMore ? offset + newPosts.length : newPosts.length
+            setHasMore(loadedCount < totalCount)
         } catch (err) {
             console.error('Fetch error:', err)
             setError('Failed to load posts. Please try again.')
         } finally {
-            setLoading(false)
+            if (isLoadMore) {
+                setLoadingMore(false)
+            } else {
+                setLoading(false)
+            }
         }
-    }, [router])
+    }, [router, offset])
+
+    // Load more function for infinite scroll
+    const loadMore = useCallback(() => {
+        if (!loadingMore && hasMore && !loading) {
+            fetchPosts(query, true)
+        }
+    }, [fetchPosts, loadingMore, hasMore, loading, query])
+
+    // Intersection Observer for infinite scroll
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+                    loadMore()
+                }
+            },
+            { rootMargin: '300px' } // Start loading 300px before reaching the end
+        )
+
+        const currentRef = loadMoreRef.current
+        if (currentRef) {
+            observer.observe(currentRef)
+        }
+
+        return () => {
+            if (currentRef) {
+                observer.unobserve(currentRef)
+            }
+        }
+    }, [hasMore, loading, loadingMore, loadMore])
 
     useEffect(() => {
         fetchPosts(initialQuery)
-    }, [fetchPosts, initialQuery])
+    }, [initialQuery]) // Remove fetchPosts from deps to avoid infinite loop
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault()
@@ -301,6 +368,23 @@ function DashboardContent() {
                             }}
                         />
                     ))}
+                </div>
+            )}
+
+            {/* Load More Trigger & Indicator */}
+            {!loading && !error && posts.length > 0 && (
+                <div ref={loadMoreRef} className="flex justify-center py-8">
+                    {loadingMore && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>Loading more posts...</span>
+                        </div>
+                    )}
+                    {!hasMore && posts.length > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                            All {total} posts loaded
+                        </p>
+                    )}
                 </div>
             )}
         </div>

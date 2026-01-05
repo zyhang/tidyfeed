@@ -324,7 +324,7 @@ async function saveTweetToTidyFeed(tweet: any): Promise<boolean> {
             author: {
                 name: tweet.authorName || '',
                 handle: tweet.authorHandle || '',
-                avatar: '' // We might miss avatar in network interceptor... acceptable fallback
+                avatar: tweet.authorAvatar || ''
             },
             media: [], // Interceptor might not parse media URLs deeply yet?
             url: `https://x.com/${tweet.authorHandle}/status/${tweet.id}`

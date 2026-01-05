@@ -1186,27 +1186,34 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 		const limit = Math.min(parseInt(c.req.query('limit') || '20'), 100);
 		const offset = parseInt(c.req.query('offset') || '0');
 
-		let query = 'SELECT * FROM saved_posts WHERE user_id = ?';
-		const params: any[] = [userId];
+		let baseQuery = 'FROM saved_posts WHERE user_id = ?';
+		const baseParams: any[] = [userId];
 
 		if (search) {
-			query += ' AND (content LIKE ? OR author_info LIKE ?)';
-			params.push(`%${search}%`, `%${search}%`);
+			baseQuery += ' AND (content LIKE ? OR author_info LIKE ?)';
+			baseParams.push(`%${search}%`, `%${search}%`);
 		}
 
-		// Sort by pinned_at DESC first (pinned items), then created_at DESC
-		query += ' ORDER BY pinned_at DESC, created_at DESC LIMIT ? OFFSET ?';
-		params.push(limit, offset);
-
-		const posts = await c.env.DB.prepare(query).bind(...params).all<any>();
+		// Get total count for pagination
+		const countResult = await c.env.DB.prepare(`SELECT COUNT(*) as total ${baseQuery}`)
+			.bind(...baseParams)
+			.first<{ total: number }>();
+		const total = countResult?.total || 0;
 
 		// If no posts, return early
-		if (!posts.results || posts.results.length === 0) {
+		if (total === 0) {
 			return c.json({
 				count: 0,
+				total: 0,
 				posts: [],
 			});
 		}
+
+		// Sort by pinned_at DESC first (pinned items), then created_at DESC
+		const query = `SELECT * ${baseQuery} ORDER BY pinned_at DESC, created_at DESC LIMIT ? OFFSET ?`;
+		const params = [...baseParams, limit, offset];
+
+		const posts = await c.env.DB.prepare(query).bind(...params).all<any>();
 
 		// Parse JSON fields and extract IDs for tag fetching
 		const formattedPosts = posts.results.map((post) => ({
@@ -1331,6 +1338,7 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 
 		return c.json({
 			count: formattedPosts.length,
+			total,
 			posts: formattedPosts,
 		});
 	} catch (error) {

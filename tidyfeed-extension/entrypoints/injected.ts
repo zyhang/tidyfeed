@@ -35,11 +35,13 @@ export default defineUnlistedScript(() => {
         fullText: string;
         authorHandle: string;
         authorName: string;
+        authorAvatar: string;
         isNoteTweet: boolean;
         quotedTweet?: {
             id: string;
             fullText: string;
             authorHandle: string;
+            authorAvatar: string;
         };
     }
 
@@ -105,16 +107,19 @@ export default defineUnlistedScript(() => {
     /**
      * Extract author info from tweet result
      */
-    function extractAuthorInfo(tweetResult: any): { handle: string; name: string } | null {
+    function extractAuthorInfo(tweetResult: any): { handle: string; name: string; avatar: string } | null {
         try {
             const result = tweetResult?.result || tweetResult;
             const tweet = result?.tweet || result;
             const userResults = tweet?.core?.user_results?.result;
 
             if (userResults?.legacy) {
+                // Get avatar URL and replace _normal with _bigger for higher resolution
+                const avatarUrl = userResults.legacy.profile_image_url_https || '';
                 return {
                     handle: userResults.legacy.screen_name || '',
                     name: userResults.legacy.name || '',
+                    avatar: avatarUrl.replace('_normal', '_bigger'),
                 };
             }
             return null;
@@ -144,6 +149,7 @@ export default defineUnlistedScript(() => {
                     id,
                     fullText: textInfo.fullText,
                     authorHandle: authorInfo?.handle || '',
+                    authorAvatar: authorInfo?.avatar || '',
                 };
             }
             return undefined;
@@ -191,6 +197,7 @@ export default defineUnlistedScript(() => {
                 fullText: textInfo.fullText,
                 authorHandle: authorInfo?.handle || '',
                 authorName: authorInfo?.name || '',
+                authorAvatar: authorInfo?.avatar || '',
                 isNoteTweet: textInfo.isNoteTweet,
                 quotedTweet,
             };
@@ -267,6 +274,7 @@ export default defineUnlistedScript(() => {
                             fullText: tweet.quotedTweet.fullText,
                             authorHandle: tweet.quotedTweet.authorHandle,
                             authorName: '',
+                            authorAvatar: tweet.quotedTweet.authorAvatar || '',
                             isNoteTweet: false,
                         });
                     }
