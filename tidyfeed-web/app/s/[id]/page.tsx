@@ -4,9 +4,8 @@ export const runtime = 'edge';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, X, Loader2, StickyNote, Plus, MessageSquarePlus, Brain, BookMarked, ChevronRight, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Sparkles, X, Loader2, StickyNote, Plus, MessageSquarePlus, Brain, BookMarked, ChevronRight, PanelRightClose, PanelRightOpen, Lightbulb, Quote, MoreVertical, Pencil, Trash2, Wand2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import NoteItem from '@/components/NoteItem';
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
 
 interface Note {
@@ -34,7 +33,7 @@ const SnapshotContent = React.memo(
             <div
                 ref={ref}
                 className={`
-                    transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
+                    transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
                     min-h-screen
                 `}
                 style={{ marginRight: `${panelWidth}px` }}
@@ -45,7 +44,155 @@ const SnapshotContent = React.memo(
 );
 SnapshotContent.displayName = 'SnapshotContent';
 
-type TabType = 'all' | 'insights' | 'notes';
+type TabType = 'insights' | 'notes';
+
+// Note Card Component - Redesigned
+function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
+    note: Note;
+    isOwner: boolean;
+    onEdit: (id: number, content: string) => Promise<void>;
+    onDelete: (id: number) => void;
+    onHighlightClick: (note: Note) => void;
+}) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editContent, setEditContent] = useState(note.note_content);
+    const [isSaving, setIsSaving] = useState(false);
+    const [showActions, setShowActions] = useState(false);
+
+    const handleSave = async () => {
+        if (!editContent.trim() || editContent === note.note_content) {
+            setIsEditing(false);
+            return;
+        }
+        setIsSaving(true);
+        try {
+            await onEdit(note.id, editContent.trim());
+            setIsEditing(false);
+        } catch {
+            setEditContent(note.note_content);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const formatTime = (dateStr: string) => {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diff = now.getTime() - date.getTime();
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        if (minutes < 1) return 'now';
+        if (minutes < 60) return `${minutes}m`;
+        if (hours < 24) return `${hours}h`;
+        if (days < 7) return `${days}d`;
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
+    return (
+        <div
+            className="group relative pl-4 pr-2 py-3 hover:bg-white/50 rounded-r-2xl transition-all duration-200 border-l-2 border-transparent hover:border-violet-400"
+            onMouseEnter={() => setShowActions(true)}
+            onMouseLeave={() => setShowActions(false)}
+        >
+            {/* Timeline Dot */}
+            <div className="absolute left-0 top-5 -translate-x-1/2 w-3 h-3 rounded-full bg-violet-200 ring-4 ring-white group-hover:bg-violet-500 group-hover:ring-violet-100 transition-all duration-200" />
+
+            {/* Selected Text Quote */}
+            <button
+                onClick={() => onHighlightClick(note)}
+                className="w-full text-left mb-2 group/btn"
+            >
+                <div className="flex items-start gap-2">
+                    <Quote className="h-3.5 w-3.5 text-violet-300 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-zinc-500 leading-relaxed line-clamp-2 font-serif italic">
+                        {note.selected_text}
+                    </p>
+                </div>
+            </button>
+
+            {/* Note Content */}
+            {isEditing ? (
+                <div className="mt-2 space-y-2">
+                    <textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSave();
+                            }
+                            if (e.key === 'Escape') {
+                                setIsEditing(false);
+                                setEditContent(note.note_content);
+                            }
+                        }}
+                        autoFocus
+                        rows={3}
+                        className="w-full px-3 py-2.5 text-sm text-zinc-800 bg-white border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 placeholder:text-zinc-400 transition-all shadow-sm"
+                        placeholder="Your note..."
+                    />
+                    <div className="flex items-center justify-end gap-2">
+                        <button
+                            onClick={() => {
+                                setIsEditing(false);
+                                setEditContent(note.note_content);
+                            }}
+                            disabled={isSaving}
+                            className="px-3 py-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving || !editContent.trim()}
+                            className="px-3 py-1.5 text-xs font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-all flex items-center gap-1.5 shadow-sm shadow-violet-600/20"
+                        >
+                            {isSaving ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                                <Plus className="h-3 w-3" />
+                            )}
+                            Save
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div className="mt-2">
+                    <p className="text-sm text-zinc-800 leading-relaxed whitespace-pre-wrap">
+                        {note.note_content}
+                    </p>
+                </div>
+            )}
+
+            {/* Footer */}
+            <div className="mt-2 flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400 font-medium tracking-wide uppercase">
+                    {formatTime(note.created_at)}
+                </span>
+
+                {isOwner && !isEditing && (
+                    <div className={`flex items-center gap-0.5 transition-opacity duration-200 ${showActions ? 'opacity-100' : 'opacity-0'}`}>
+                        <button
+                            onClick={() => setIsEditing(true)}
+                            className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-violet-50 text-zinc-400 hover:text-violet-600 transition-colors"
+                            title="Edit"
+                        >
+                            <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                            onClick={() => onDelete(note.id)}
+                            className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-zinc-400 hover:text-red-500 transition-colors"
+                            title="Delete"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 export default function SnapshotViewerPage() {
     const params = useParams();
@@ -58,7 +205,7 @@ export default function SnapshotViewerPage() {
     const [error, setError] = useState<string | null>(null);
 
     const [showPanel, setShowPanel] = useState(false);
-    const [activeTab, setActiveTab] = useState<TabType>('all');
+    const [activeTab, setActiveTab] = useState<TabType>('insights');
 
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
@@ -85,7 +232,7 @@ export default function SnapshotViewerPage() {
 
     const getPanelWidth = () => {
         if (!showPanel) return 0;
-        return 440;
+        return 420;
     };
 
     const panelWidth = getPanelWidth();
@@ -142,7 +289,7 @@ export default function SnapshotViewerPage() {
         setSummaryLoading(true);
         setSummaryError(null);
         setShowPanel(true);
-        setActiveTab('all');
+        setActiveTab('insights');
 
         try {
             const response = await fetch(`${apiUrl}/api/ai/summarize`, {
@@ -252,7 +399,7 @@ export default function SnapshotViewerPage() {
                 setShowNoteInput(false);
                 setNoteInput('');
                 setShowPanel(true);
-                setActiveTab('all');
+                setActiveTab('notes');
                 window.getSelection()?.removeAllRanges();
                 fetchNotes();
             } else if (response.status === 401) {
@@ -315,7 +462,7 @@ export default function SnapshotViewerPage() {
     const handleHighlightClick = (note: Note) => {
         setHighlightedNoteId(note.id);
         setShowPanel(true);
-        setActiveTab('all');
+        setActiveTab('notes');
         setTimeout(() => {
             const noteElement = document.getElementById(`note-${note.id}`);
             noteElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -329,7 +476,6 @@ export default function SnapshotViewerPage() {
         const doc = parser.parseFromString(snapshotHtml, 'text/html');
         const body = doc.body;
 
-        // Build index of all text nodes with their global offsets
         const buildTextIndex = () => {
             const walker = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
             const textNodes: { node: Text; start: number; end: number }[] = [];
@@ -346,7 +492,6 @@ export default function SnapshotViewerPage() {
 
         const { textNodes, totalLength } = buildTextIndex();
 
-        // Resolve range for each note - prioritize offset, fallback to text search
         const resolveRange = (note: Note) => {
             const start = note.text_offset_start;
             const end = note.text_offset_end;
@@ -354,7 +499,6 @@ export default function SnapshotViewerPage() {
                 return { start, end };
             }
 
-            // Fallback: search for selected_text (first occurrence)
             if (!note.selected_text) return null;
             const fullText = textNodes.map(t => t.node.textContent || '').join('');
             const pos = fullText.indexOf(note.selected_text);
@@ -362,7 +506,6 @@ export default function SnapshotViewerPage() {
             return { start: pos, end: pos + note.selected_text.length };
         };
 
-        // Process notes - sort by start position descending to avoid offset invalidation
         const sortedNotes = [...notes]
             .map((note) => {
                 const range = resolveRange(note);
@@ -371,9 +514,7 @@ export default function SnapshotViewerPage() {
             .filter((item): item is { note: Note; range: { start: number; end: number } } => !!item)
             .sort((a, b) => b.range.start - a.range.start);
 
-        // Apply highlight for each note by processing all text nodes in range
         const applyHighlight = (note: Note, startPos: number, endPos: number) => {
-            // Re-collect text nodes (DOM may have changed from previous highlights)
             const currentWalker = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
             const currentNodes: { node: Text; start: number; end: number }[] = [];
             let n: Node | null;
@@ -385,12 +526,10 @@ export default function SnapshotViewerPage() {
                 off += len;
             }
 
-            // Find all text nodes that overlap with the highlight range
             const nodesToProcess = currentNodes.filter(
                 ({ start, end }) => end > startPos && start < endPos
             );
 
-            // Process each overlapping node
             for (const { node: textNode, start: nodeStart, end: nodeEnd } of nodesToProcess) {
                 const nodeText = textNode.textContent || '';
                 const localStart = Math.max(0, startPos - nodeStart);
@@ -418,25 +557,23 @@ export default function SnapshotViewerPage() {
             }
         };
 
-        // Apply all highlights
         for (const { note, range } of sortedNotes) {
             applyHighlight(note, range.start, range.end);
         }
 
-        // Inject highlight styles
         const style = doc.createElement('style');
         style.textContent = `
             .note-highlight {
-                background: linear-gradient(to bottom, rgba(139, 92, 246, 0.12) 0%, rgba(139, 92, 246, 0.18) 100%);
-                border-bottom: 2px solid rgba(139, 92, 246, 0.35);
+                background: linear-gradient(to bottom, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.20) 100%);
+                border-bottom: 2px solid rgb(139, 92, 246);
                 cursor: pointer;
                 transition: all 0.2s ease;
                 padding: 1px 0;
                 border-radius: 2px;
             }
             .note-highlight:hover {
-                background: linear-gradient(to bottom, rgba(139, 92, 246, 0.18) 0%, rgba(139, 92, 246, 0.25) 100%);
-                border-bottom-color: rgba(139, 92, 246, 0.5);
+                background: linear-gradient(to bottom, rgba(139, 92, 246, 0.25) 0%, rgba(139, 92, 246, 0.30) 100%);
+                border-bottom-width: 3px;
             }
         `;
         doc.head.appendChild(style);
@@ -475,8 +612,8 @@ export default function SnapshotViewerPage() {
             styleEl.id = STYLE_ID;
             styleEl.textContent = `
                 .active-selection {
-                    background: linear-gradient(to bottom, rgba(99, 102, 241, 0.10) 0%, rgba(99, 102, 241, 0.20) 100%);
-                    border-bottom: 2px solid rgba(99, 102, 241, 0.35);
+                    background: linear-gradient(to bottom, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.25) 100%);
+                    border-bottom: 2px solid rgb(99, 102, 241);
                     border-radius: 2px;
                     padding: 1px 0;
                     transition: background 0.2s ease;
@@ -521,66 +658,65 @@ export default function SnapshotViewerPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center font-sans">
-                <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-zinc-100 flex items-center justify-center font-sans">
+                <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-6 w-6 text-violet-500 animate-spin" />
+                    <p className="text-sm text-zinc-500 font-medium">Loading snapshot...</p>
+                </div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center font-sans">
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-zinc-100 flex items-center justify-center font-sans">
                 <p className="text-zinc-500 text-sm font-medium">{error}</p>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] relative overflow-hidden font-sans">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-zinc-100 relative overflow-hidden font-sans">
             {/* Top Control Bar */}
-            <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-zinc-200">
+            <div className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-xl border-b border-zinc-200/50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6">
                     <div className="h-14 flex items-center justify-between gap-4">
                         {/* Left - Breadcrumb */}
                         <div className="flex items-center gap-2 text-sm">
                             <button
                                 onClick={() => router.push('/dashboard')}
-                                className="text-zinc-500 hover:text-zinc-900 transition-colors"
+                                className="text-zinc-500 hover:text-zinc-900 transition-colors font-medium"
                             >
                                 Dashboard
                             </button>
                             <ChevronRight className="h-4 w-4 text-zinc-300" />
-                            <span className="text-zinc-900 font-medium">Snapshot</span>
+                            <span className="text-zinc-900 font-semibold">Snapshot</span>
                         </div>
 
-                        {/* Right - Controls */}
-                        <div className="flex items-center gap-2">
-                            {/* Panel Toggle */}
-                            <button
-                                onClick={() => setShowPanel(!showPanel)}
-                                className={`
-                                    h-9 px-4 rounded-xl text-sm font-medium
-                                    flex items-center gap-2 transition-all duration-200
-                                    border
-                                    ${showPanel
-                                        ? 'bg-zinc-900 text-white border-zinc-800'
-                                        : 'bg-white text-zinc-600 border-zinc-200 hover:text-zinc-900 hover:border-zinc-300'
-                                    }
-                                `}
-                            >
-                                {showPanel ? (
-                                    <>
-                                        <PanelRightClose className="h-4 w-4" />
-                                        <span className="hidden sm:inline">Hide Panel</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <PanelRightOpen className="h-4 w-4" />
-                                        <span className="hidden sm:inline">Show Panel</span>
-                                    </>
-                                )}
-                            </button>
-                        </div>
+                        {/* Right - Panel Toggle */}
+                        <button
+                            onClick={() => setShowPanel(!showPanel)}
+                            className={`
+                                h-9 px-4 rounded-full text-sm font-semibold
+                                flex items-center gap-2 transition-all duration-200
+                                ${showPanel
+                                    ? 'bg-zinc-900 text-white shadow-lg shadow-zinc-900/20'
+                                    : 'bg-white text-zinc-600 border border-zinc-200 hover:border-zinc-300 hover:text-zinc-900 shadow-sm'
+                                }
+                            `}
+                        >
+                            {showPanel ? (
+                                <>
+                                    <PanelRightClose className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Hide</span>
+                                </>
+                            ) : (
+                                <>
+                                    <PanelRightOpen className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Panel</span>
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -594,10 +730,10 @@ export default function SnapshotViewerPage() {
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setShowNoteInput(true)}
                     tabIndex={-1}
-                    className="note-action-btn fixed z-[70] h-11 w-11 bg-violet-600 text-white rounded-2xl shadow-lg shadow-violet-600/20 flex items-center justify-center hover:bg-violet-700 hover:shadow-xl hover:shadow-violet-600/30 hover:scale-105 transition-all duration-200 animate-in fade-in zoom-in-50"
+                    className="note-action-btn fixed z-[70] h-12 w-12 bg-violet-600 text-white rounded-2xl shadow-xl shadow-violet-600/25 flex items-center justify-center hover:bg-violet-700 hover:shadow-2xl hover:shadow-violet-600/35 hover:scale-105 transition-all duration-200 animate-in fade-in zoom-in-50"
                     style={{
-                        top: selection.rect.top + window.scrollY - 52,
-                        left: selection.rect.left + selection.rect.width / 2 - 22,
+                        top: selection.rect.top + window.scrollY - 56,
+                        left: selection.rect.left + selection.rect.width / 2 - 24,
                     }}
                     title="Add a note"
                 >
@@ -608,10 +744,10 @@ export default function SnapshotViewerPage() {
             {/* Note Input Popup */}
             {selection && showNoteInput && currentUserId && (
                 <div
-                    className="note-input-popup fixed z-[80] bg-white rounded-2xl shadow-2xl shadow-zinc-900/10 border border-zinc-200 p-5 w-[380px] animate-in fade-in slide-in-from-top-2 duration-200"
+                    className="note-input-popup fixed z-[80] bg-white rounded-2xl shadow-2xl shadow-zinc-900/10 border border-zinc-200/60 p-5 w-[400px] animate-in fade-in slide-in-from-top-2 duration-200"
                     style={{
                         top: selection.rect.bottom + window.scrollY + 12,
-                        left: Math.max(12, Math.min(selection.rect.left + selection.rect.width / 2 - 190, window.innerWidth - 392)),
+                        left: Math.max(12, Math.min(selection.rect.left + selection.rect.width / 2 - 200, window.innerWidth - 412)),
                     }}
                 >
                     <button
@@ -626,8 +762,16 @@ export default function SnapshotViewerPage() {
                         <X className="h-4 w-4" />
                     </button>
 
-                    <h3 className="text-sm font-semibold text-zinc-900 mb-3">Add Note</h3>
-                    <p className="text-xs text-zinc-500 mb-3 line-clamp-2">{selection.text}</p>
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="h-7 w-7 rounded-lg bg-violet-100 flex items-center justify-center">
+                            <StickyNote className="h-4 w-4 text-violet-600" />
+                        </div>
+                        <h3 className="text-sm font-bold text-zinc-900">Add Note</h3>
+                    </div>
+
+                    <p className="text-xs text-zinc-500 mb-4 line-clamp-2 bg-zinc-50 rounded-lg px-3 py-2 border border-zinc-100">
+                        "{selection.text}"
+                    </p>
 
                     <textarea
                         value={noteInput}
@@ -646,15 +790,15 @@ export default function SnapshotViewerPage() {
                         }}
                         autoFocus
                         rows={3}
-                        placeholder="Write your note..."
-                        className="w-full px-3 py-2.5 text-sm text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-300 placeholder:text-zinc-400 transition-all"
+                        placeholder="Write your thoughts..."
+                        className="w-full px-3 py-2.5 text-sm text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 placeholder:text-zinc-400 transition-all"
                     />
-                    <div className="mt-3 flex items-center justify-between">
+                    <div className="mt-4 flex items-center justify-between">
                         <span className="text-[11px] text-zinc-400">Press Enter to save</span>
                         <button
                             onClick={handleCreateNote}
                             disabled={!noteInput.trim() || isCreatingNote}
-                            className="h-9 px-4 text-sm font-medium bg-violet-600 text-white rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm shadow-violet-600/20"
+                            className="h-9 px-5 text-sm font-semibold bg-violet-600 text-white rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-lg shadow-violet-600/20"
                         >
                             {isCreatingNote ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -676,289 +820,274 @@ export default function SnapshotViewerPage() {
                 />
             </div>
 
-            {/* Side Panel */}
+            {/* Side Panel - Completely Redesigned */}
             <div
                 className={`
                     sidebar-panel fixed top-14 right-0 bottom-0 z-40
-                    bg-white border-l border-zinc-200
+                    bg-gradient-to-b from-white to-zinc-50/80
+                    border-l border-zinc-200/60
                     shadow-2xl shadow-zinc-900/5
                     flex flex-col
-                    transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
+                    transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
                 `}
                 style={{
                     width: `${panelWidth}px`,
                     transform: showPanel ? 'translateX(0)' : 'translateX(100%)'
                 }}
             >
-                {/* Panel Header with Tabs */}
-                <div className="border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
-                    <div className="px-5 pt-4">
-                        {/* Tab Navigation */}
-                        <div className="flex gap-1 bg-zinc-100 rounded-xl p-1">
-                            <button
-                                onClick={() => {
-                                    setActiveTab('all');
-                                    if (!summary && !summaryLoading) {
-                                        handleGenerateSummary();
-                                    }
-                                }}
-                                className={`
-                                    flex-1 h-9 px-3 rounded-lg text-sm font-medium
-                                    flex items-center justify-center gap-1.5
-                                    transition-all duration-200
-                                    ${activeTab === 'all'
-                                        ? 'bg-white text-zinc-900 shadow-sm'
-                                        : 'text-zinc-500 hover:text-zinc-700'
-                                    }
-                                `}
-                            >
-                                <BookMarked className="h-3.5 w-3.5" />
-                                <span>All</span>
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setActiveTab('insights');
-                                    if (!summary && !summaryLoading) {
-                                        handleGenerateSummary();
-                                    }
-                                }}
-                                className={`
-                                    flex-1 h-9 px-3 rounded-lg text-sm font-medium
-                                    flex items-center justify-center gap-1.5
-                                    transition-all duration-200
-                                    ${activeTab === 'insights'
-                                        ? 'bg-white text-zinc-900 shadow-sm'
-                                        : 'text-zinc-500 hover:text-zinc-700'
-                                    }
-                                `}
-                            >
-                                <Brain className="h-3.5 w-3.5" />
-                                <span>Insights</span>
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('notes')}
-                                className={`
-                                    relative flex-1 h-9 px-3 rounded-lg text-sm font-medium
-                                    flex items-center justify-center gap-1.5
-                                    transition-all duration-200
-                                    ${activeTab === 'notes'
-                                        ? 'bg-white text-zinc-900 shadow-sm'
-                                        : 'text-zinc-500 hover:text-zinc-700'
-                                    }
-                                `}
-                            >
-                                <StickyNote className="h-3.5 w-3.5" />
-                                <span>Notes</span>
-                                {notes.length > 0 && (
-                                    <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full text-[10px] font-semibold flex items-center justify-center bg-violet-500 text-white">
-                                        {notes.length}
-                                    </span>
-                                )}
-                            </button>
-                        </div>
+                {/* Panel Header - Minimalist Tabs */}
+                <div className="border-b border-zinc-200/50 bg-white/80 backdrop-blur-xl">
+                    <div className="flex">
+                        <button
+                            onClick={() => {
+                                setActiveTab('insights');
+                                if (!summary && !summaryLoading) {
+                                    handleGenerateSummary();
+                                }
+                            }}
+                            className={`
+                                flex-1 h-14 text-sm font-semibold
+                                flex items-center justify-center gap-2
+                                transition-all duration-200 relative
+                                ${activeTab === 'insights'
+                                    ? 'text-violet-700'
+                                    : 'text-zinc-400 hover:text-zinc-600'
+                                }
+                            `}
+                        >
+                            <Brain className="h-4 w-4" />
+                            <span>AI Insights</span>
+                            {activeTab === 'insights' && (
+                                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-violet-500 rounded-full" />
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('notes')}
+                            className={`
+                                flex-1 h-14 text-sm font-semibold
+                                flex items-center justify-center gap-2 relative
+                                transition-all duration-200
+                                ${activeTab === 'notes'
+                                    ? 'text-amber-700'
+                                    : 'text-zinc-400 hover:text-zinc-600'
+                                }
+                            `}
+                        >
+                            <StickyNote className="h-4 w-4" />
+                            <span>Notes</span>
+                            {notes.length > 0 && (
+                                <span className={`h-5 min-w-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${activeTab === 'notes' ? 'bg-amber-500 text-white' : 'bg-zinc-200 text-zinc-600'}`}>
+                                    {notes.length}
+                                </span>
+                            )}
+                            {activeTab === 'notes' && (
+                                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-amber-500 rounded-full" />
+                            )}
+                        </button>
                     </div>
                 </div>
 
                 {/* Panel Content */}
-                <div className="flex-1 overflow-y-auto px-5 py-5 bg-zinc-50/50">
-                    {(activeTab === 'all' || activeTab === 'insights') && (
-                        <div className={activeTab === 'all' ? 'mb-4' : ''}>
-                            {/* Bento Card - AI Insights */}
-                            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
-                                <div className="px-5 py-4 border-b border-zinc-100">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
-                                            <Brain className="h-4 w-4 text-white" />
+                <div className="flex-1 overflow-y-auto">
+                    {/* AI Insights Tab */}
+                    {activeTab === 'insights' && (
+                        <div className="p-5">
+                            {!summary && !summaryLoading && !summaryError && (
+                                <div className="flex flex-col items-center justify-center text-center py-12">
+                                    {/* Hero-style Generate Button */}
+                                    <button
+                                        onClick={handleGenerateSummary}
+                                        className="group relative h-20 w-20 mb-6"
+                                    >
+                                        <div className="absolute inset-0 bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 rounded-3xl opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
+                                        <div className="absolute inset-0 bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 rounded-3xl blur-xl opacity-50 group-hover:opacity-70 group-hover:blur-2xl transition-all duration-500" />
+                                        <div className="relative h-full w-full rounded-3xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-xl shadow-violet-500/30 group-hover:shadow-2xl group-hover:shadow-violet-500/40 group-hover:scale-105 transition-all duration-300">
+                                            <Wand2 className="h-9 w-9 text-white" />
                                         </div>
-                                        <div>
-                                            <h3 className="text-sm font-semibold text-zinc-900">AI Insights</h3>
-                                            <p className="text-xs text-zinc-500">Summary & analysis</p>
+                                        {/* Shine effect */}
+                                        <div className="absolute inset-0 rounded-3xl overflow-hidden">
+                                            <div className="absolute -top-full left-1/2 -translate-x-1/2 w-1/2 h-full bg-gradient-to-b from-white/30 to-transparent rotate-45 group-hover:animate-[shine_1s_ease-in-out]" />
                                         </div>
+                                    </button>
+                                    <h3 className="text-base font-bold text-zinc-900 mb-2">
+                                        Generate AI Insights
+                                    </h3>
+                                    <p className="text-sm text-zinc-500 max-w-[220px] leading-relaxed">
+                                        Get an AI-powered summary and key takeaways from this tweet
+                                    </p>
+                                </div>
+                            )}
+
+                            {summaryLoading && (
+                                <div className="flex flex-col items-center justify-center py-16">
+                                    <div className="relative mb-6">
+                                        {/* Animated gradient ring */}
+                                        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center">
+                                            <Brain className="h-8 w-8 text-violet-500 animate-pulse" />
+                                        </div>
+                                        <div className="absolute inset-0 h-16 w-16 rounded-2xl border-2 border-violet-200 animate-spin" style={{ animationDuration: '3s' }} />
+                                        <div className="absolute -inset-2 h-20 w-20 rounded-2xl border border-violet-100 animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
+                                    </div>
+                                    <p className="text-sm font-semibold text-zinc-800 animate-pulse">
+                                        Analyzing content...
+                                    </p>
+                                </div>
+                            )}
+
+                            {summaryError && !summaryLoading && (
+                                <div className="bg-red-50/80 backdrop-blur-sm rounded-2xl border border-red-100 p-5">
+                                    <div className="flex items-start gap-3">
+                                        <div className="h-10 w-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                                            <X className="h-5 w-5 text-red-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-sm font-bold text-red-900 mb-1">Analysis Failed</h3>
+                                            <p className="text-xs text-red-600 leading-relaxed">{summaryError}</p>
+                                        </div>
+                                        <button
+                                            onClick={handleGenerateSummary}
+                                            className="px-3 py-1.5 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                                        >
+                                            Retry
+                                        </button>
                                     </div>
                                 </div>
+                            )}
 
-                                <div className="p-5">
-                                    {summaryLoading && (
-                                        <div className="flex flex-col items-center justify-center py-10 space-y-3">
-                                            <div className="relative">
-                                                <div className="h-11 w-11 rounded-xl bg-violet-50 flex items-center justify-center">
-                                                    <Brain className="h-5.5 w-5.5 text-violet-500 animate-pulse" />
-                                                </div>
-                                                <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-white rounded-full flex items-center justify-center shadow-sm border border-zinc-100">
-                                                    <Loader2 className="h-2.5 w-2.5 text-violet-600 animate-spin" />
-                                                </div>
-                                            </div>
-                                            <div className="text-center">
-                                                <p className="text-sm font-medium text-zinc-800">Analyzing content...</p>
-                                                <p className="text-xs text-zinc-500 mt-1">Extracting key insights</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {summaryError && !summaryLoading && (
-                                        <div className="rounded-xl bg-red-50/80 border border-red-100 p-4">
-                                            <div className="flex items-start gap-3">
-                                                <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                                                    <X className="h-4 w-4 text-red-600" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <h3 className="text-sm font-semibold text-red-900 mb-1">Analysis Failed</h3>
-                                                    <p className="text-xs text-red-600 leading-relaxed">{summaryError}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {summary && !summaryLoading && (
-                                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                            <ReactMarkdown
-                                                components={{
-                                                    p: ({ children }) => (
-                                                        <p className="text-sm leading-[1.75] text-zinc-700 mb-4 last:mb-0">{children}</p>
-                                                    ),
-                                                    strong: ({ children }) => (
-                                                        <strong className="font-semibold text-zinc-900">{children}</strong>
-                                                    ),
-                                                    em: ({ children }) => (
-                                                        <em className="text-zinc-600 font-medium">{children}</em>
-                                                    ),
-                                                    ul: ({ children }) => (
-                                                        <ul className="space-y-2.5 mb-4 pl-0">{children}</ul>
-                                                    ),
-                                                    ol: ({ children }) => (
-                                                        <ol className="space-y-2.5 mb-4 pl-0">{children}</ol>
-                                                    ),
-                                                    li: ({ children }) => (
-                                                        <li className="flex gap-2.5 text-sm leading-[1.7] text-zinc-700">
-                                                            <span className="flex-shrink-0 mt-[6px] w-1 h-1 rounded-full bg-violet-400"></span>
-                                                            <span className="flex-1">{children}</span>
-                                                        </li>
-                                                    ),
-                                                    h2: ({ children }) => (
-                                                        <h2 className="text-sm font-bold text-zinc-900 mt-5 mb-3 flex items-center gap-2">
-                                                            {children}
-                                                        </h2>
-                                                    ),
-                                                    h3: ({ children }) => (
-                                                        <h3 className="text-sm font-semibold text-zinc-900 mt-4 mb-2">{children}</h3>
-                                                    ),
-                                                    blockquote: ({ children }) => (
-                                                        <blockquote className="border-l-2 border-violet-200 pl-3.5 py-2 my-4 text-zinc-600 text-sm leading-[1.75] bg-violet-50/50 rounded-r-lg">
-                                                            {children}
-                                                        </blockquote>
-                                                    ),
-                                                    a: ({ href, children }) => (
-                                                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-700 underline underline-offset-2 decoration-violet-200 hover:decoration-violet-400 transition-colors font-medium">
-                                                            {children}
-                                                        </a>
-                                                    ),
-                                                    code: ({ children }) => (
-                                                        <code className="bg-zinc-100 px-2 py-1 rounded-md text-xs font-mono text-zinc-800 border border-zinc-200">{children}</code>
-                                                    ),
-                                                }}
-                                            >{summary}</ReactMarkdown>
-                                        </div>
-                                    )}
-
-                                    {!summary && !summaryLoading && !summaryError && (
-                                        <div className="flex flex-col items-center justify-center text-center py-8">
-                                            <button
-                                                onClick={handleGenerateSummary}
-                                                className="h-13 w-13 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200 mb-4"
-                                            >
-                                                <Sparkles className="h-6 w-6 text-white" />
-                                            </button>
-                                            <p className="text-sm font-medium text-zinc-900 mb-1">Generate AI Insights</p>
-                                            <p className="text-xs text-zinc-500 max-w-[180px] leading-relaxed">
-                                                Get an AI-powered summary and analysis
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {(activeTab === 'all' || activeTab === 'notes') && (
-                        <div className={activeTab === 'all' ? '' : ''}>
-                            {/* Bento Card - Notes */}
-                            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
-                                <div className="px-5 py-4 border-b border-zinc-100">
-                                    <div className="flex items-center justify-between">
+                            {summary && !summaryLoading && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    {/* Summary Header */}
+                                    <div className="flex items-center justify-between mb-5">
                                         <div className="flex items-center gap-2.5">
-                                            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm">
-                                                <StickyNote className="h-4 w-4 text-white" />
+                                            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/25">
+                                                <Sparkles className="h-5 w-5 text-white" />
                                             </div>
                                             <div>
-                                                <h3 className="text-sm font-semibold text-zinc-900">Notes</h3>
-                                                <p className="text-xs text-zinc-500">
-                                                    {notes.length > 0 ? `${notes.length} note${notes.length > 1 ? 's' : ''}` : 'Add annotations'}
-                                                </p>
+                                                <h3 className="text-sm font-bold text-zinc-900">AI Analysis</h3>
+                                                <p className="text-xs text-zinc-500">Generated insights</p>
                                             </div>
                                         </div>
+                                        <button
+                                            onClick={handleGenerateSummary}
+                                            className="h-8 w-8 rounded-lg bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center text-zinc-500 hover:text-zinc-700 transition-colors"
+                                            title="Regenerate"
+                                        >
+                                            <Loader2 className="h-4 w-4" />
+                                        </button>
                                     </div>
-                                </div>
 
-                                <div className="p-5">
-                                    {notesLoading && (
-                                        <div className="flex items-center justify-center py-8">
-                                            <Loader2 className="h-5 w-5 text-zinc-400 animate-spin" />
-                                        </div>
-                                    )}
+                                    {/* Summary Content */}
+                                    <div className="bg-white rounded-2xl border border-zinc-200/60 shadow-sm p-5">
+                                        <ReactMarkdown
+                                            components={{
+                                                p: ({ children }) => (
+                                                    <p className="text-sm leading-[1.8] text-zinc-700 mb-4 last:mb-0">{children}</p>
+                                                ),
+                                                strong: ({ children }) => (
+                                                    <strong className="font-bold text-zinc-900">{children}</strong>
+                                                ),
+                                                em: ({ children }) => (
+                                                    <em className="text-violet-700 font-medium">{children}</em>
+                                                ),
+                                                ul: ({ children }) => (
+                                                    <ul className="space-y-3 mb-4 pl-0">{children}</ul>
+                                                ),
+                                                ol: ({ children }) => (
+                                                                                    <ol className="space-y-3 mb-4 pl-0">{children}</ol>
+                                                                                ),
+                                                                                li: ({ children }) => (
+                                                                                    <li className="flex gap-3 text-sm leading-[1.75] text-zinc-700">
+                                                                                        <span className="flex-shrink-0 mt-2 w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+                                                                                        <span className="flex-1">{children}</span>
+                                                                                    </li>
+                                                                                ),
+                                                                                h2: ({ children }) => (
+                                                                                    <h2 className="text-base font-bold text-zinc-900 mt-6 mb-4 flex items-center gap-2">
+                                                                                        {children}
+                                                                                    </h2>
+                                                                                ),
+                                                                                h3: ({ children }) => (
+                                                                                    <h3 className="text-sm font-bold text-zinc-900 mt-5 mb-3">{children}</h3>
+                                                                                ),
+                                                                                blockquote: ({ children }) => (
+                                                                                    <blockquote className="border-l-2 border-violet-300 pl-4 py-3 my-4 text-zinc-600 text-sm leading-[1.75] bg-violet-50/50 rounded-r-xl">
+                                                                                        {children}
+                                                                                    </blockquote>
+                                                                                ),
+                                                                                a: ({ href, children }) => (
+                                                                                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-700 underline underline-offset-2 decoration-violet-200 hover:decoration-violet-400 transition-colors font-medium">
+                                                                                        {children}
+                                                                                    </a>
+                                                                                ),
+                                                                                code: ({ children }) => (
+                                                                                    <code className="bg-zinc-100 px-2 py-1 rounded-lg text-xs font-mono text-zinc-800 border border-zinc-200">{children}</code>
+                                                                                ),
+                                                                            }}
+                                                                        >{summary}</ReactMarkdown>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
 
-                                    {!notesLoading && notes.length > 0 && (
-                                        <div className="space-y-3">
-                                            {notes.map(note => (
-                                                <div
-                                                    key={note.id}
-                                                    id={`note-${note.id}`}
-                                                    className={`
-                                                        transition-all duration-200
-                                                        ${highlightedNoteId === note.id ? 'ring-2 ring-violet-400 ring-offset-2 rounded-xl' : ''}
-                                                    `}
-                                                >
-                                                    <NoteItem
-                                                        note={note}
-                                                        isOwner={isOwner}
-                                                        onEdit={handleEditNote}
-                                                        onDelete={handleDeleteNote}
-                                                        onHighlightClick={handleHighlightClick}
-                                                    />
+                                                    {/* Notes Tab */}
+                                                    {activeTab === 'notes' && (
+                                                        <div className="p-5">
+                                                            {notesLoading && (
+                                                                <div className="flex items-center justify-center py-16">
+                                                                    <Loader2 className="h-6 w-6 text-zinc-300 animate-spin" />
+                                                                </div>
+                                                            )}
+
+                                                            {!notesLoading && notes.length > 0 && (
+                                                                <div className="space-y-1">
+                                                                    {notes.map(note => (
+                                                                        <div
+                                                                            key={note.id}
+                                                                            id={`note-${note.id}`}
+                                                                        >
+                                                                            <NoteCard
+                                                                                note={note}
+                                                                                isOwner={isOwner}
+                                                                                onEdit={handleEditNote}
+                                                                                onDelete={handleDeleteNote}
+                                                                                onHighlightClick={handleHighlightClick}
+                                                                            />
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            {!notesLoading && notes.length === 0 && (
+                                                                <div className="flex flex-col items-center justify-center text-center py-16">
+                                                                    <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 border border-amber-200 flex items-center justify-center mb-5">
+                                                                        <StickyNote className="h-8 w-8 text-amber-500" />
+                                                                    </div>
+                                                                    <h3 className="text-sm font-bold text-zinc-900 mb-2">
+                                                                        No Notes Yet
+                                                                    </h3>
+                                                                    <p className="text-sm text-zinc-500 max-w-[200px] leading-relaxed mb-4">
+                                                                        {currentUserId
+                                                                            ? 'Select any text in the tweet to add your first note'
+                                                                            : 'Log in to add notes to this tweet'}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {!notesLoading && notes.length === 0 && (
-                                        <div className="flex flex-col items-center justify-center text-center py-8">
-                                            <div className="h-13 w-13 rounded-2xl bg-zinc-100 border border-zinc-200 flex items-center justify-center mb-3">
-                                                <MessageSquarePlus className="h-6 w-6 text-zinc-400" />
                                             </div>
-                                            <p className="text-sm font-medium text-zinc-900 mb-1">No Notes Yet</p>
-                                            <p className="text-xs text-zinc-500 max-w-[180px] leading-relaxed">
-                                                {currentUserId
-                                                    ? 'Select text to add notes'
-                                                    : 'Log in to add notes'}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
 
-            {/* Delete Confirmation Dialog */}
-            <DeleteConfirmDialog
-                isOpen={deleteDialogOpen}
-                onClose={() => {
-                    setDeleteDialogOpen(false);
-                    setNoteToDelete(null);
-                }}
-                onConfirm={confirmDelete}
-                isDeleting={isDeleting}
-            />
-        </div>
-    );
-}
+                                            {/* Delete Confirmation Dialog */}
+                                            <DeleteConfirmDialog
+                                                isOpen={deleteDialogOpen}
+                                                onClose={() => {
+                                                    setDeleteDialogOpen(false);
+                                                    setNoteToDelete(null);
+                                                }}
+                                                onConfirm={confirmDelete}
+                                                isDeleting={isDeleting}
+                                            />
+                                        </div>
+                                    );
+                                }
