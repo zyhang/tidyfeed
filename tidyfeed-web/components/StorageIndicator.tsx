@@ -90,7 +90,7 @@ export function StorageIndicator({ isCollapsed, className, ...props }: StorageIn
     }
 
     return (
-        <div className={cn("px-4 py-3 mb-1", className)} {...props}>
+        <div className={cn("px-4 py-3", className)} {...props}>
             <div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold tracking-widest mb-2 select-none">
                 <span className="flex items-center gap-1.5 ">
                     STORAGE

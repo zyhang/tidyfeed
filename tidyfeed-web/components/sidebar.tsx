@@ -189,10 +189,18 @@ export function Sidebar({ className, ...props }: SidebarProps) {
 
             </nav>
 
+            {/* Bottom Section: Storage & Profile */}
             <div className="border-t bg-background z-10">
-                <StorageIndicator isCollapsed={isCollapsed} />
+                {/* Storage Panel */}
+                <div className="p-3 pb-4">
+                    <StorageIndicator isCollapsed={isCollapsed} />
+                </div>
 
-                <div className="p-4 pt-2">
+                {/* Separator */}
+                <div className="h-px bg-border mx-3" />
+
+                {/* Profile Button */}
+                <div className="p-3">
                     <UserNav isCollapsed={isCollapsed} />
                 </div>
             </div>

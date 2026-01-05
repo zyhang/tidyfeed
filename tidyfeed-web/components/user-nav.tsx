@@ -61,8 +61,8 @@ export function UserNav({ isCollapsed }: UserNavProps) {
     if (loading) {
         return (
             <div className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-md transition-colors",
-                isCollapsed && "justify-center px-2"
+                "flex items-center gap-2 rounded-md transition-colors",
+                isCollapsed && "justify-center"
             )}>
                 <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
                 {!isCollapsed && (
@@ -83,8 +83,8 @@ export function UserNav({ isCollapsed }: UserNavProps) {
             <DropdownMenuTrigger asChild>
                 <button
                     className={cn(
-                        "w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors outline-none",
-                        isCollapsed && "justify-center px-2"
+                        "w-full flex items-center gap-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors outline-none",
+                        isCollapsed && "justify-center"
                     )}
                 >
                     <Avatar className="h-8 w-8">
