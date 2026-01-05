@@ -200,9 +200,12 @@ export default function SnapshotViewerPage() {
         selectionRangeRef.current = range.cloneRange();
 
         const rect = range.getBoundingClientRect();
-        const textContent = container.textContent || '';
-        const offsetStart = textContent.indexOf(text);
-        const offsetEnd = offsetStart + text.length;
+        const rawText = range.toString();
+        const preRange = range.cloneRange();
+        preRange.selectNodeContents(container);
+        preRange.setEnd(range.startContainer, range.startOffset);
+        const offsetStart = preRange.toString().length;
+        const offsetEnd = offsetStart + rawText.length;
 
         setSelection({
             text,
@@ -320,72 +323,90 @@ export default function SnapshotViewerPage() {
     };
 
     const highlightedHtml = useMemo(() => {
-        if (notes.length === 0 || !snapshotHtml) return snapshotHtml;
+        if (!snapshotHtml) return snapshotHtml;
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(snapshotHtml, 'text/html');
         const body = doc.body;
 
-        const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
-        const textNodes: Text[] = [];
-        let node: Node | null;
-        while ((node = walker.nextNode())) {
-            textNodes.push(node as Text);
-        }
+        const buildTextIndex = () => {
+            const walker = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
+            const textNodes: Text[] = [];
+            let node: Node | null;
+            while ((node = walker.nextNode())) {
+                textNodes.push(node as Text);
+            }
+            const fullText = textNodes.map((textNode) => textNode.textContent || '').join('');
+            return { textNodes, fullText };
+        };
 
-        let fullText = '';
-        const nodeMapping: { node: Text; start: number; end: number }[] = [];
-        for (const textNode of textNodes) {
-            const start = fullText.length;
-            fullText += textNode.textContent || '';
-            nodeMapping.push({ node: textNode, start, end: fullText.length });
-        }
+        const { fullText } = buildTextIndex();
+
+        const resolveRange = (note: Note) => {
+            const start = note.text_offset_start;
+            const end = note.text_offset_end;
+            if (typeof start === 'number' && typeof end === 'number' && end > start) {
+                return { start, end };
+            }
+
+            if (!note.selected_text) return null;
+            const pos = fullText.indexOf(note.selected_text);
+            if (pos === -1) return null;
+            return { start: pos, end: pos + note.selected_text.length };
+        };
 
         const sortedNotes = [...notes]
-            .filter(n => n.selected_text && n.selected_text.length > 0)
-            .sort((a, b) => {
-                const posA = fullText.indexOf(a.selected_text);
-                const posB = fullText.indexOf(b.selected_text);
-                return posB - posA;
-            });
+            .map((note) => {
+                const range = resolveRange(note);
+                return range ? { note, range } : null;
+            })
+            .filter((item): item is { note: Note; range: { start: number; end: number } } => !!item)
+            .sort((a, b) => b.range.start - a.range.start);
 
-        for (const note of sortedNotes) {
-            const textToFind = note.selected_text;
-            const pos = fullText.indexOf(textToFind);
-            if (pos === -1) continue;
+        const applyHighlight = (note: Note, startPos: number, endPos: number) => {
+            const walker = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
+            let node: Node | null = walker.nextNode();
+            let offset = 0;
 
-            const startPos = pos;
-            const endPos = pos + textToFind.length;
+            while (node) {
+                const textNode = node as Text;
+                const nodeText = textNode.textContent || '';
+                const nodeStart = offset;
+                const nodeEnd = offset + nodeText.length;
+                const nextNode = walker.nextNode();
 
-            for (const mapping of nodeMapping) {
-                if (mapping.end <= startPos || mapping.start >= endPos) continue;
+                if (nodeEnd > startPos && nodeStart < endPos) {
+                    const localStart = Math.max(0, startPos - nodeStart);
+                    const localEnd = Math.min(nodeText.length, endPos - nodeStart);
 
-                const nodeText = mapping.node.textContent || '';
-                const localStart = Math.max(0, startPos - mapping.start);
-                const localEnd = Math.min(nodeText.length, endPos - mapping.start);
+                    if (localStart < localEnd) {
+                        const before = nodeText.slice(0, localStart);
+                        const highlighted = nodeText.slice(localStart, localEnd);
+                        const after = nodeText.slice(localEnd);
 
-                if (localStart >= localEnd) continue;
+                        const wrapper = doc.createElement('span');
+                        wrapper.className = 'note-highlight';
+                        wrapper.setAttribute('data-note-id', note.id.toString());
+                        wrapper.textContent = highlighted;
 
-                const before = nodeText.slice(0, localStart);
-                const highlighted = nodeText.slice(localStart, localEnd);
-                const after = nodeText.slice(localEnd);
+                        const parent = textNode.parentNode;
+                        if (parent) {
+                            const fragment = doc.createDocumentFragment();
+                            if (before) fragment.appendChild(doc.createTextNode(before));
+                            fragment.appendChild(wrapper);
+                            if (after) fragment.appendChild(doc.createTextNode(after));
+                            parent.replaceChild(fragment, textNode);
+                        }
+                    }
+                }
 
-                const wrapper = doc.createElement('span');
-                wrapper.className = 'note-highlight';
-                wrapper.setAttribute('data-note-id', note.id.toString());
-                wrapper.textContent = highlighted;
-
-                const parent = mapping.node.parentNode;
-                if (!parent) continue;
-
-                const fragment = doc.createDocumentFragment();
-                if (before) fragment.appendChild(doc.createTextNode(before));
-                fragment.appendChild(wrapper);
-                if (after) fragment.appendChild(doc.createTextNode(after));
-
-                parent.replaceChild(fragment, mapping.node);
-                break;
+                offset = nodeEnd;
+                node = nextNode;
             }
+        };
+
+        for (const { note, range } of sortedNotes) {
+            applyHighlight(note, range.start, range.end);
         }
 
         const style = doc.createElement('style');

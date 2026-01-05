@@ -1,9 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Loader2, User, Settings, Link2, Sparkles } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { ProfileSection } from './_components/profile-section'
 import { PreferencesSection } from './_components/preferences-section'
 import { SocialAccountsSection } from './_components/social-accounts-section'
@@ -23,11 +21,8 @@ interface UserData {
 }
 
 export function SettingsPageClient() {
-    const searchParams = useSearchParams()
     const [user, setUser] = useState<UserData | null>(null)
     const [loading, setLoading] = useState(true)
-
-    const defaultTab = searchParams.get('tab') || 'profile'
 
     useEffect(() => {
         async function fetchUser() {
@@ -73,51 +68,24 @@ export function SettingsPageClient() {
                 </p>
             </div>
 
-            <Tabs defaultValue={defaultTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="profile" className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        <span className="hidden sm:inline">Profile</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="preferences" className="flex items-center gap-2">
-                        <Settings className="h-4 w-4" />
-                        <span className="hidden sm:inline">Preferences</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="accounts" className="flex items-center gap-2">
-                        <Link2 className="h-4 w-4" />
-                        <span className="hidden sm:inline">Accounts</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="ai" className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" />
-                        <span className="hidden sm:inline">AI</span>
-                    </TabsTrigger>
-                </TabsList>
+            <div className="space-y-8">
+                <ProfileSection
+                    user={user}
+                    onUpdate={(newName) => setUser({ ...user, name: newName })}
+                />
 
-                <TabsContent value="profile">
-                    <ProfileSection
-                        user={user}
-                        onUpdate={(newName) => setUser({ ...user, name: newName })}
-                    />
-                </TabsContent>
+                <PreferencesSection
+                    preferences={user.preferences || {}}
+                    onUpdate={(newPrefs) => setUser({ ...user, preferences: newPrefs })}
+                />
 
-                <TabsContent value="preferences">
-                    <PreferencesSection
-                        preferences={user.preferences || {}}
-                        onUpdate={(newPrefs) => setUser({ ...user, preferences: newPrefs })}
-                    />
-                </TabsContent>
+                <SocialAccountsSection />
 
-                <TabsContent value="accounts">
-                    <SocialAccountsSection />
-                </TabsContent>
-
-                <TabsContent value="ai">
-                    <AIInsightSection
-                        customPrompt={user.customAiPrompt || ''}
-                        onUpdate={(newPrompt) => setUser({ ...user, customAiPrompt: newPrompt })}
-                    />
-                </TabsContent>
-            </Tabs>
+                <AIInsightSection
+                    customPrompt={user.customAiPrompt || ''}
+                    onUpdate={(newPrompt) => setUser({ ...user, customAiPrompt: newPrompt })}
+                />
+            </div>
         </div>
     )
 }
