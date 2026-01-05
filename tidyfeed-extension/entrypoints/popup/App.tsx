@@ -51,12 +51,19 @@ function App() {
             // Log what we found for debugging
             console.log('[TidyFeed] Found auth_token cookies:', cookies.map(c => `${c.domain} (${c.secure ? 'secure' : 'insecure'})`));
 
-            // Use the first valid one we find
-            // In practice, there should only be one relevant one, usually on .tidyfeed.app
-            const validCookie = cookies.find(c => c.value && c.value.length > 0);
-            if (validCookie) {
-              token = validCookie.value;
-              console.log('[TidyFeed] Using auth_token from domain:', validCookie.domain);
+            // IMPORTANT: Filter to only use cookies from tidyfeed.app domain
+            // cookies.getAll returns ALL cookies with this name across all domains
+            const tidyfeedCookie = cookies.find(c =>
+              c.value &&
+              c.value.length > 0 &&
+              (c.domain === '.tidyfeed.app' || c.domain === 'tidyfeed.app' || c.domain.endsWith('.tidyfeed.app'))
+            );
+
+            if (tidyfeedCookie) {
+              token = tidyfeedCookie.value;
+              console.log('[TidyFeed] Using auth_token from domain:', tidyfeedCookie.domain);
+            } else {
+              console.log('[TidyFeed] No tidyfeed.app auth_token cookie found');
             }
           } else {
             console.log('[TidyFeed] No auth_token cookies found via getAll');
@@ -85,12 +92,30 @@ function App() {
           console.log('[TidyFeed] Auth check successful:', data);
           // API returns user object with camelCase fields
           const user = data.user || data;
+
+          // Fetch actual storage usage from downloads API (same as web)
+          let storageUsage = 0;
+          try {
+            const storageRes = await fetch(`${BACKEND_URL}/api/downloads/usage`, {
+              method: 'GET',
+              headers,
+              credentials: 'include',
+            });
+            if (storageRes.ok) {
+              const storageData = await storageRes.json();
+              storageUsage = storageData.usage || 0;
+              console.log('[TidyFeed] Storage usage from API:', storageUsage);
+            }
+          } catch (e) {
+            console.warn('[TidyFeed] Failed to fetch storage usage:', e);
+          }
+
           setUserInfo({
             id: user.id,
             name: user.name,
             email: user.email,
             avatar_url: user.avatarUrl || user.avatar_url || user.picture, // API uses camelCase
-            storage_usage: user.storageUsage || 0,
+            storage_usage: storageUsage,
             saved_posts_count: user.savedPostsCount || 0, // from backend
           });
           await browser.storage.local.set({ user_type: 'authenticated' });
