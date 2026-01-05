@@ -555,8 +555,17 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 
 		// Fetch fresh user data from DB
 		const dbUser = await c.env.DB.prepare(
-			'SELECT id, email, name, avatar_url, created_at, storage_usage FROM users WHERE id = ?'
-		).bind(payload.sub).first<{ id: string; email: string; name: string; avatar_url: string; created_at: string; storage_usage: number }>();
+			'SELECT id, email, name, avatar_url, created_at, storage_usage, preferences, custom_ai_prompt FROM users WHERE id = ?'
+		).bind(payload.sub).first<{
+			id: string;
+			email: string;
+			name: string;
+			avatar_url: string;
+			created_at: string;
+			storage_usage: number;
+			preferences: string;
+			custom_ai_prompt: string;
+		}>();
 
 		if (!dbUser) {
 			return c.json({ error: 'User not found' }, 404);
@@ -576,6 +585,8 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 				createdAt: dbUser.created_at,
 				storageUsage: dbUser.storage_usage || 0,
 				savedPostsCount: savedCount?.count || 0,
+				preferences: dbUser.preferences ? JSON.parse(dbUser.preferences) : {},
+				customAiPrompt: dbUser.custom_ai_prompt
 			},
 		});
 	} catch (error) {
@@ -634,6 +645,64 @@ app.post('/api/auth/link-social', cookieAuthMiddleware, async (c) => {
 	} catch (error) {
 		console.error('Link social account error:', error);
 		return c.json({ error: 'Internal server error', details: String(error) }, 500);
+	}
+});
+
+// Update user profile (name)
+app.patch('/api/user/profile', cookieAuthMiddleware, async (c) => {
+	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+		const { name } = await c.req.json();
+
+		if (name === undefined) {
+			return c.json({ error: 'Name is required' }, 400);
+		}
+
+		await c.env.DB.prepare(
+			'UPDATE users SET name = ? WHERE id = ?'
+		).bind(name, userId).run();
+
+		return c.json({ success: true });
+	} catch (error) {
+		console.error('Update profile error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
+// Update user settings (preferences, custom AI prompt)
+app.patch('/api/user/settings', cookieAuthMiddleware, async (c) => {
+	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+		const body = await c.req.json();
+
+		const { preferences, customAiPrompt } = body;
+
+		// Build dynamic update query
+		const updates: string[] = [];
+		const values: any[] = [];
+
+		if (preferences !== undefined) {
+			updates.push('preferences = ?');
+			values.push(JSON.stringify(preferences));
+		}
+
+		if (customAiPrompt !== undefined) {
+			updates.push('custom_ai_prompt = ?');
+			values.push(customAiPrompt);
+		}
+
+		if (updates.length > 0) {
+			values.push(userId);
+			const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
+			await c.env.DB.prepare(query).bind(...values).run();
+		}
+
+		return c.json({ success: true });
+	} catch (error) {
+		console.error('Update settings error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
 	}
 });
 

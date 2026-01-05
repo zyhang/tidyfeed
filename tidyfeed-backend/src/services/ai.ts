@@ -56,7 +56,8 @@ export class AIService {
         snapshotKey: string,
         r2: R2Bucket,
         db: D1Database,
-        webAppUrl: string = 'https://tidyfeed.app'
+        webAppUrl: string = 'https://tidyfeed.app',
+        customPrompt?: string
     ): Promise<string> {
         // Step A: Fetch the actual snapshot content from R2
         const snapshotObject = await r2.get(snapshotKey);
@@ -73,7 +74,7 @@ export class AIService {
         const config = await this.fetchAIConfig(db);
 
         // Step D: Build prompt with the actual content
-        const prompt = this.buildPromptWithContent(config, textContent);
+        const prompt = this.buildPromptWithContent(config, textContent, customPrompt);
 
         // Step E: Call BigModel API (without web_search since we have the content)
         const response = await this.callBigModel(config.model, prompt);
@@ -155,9 +156,16 @@ export class AIService {
     /**
      * Build prompt with actual content instead of URL.
      */
-    private buildPromptWithContent(config: AIConfig, content: string): string {
-        // Create a prompt that includes the actual content
-        let prompt = `请阅读以下推文内容，并进行总结分析：\n\n---\n${content}\n---`;
+    private buildPromptWithContent(config: AIConfig, content: string, customPrompt?: string): string {
+        // Use custom prompt if provided, otherwise use default
+        let systemInstruction = customPrompt;
+
+        // If no custom prompt, use template or default instruction
+        if (!systemInstruction) {
+            systemInstruction = "请阅读以下推文内容，并进行总结分析：";
+        }
+
+        let prompt = `${systemInstruction}\n\n---\n${content}\n---`;
 
         // Append output format instructions
         if (config.output_format) {

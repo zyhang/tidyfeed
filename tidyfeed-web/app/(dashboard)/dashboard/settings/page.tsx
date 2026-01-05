@@ -1,58 +1,38 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Twitter, Instagram, Hash, Smartphone, Link2 } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { User, Settings, Share2, Sparkles, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { ProfileSection } from './_components/profile-section'
+import { PreferencesSection } from './_components/preferences-section'
+import { AIInsightSection } from './_components/ai-insight-section'
+import { SocialAccountsSection } from './_components/social-accounts-section'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
-interface SocialAccount {
-    platform: string
-    platform_user_id: string
-    platform_username: string | null
-    display_name: string | null
-    avatar_url: string | null
-    last_synced_at: string | null
-}
-
-function getPlatformIcon(platform: string) {
-    switch (platform) {
-        case 'x':
-            return <Twitter className="h-5 w-5" />
-        case 'instagram':
-            return <Instagram className="h-5 w-5" />
-        default:
-            return <Hash className="h-5 w-5" />
-    }
-}
-
-function getPlatformName(platform: string) {
-    switch (platform) {
-        case 'x':
-            return 'X (Twitter)'
-        case 'instagram':
-            return 'Instagram'
-        case 'reddit':
-            return 'Reddit'
-        default:
-            return platform
-    }
-}
+const SIDEBAR_ITEMS = [
+    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'preferences', label: 'Preferences', icon: Settings },
+    { id: 'social', label: 'Social Accounts', icon: Share2 },
+    { id: 'ai', label: 'AI Insight', icon: Sparkles },
+]
 
 export default function SettingsPage() {
     const router = useRouter()
-    const [accounts, setAccounts] = useState<SocialAccount[]>([])
+    const searchParams = useSearchParams()
+
+    // Allow linking to specific tab ?tab=ai
+    const initialTab = searchParams.get('tab') || 'profile'
+
+    const [activeTab, setActiveTab] = useState(initialTab)
+    const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
-        async function fetchAccounts() {
+        async function fetchUser() {
             try {
-                const response = await fetch(`${API_URL}/api/auth/social-accounts`, {
+                const response = await fetch(`${API_URL}/auth/me`, {
                     credentials: 'include',
                 })
 
@@ -61,124 +41,96 @@ export default function SettingsPage() {
                         router.push('/')
                         return
                     }
-                    throw new Error('Failed to fetch accounts')
+                    throw new Error('Failed to fetch user')
                 }
 
                 const data = await response.json()
-                setAccounts(data.accounts || [])
-            } catch (err) {
-                console.error('Fetch error:', err)
-                setError('Failed to load linked accounts.')
+                setUser(data.user)
+            } catch (error) {
+                console.error('Fetch user error:', error)
             } finally {
                 setLoading(false)
             }
         }
-
-        fetchAccounts()
+        fetchUser()
     }, [router])
 
+    useEffect(() => {
+        // Sync URL with Tab
+        const params = new URLSearchParams(window.location.search)
+        if (params.get('tab') !== activeTab) {
+            router.push(`/dashboard/settings?tab=${activeTab}`, { scroll: false })
+        }
+    }, [activeTab, router])
+
+    if (loading) {
+        return (
+            <div className="flex h-[50vh] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        )
+    }
+
+    if (!user) return null
+
     return (
-        <div className="space-y-6">
-            <div>
+        <div className="space-y-6 pb-16">
+            <div className="space-y-0.5">
                 <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
                 <p className="text-muted-foreground">
-                    Manage your account settings and linked social accounts.
+                    Manage your account settings and preferences.
                 </p>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <Link2 className="h-5 w-5 text-primary" />
-                        <CardTitle>Linked Social Accounts</CardTitle>
-                    </div>
-                    <CardDescription className="flex items-start gap-2 mt-2 p-3 bg-muted/50 rounded-lg">
-                        <Smartphone className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
-                        <span>
-                            <strong>Save on Mobile:</strong> Mention <code className="px-1 py-0.5 bg-muted rounded text-sm">@tidyfeed</code> in a reply to any post on mobile, and we'll instantly archive it to your TidyFeed library. This feature requires a linked account.
-                        </span>
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {loading ? (
-                        <div className="space-y-4">
-                            {[1, 2].map((i) => (
-                                <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
-                                    <Skeleton className="h-10 w-10 rounded-full" />
-                                    <div className="space-y-2 flex-1">
-                                        <Skeleton className="h-4 w-32" />
-                                        <Skeleton className="h-3 w-24" />
-                                    </div>
-                                    <Skeleton className="h-6 w-20" />
-                                </div>
-                            ))}
-                        </div>
-                    ) : error ? (
-                        <div className="text-center py-8 text-destructive">
-                            {error}
-                        </div>
-                    ) : accounts.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <Link2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p className="font-medium">No accounts linked yet</p>
-                            <p className="text-sm mt-1">
-                                Use the TidyFeed extension to log in on X/Instagram to enable mobile saving.
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {accounts.map((account) => (
-                                <div
-                                    key={`${account.platform}-${account.platform_user_id}`}
-                                    className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                                >
-                                    {/* Platform Icon */}
-                                    <div className="flex items-center justify-center h-10 w-10 rounded-full bg-muted">
-                                        {getPlatformIcon(account.platform)}
-                                    </div>
+            <div className="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
+                <aside className="-mx-4 lg:w-1/5">
+                    <nav className="flex space-x-2 lg:flex-col lg:space-x-0 lg:space-y-1">
+                        {SIDEBAR_ITEMS.map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => setActiveTab(item.id)}
+                                className={cn(
+                                    "flex items-center gap-2 justify-start rounded-md px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors text-left",
+                                    activeTab === item.id
+                                        ? "bg-muted hover:bg-muted"
+                                        : "hover:bg-transparent hover:underline",
+                                    "justify-start"
+                                )}
+                            >
+                                <item.icon className="h-4 w-4" />
+                                {item.label}
+                            </button>
+                        ))}
+                    </nav>
+                </aside>
 
-                                    {/* Account Info */}
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <Avatar className="h-10 w-10">
-                                            <AvatarImage src={account.avatar_url || undefined} />
-                                            <AvatarFallback>
-                                                {account.display_name?.[0] || account.platform_username?.[0] || '?'}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div className="min-w-0">
-                                            <p className="font-medium truncate">
-                                                {account.display_name || account.platform_username || 'Unknown'}
-                                            </p>
-                                            {account.platform_username && (
-                                                <p className="text-sm text-muted-foreground truncate">
-                                                    @{account.platform_username}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Platform Name */}
-                                    <div className="hidden sm:block text-sm text-muted-foreground">
-                                        {getPlatformName(account.platform)}
-                                    </div>
-
-                                    {/* Account ID */}
-                                    <div className="hidden md:block">
-                                        <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                                            {account.platform_user_id}
-                                        </code>
-                                    </div>
-
-                                    {/* Status */}
-                                    <Badge variant="outline" className="text-green-600 border-green-600">
-                                        Connected
-                                    </Badge>
-                                </div>
-                            ))}
-                        </div>
+                <div className="flex-1 lg:max-w-2xl text-left">
+                    {activeTab === 'profile' && (
+                        <ProfileSection
+                            user={user}
+                            onUpdate={(newName) => setUser({ ...user, name: newName })}
+                        />
                     )}
-                </CardContent>
-            </Card>
+
+                    {activeTab === 'preferences' && (
+                        <PreferencesSection
+                            preferences={user.preferences || {}}
+                            onUpdate={(newPrefs) => setUser({ ...user, preferences: newPrefs })}
+                        />
+                    )}
+
+                    {activeTab === 'social' && (
+                        <SocialAccountsSection />
+                    )}
+
+                    {activeTab === 'ai' && (
+                        <AIInsightSection
+                            customPrompt={user.customAiPrompt}
+                            onUpdate={(newPrompt) => setUser({ ...user, customAiPrompt: newPrompt })}
+                        />
+                    )}
+                </div>
+            </div>
         </div>
     )
 }

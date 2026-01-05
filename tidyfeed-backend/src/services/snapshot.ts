@@ -622,9 +622,19 @@ function formatTweetText(text: string, entities?: { urls: { url: string; expande
 	if (entities && entities.urls && entities.urls.length > 0) {
 		entities.urls.forEach(urlEntity => {
 			const linkHtml = `<a href="${urlEntity.expanded_url}" target="_blank" rel="noopener">${urlEntity.display_url}</a>`;
-			// Replace the t.co URL with the link
-			// We use split/join to replace all occurrences globally (though usually unique)
-			formatted = formatted.split(urlEntity.url).join(linkHtml);
+
+			// Try exact match first (most common case)
+			if (formatted.includes(urlEntity.url)) {
+				formatted = formatted.split(urlEntity.url).join(linkHtml);
+			} else {
+				// Fallback: TikHub API sometimes returns mismatched URL entities
+				// Find ANY t.co URL using regex and replace with entity data
+				const tcoUrlPattern = /https?:\/\/t\.co\/[a-zA-Z0-9]+/g;
+				const match = formatted.match(tcoUrlPattern);
+				if (match) {
+					formatted = formatted.replace(match[0], linkHtml);
+				}
+			}
 		});
 	} else {
 		// Fallback: Regex replacement with better punctuation handling

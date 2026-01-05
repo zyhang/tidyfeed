@@ -107,6 +107,11 @@ ai.post('/summarize', authMiddleware, async (c) => {
             }, 400);
         }
 
+        // Check if user has custom prompt
+        const user = await c.env.DB.prepare(
+            'SELECT custom_ai_prompt FROM users WHERE id = ?'
+        ).bind(userId).first<{ custom_ai_prompt: string | null }>();
+
         // Generate summary using AIService
         const aiService = new AIService(c.env.BIGMODEL_API_KEY);
         const webAppUrl = c.env.WEB_APP_URL || 'https://tidyfeed.app';
@@ -115,7 +120,8 @@ ai.post('/summarize', authMiddleware, async (c) => {
             cachedTweet.snapshot_r2_key,
             c.env.MEDIA_BUCKET,
             c.env.DB,
-            webAppUrl
+            webAppUrl,
+            user?.custom_ai_prompt || undefined
         );
 
         // Save the summary to saved_posts

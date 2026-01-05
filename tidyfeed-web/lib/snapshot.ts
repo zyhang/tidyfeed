@@ -575,31 +575,36 @@ function formatTweetText(text: string, entities?: { urls: { url: string; expande
 		console.log('[Snapshot] formatTweetText - no entities found, will use fallback regex');
 	}
 
-	// Step 1: Remove trailing t.co URLs (Twitter's auto-appended links)
-	let formatted = stripTrailingTcoUrls(text);
+	// Step 1: Decode HTML entities if the text is already escaped (fixes &#039; issue)
+	let formatted = decodeHtmlEntities(text);
 
-	// Step 2: Decode HTML entities if the text is already escaped (fixes &#039; issue)
-	formatted = decodeHtmlEntities(formatted);
+	// Step 2: Escape HTML for safety
+	formatted = escapeHtml(formatted);
 
-	// Step 3: Replace URLs using entities FIRST (before HTML escaping)
-	// This is crucial because urlEntity.url contains unescaped characters like &
+	// Step 3: Replace URLs using entities
+	// IMPORTANT: If the URL in entities doesn't match the URL in text,
+	// we need to find and replace ALL t.co URLs in the text
 	if (entities && entities.urls && entities.urls.length > 0) {
-		entities.urls.forEach(urlEntity => {
-			// Generate a friendly display text for the link
-			const displayText = escapeHtml(generateLinkDisplayText(urlEntity.expanded_url, urlEntity.display_url));
-			const expandedUrlEscaped = escapeHtml(urlEntity.expanded_url);
-			const linkHtml = `<a href="${expandedUrlEscaped}" target="_blank" rel="noopener">${displayText}</a>`;
+		entities.urls.forEach((urlEntity, index) => {
+			// Build link HTML (use raw values - the URL is from TikHub API which is safe)
+			const linkHtml = `<a href="${urlEntity.expanded_url}" target="_blank" rel="noopener">${urlEntity.display_url}</a>`;
 
-			// Check if the t.co URL exists in the text before replacing
-			const urlExists = formatted.includes(urlEntity.url);
-			console.log('[Snapshot] Replacing URL:', {
-				url: urlEntity.url,
-				urlExists,
-				textBefore: formatted.substring(0, 100) + '...'
-			});
-
-			// Replace the t.co URL with the link in the unescaped text
-			formatted = formatted.split(urlEntity.url).join(linkHtml);
+			// Try exact match first
+			if (formatted.includes(urlEntity.url)) {
+				console.log(`[Snapshot] Exact match - replacing ${urlEntity.url}`);
+				formatted = formatted.split(urlEntity.url).join(linkHtml);
+			} else {
+				// Fallback: Find ANY t.co URL and replace it with entity data
+				// This handles the case where TikHub API returns mismatched URLs
+				const tcoUrlPattern = /https?:\/\/t\.co\/[a-zA-Z0-9]+/g;
+				const match = formatted.match(tcoUrlPattern);
+				if (match) {
+					console.log(`[Snapshot] Fallback - replacing ${match[0]} with entity ${index} data`);
+					formatted = formatted.replace(match[0], linkHtml);
+				} else {
+					console.log(`[Snapshot] WARNING: No t.co URL found to replace for entity ${index}`);
+				}
+			}
 		});
 	} else {
 		// Fallback: Regex replacement with intelligent display text
@@ -611,10 +616,9 @@ function formatTweetText(text: string, entities?: { urls: { url: string; expande
 				// Trim trailing punctuation (common issue in mixed text)
 				const cleanUrl = match.replace(/[.,:;!?)}\]'">，。：；！？）】"]+$/, '');
 				const trailing = match.substring(cleanUrl.length);
-				// Generate friendly display text and escape it
-				const displayText = escapeHtml(generateLinkDisplayText(cleanUrl, cleanUrl));
-				const cleanUrlEscaped = escapeHtml(cleanUrl);
-				return `<a href="${cleanUrlEscaped}" target="_blank" rel="noopener">${displayText}</a>${trailing}`;
+				// Generate friendly display text
+				const displayText = generateLinkDisplayText(cleanUrl, cleanUrl);
+				return `<a href="${cleanUrl}" target="_blank" rel="noopener">${displayText}</a>${trailing}`;
 			}
 		);
 	}
@@ -630,19 +634,6 @@ function formatTweetText(text: string, entities?: { urls: { url: string; expande
 		/#(\w+)/g,
 		'<a href="https://x.com/hashtag/$1" target="_blank" rel="noopener">#$1</a>'
 	);
-
-	// Step 6: Final safety - escape any remaining text but protect our HTML links
-	// Split by HTML tags we created, escape the non-HTML parts, then rejoin
-	const parts = formatted.split(/(<a\b[^>]*>.*?<\/a>)/g);
-	const escapedParts = parts.map(part => {
-		// If it looks like an HTML tag we created, return as-is
-		if (part.startsWith('<a ') || part.startsWith('</a>')) {
-			return part;
-		}
-		// Otherwise escape it
-		return escapeHtml(part);
-	});
-	formatted = escapedParts.join('');
 
 	return formatted;
 }

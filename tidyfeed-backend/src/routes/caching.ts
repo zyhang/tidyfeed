@@ -402,6 +402,107 @@ caching.post('/cache', async (c) => {
 });
 
 /**
+ * POST /api/tweets/:tweet_id/regenerate
+ * Regenerate snapshot for a cached tweet
+ * Query params:
+ * - refresh=true: Re-fetch from TikHub API instead of using cache
+ */
+caching.post('/:tweet_id/regenerate', async (c) => {
+    const tweetId = c.req.param('tweet_id');
+    const refresh = c.req.query('refresh') === 'true';
+
+    try {
+        console.log(`[Caching] Regenerating snapshot for ${tweetId} (refresh: ${refresh})`);
+
+        let tweetData: any;
+        let comments: any[] = [];
+
+        if (refresh) {
+            // Re-fetch from TikHub API
+            console.log(`[Caching] Re-fetching tweet ${tweetId} from TikHub API`);
+            const { TikHubService } = await import('../services/tikhub');
+            const tikhubService = new TikHubService(c.env.TIKHUB_API_KEY);
+
+            tweetData = await tikhubService.fetchTweetDetail(tweetId);
+            if (!tweetData) {
+                return c.json({ error: 'Failed to fetch tweet from TikHub API' }, 500);
+            }
+
+            // Fetch comments if needed
+            // const commentsResult = await tikhubService.fetchTweetComments(tweetId);
+            // comments = commentsResult.comments;
+        } else {
+            // Use existing cached data
+            const cached = await c.env.DB.prepare(
+                `SELECT cached_data, comments_data, comments_count, has_media, has_video, has_quoted_tweet
+                     FROM cached_tweets WHERE tweet_id = ?`
+            ).bind(tweetId).first<{
+                cached_data: string;
+                comments_data: string | null;
+                comments_count: number;
+                has_media: number;
+                has_video: number;
+                has_quoted_tweet: number;
+            }>();
+
+            if (!cached) {
+                return c.json({ error: 'Tweet not cached' }, 404);
+            }
+
+            // Parse cached data
+            tweetData = JSON.parse(cached.cached_data);
+            comments = cached.comments_data ? JSON.parse(cached.comments_data) : [];
+        }
+
+        // Regenerate snapshot with updated logic
+        const { generateTweetSnapshot } = await import('../services/snapshot');
+        const snapshotHtml = generateTweetSnapshot(tweetData, comments, {
+            theme: 'auto'
+        });
+
+        // Upload to R2
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const r2Key = `snapshots/${tweetId}.html`;
+
+        await c.env.MEDIA_BUCKET.put(r2Key, snapshotHtml, {
+            httpMetadata: {
+                contentType: 'text/html; charset=utf-8',
+            },
+        });
+
+        // Update database with new R2 key and data if refreshing
+        if (refresh) {
+            await c.env.DB.prepare(
+                `UPDATE cached_tweets
+                 SET snapshot_r2_key = ?, updated_at = ?, cached_data = ?
+                 WHERE tweet_id = ?`
+            ).bind(
+                r2Key,
+                new Date().toISOString(),
+                JSON.stringify(tweetData),
+                tweetId
+            ).run();
+        } else {
+            await c.env.DB.prepare(
+                'UPDATE cached_tweets SET snapshot_r2_key = ?, updated_at = ? WHERE tweet_id = ?'
+            ).bind(r2Key, new Date().toISOString(), tweetId).run();
+        }
+
+        console.log(`[Caching] Successfully regenerated snapshot for ${tweetId}`);
+
+        return c.json({
+            success: true,
+            message: refresh ? 'Snapshot regenerated with fresh data' : 'Snapshot regenerated',
+            snapshotUrl: `${c.env.WEB_APP_URL || 'https://tidyfeed.app'}/s/${tweetId}`,
+            refreshed: refresh
+        });
+    } catch (error) {
+        console.error('[Caching] Error regenerating snapshot:', error);
+        return c.json({ error: 'Internal server error', details: String(error) }, 500);
+    }
+});
+
+/**
  * DELETE /api/tweets/:tweet_id/cache
  * Remove a cached tweet and its snapshot
  */

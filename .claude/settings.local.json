@@ -4,7 +4,13 @@
       "Bash(npm run build)",
       "WebSearch",
       "Skill(ui-ux-pro-max)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(curl:*)",
+      "Bash(npm run deploy:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(npm install:*)"
     ]
   }
 }
