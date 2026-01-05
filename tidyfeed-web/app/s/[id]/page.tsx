@@ -4,7 +4,7 @@ export const runtime = 'edge';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, X, Loader2, StickyNote, Plus, MessageSquarePlus, Brain, BookMarked, ChevronRight, PanelRightClose, PanelRightOpen, Lightbulb, Quote, MoreVertical, Pencil, Trash2, Wand2 } from 'lucide-react';
+import { X, Loader2, Plus, ChevronLeft, Sparkles, MessageSquareText, Trash2, Pencil, Copy } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
 import { toast } from 'sonner';
@@ -33,10 +33,7 @@ const SnapshotContent = React.memo(
         ({ html, panelWidth }, ref) => (
             <div
                 ref={ref}
-                className={`
-                    transition-all duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
-                    min-h-screen
-                `}
+                className={`transition-all duration-300 min-h-screen`}
                 style={{ marginRight: `${panelWidth}px` }}
                 dangerouslySetInnerHTML={{ __html: html }}
             />
@@ -45,9 +42,9 @@ const SnapshotContent = React.memo(
 );
 SnapshotContent.displayName = 'SnapshotContent';
 
-type TabType = 'insights' | 'notes';
+type TabType = 'ai' | 'notes';
 
-// Note Card Component - Redesigned
+// Notion-style Note Card
 function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
     note: Note;
     isOwner: boolean;
@@ -58,7 +55,6 @@ function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(note.note_content);
     const [isSaving, setIsSaving] = useState(false);
-    const [showActions, setShowActions] = useState(false);
 
     const handleSave = async () => {
         if (!editContent.trim() || editContent === note.note_content) {
@@ -83,108 +79,91 @@ function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
         const minutes = Math.floor(diff / 60000);
         const hours = Math.floor(diff / 3600000);
         const days = Math.floor(diff / 86400000);
-        if (minutes < 1) return 'now';
-        if (minutes < 60) return `${minutes}m`;
-        if (hours < 24) return `${hours}h`;
-        if (days < 7) return `${days}d`;
+        if (minutes < 1) return 'Just now';
+        if (minutes < 60) return `${minutes}m ago`;
+        if (hours < 24) return `${hours}h ago`;
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
     return (
-        <div
-            className="group relative pl-4 pr-2 py-3 hover:bg-white/50 rounded-r-2xl transition-all duration-200 border-l-2 border-transparent hover:border-violet-400"
-            onMouseEnter={() => setShowActions(true)}
-            onMouseLeave={() => setShowActions(false)}
-        >
-            {/* Timeline Dot */}
-            <div className="absolute left-0 top-5 -translate-x-1/2 w-3 h-3 rounded-full bg-violet-200 ring-4 ring-white group-hover:bg-violet-500 group-hover:ring-violet-100 transition-all duration-200" />
-
-            {/* Selected Text Quote */}
+        <div className="group bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all">
+            {/* Quote section */}
             <button
                 onClick={() => onHighlightClick(note)}
-                className="w-full text-left mb-2 group/btn"
+                className="w-full text-left p-4 pb-3 border-b border-gray-100 hover:bg-gray-50 transition-colors"
             >
-                <div className="flex items-start gap-2">
-                    <Quote className="h-3.5 w-3.5 text-violet-300 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-zinc-500 leading-relaxed line-clamp-2 font-serif italic">
-                        {note.selected_text}
-                    </p>
-                </div>
+                <p className="text-sm text-gray-500 leading-relaxed line-clamp-2 font-serif">
+                    "{note.selected_text}"
+                </p>
             </button>
 
-            {/* Note Content */}
-            {isEditing ? (
-                <div className="mt-2 space-y-2">
-                    <textarea
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSave();
-                            }
-                            if (e.key === 'Escape') {
-                                setIsEditing(false);
-                                setEditContent(note.note_content);
-                            }
-                        }}
-                        autoFocus
-                        rows={3}
-                        className="w-full px-3 py-2.5 text-sm text-zinc-800 bg-white border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 placeholder:text-zinc-400 transition-all shadow-sm"
-                        placeholder="Your note..."
-                    />
-                    <div className="flex items-center justify-end gap-2">
-                        <button
-                            onClick={() => {
-                                setIsEditing(false);
-                                setEditContent(note.note_content);
+            {/* Note content */}
+            <div className="p-4">
+                {isEditing ? (
+                    <div className="space-y-3">
+                        <textarea
+                            value={editContent}
+                            onChange={(e) => setEditContent(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSave();
+                                }
+                                if (e.key === 'Escape') {
+                                    setIsEditing(false);
+                                    setEditContent(note.note_content);
+                                }
                             }}
-                            disabled={isSaving}
-                            className="px-3 py-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={isSaving || !editContent.trim()}
-                            className="px-3 py-1.5 text-xs font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-all flex items-center gap-1.5 shadow-sm shadow-violet-600/20"
-                        >
-                            {isSaving ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                                <Plus className="h-3 w-3" />
-                            )}
-                            Save
-                        </button>
+                            autoFocus
+                            rows={4}
+                            className="w-full px-3 py-2 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white placeholder:text-gray-400"
+                            placeholder="Your note..."
+                        />
+                        <div className="flex items-center justify-end gap-2">
+                            <button
+                                onClick={() => {
+                                    setIsEditing(false);
+                                    setEditContent(note.note_content);
+                                }}
+                                disabled={isSaving}
+                                className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                disabled={isSaving || !editContent.trim()}
+                                className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:opacity-50 transition-colors flex items-center gap-2"
+                            >
+                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                                Save
+                            </button>
+                        </div>
                     </div>
-                </div>
-            ) : (
-                <div className="mt-2">
-                    <p className="text-sm text-zinc-800 leading-relaxed whitespace-pre-wrap">
+                ) : (
+                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
                         {note.note_content}
                     </p>
-                </div>
-            )}
+                )}
+            </div>
 
             {/* Footer */}
-            <div className="mt-2 flex items-center justify-between">
-                <span className="text-[10px] text-zinc-400 font-medium tracking-wide uppercase">
+            <div className="px-4 py-2 flex items-center justify-between border-t border-gray-100">
+                <span className="text-xs text-gray-400">
                     {formatTime(note.created_at)}
                 </span>
 
                 {isOwner && !isEditing && (
-                    <div className={`flex items-center gap-0.5 transition-opacity duration-200 ${showActions ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                             onClick={() => setIsEditing(true)}
-                            className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-violet-50 text-zinc-400 hover:text-violet-600 transition-colors"
-                            title="Edit"
+                            className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                         >
                             <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
                             onClick={() => onDelete(note.id)}
-                            className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-zinc-400 hover:text-red-500 transition-colors"
-                            title="Delete"
+                            className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
                         >
                             <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -206,7 +185,7 @@ export default function SnapshotViewerPage() {
     const [error, setError] = useState<string | null>(null);
 
     const [showPanel, setShowPanel] = useState(false);
-    const [activeTab, setActiveTab] = useState<TabType>('insights');
+    const [activeTab, setActiveTab] = useState<TabType>('notes');
 
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
@@ -228,9 +207,6 @@ export default function SnapshotViewerPage() {
     const [noteToDelete, setNoteToDelete] = useState<number | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const [highlightedNoteId, setHighlightedNoteId] = useState<number | null>(null);
-    const selectionRangeRef = useRef<Range | null>(null);
-
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app';
 
     const handleCopy = async (key: string, text: string) => {
@@ -243,7 +219,7 @@ export default function SnapshotViewerPage() {
             copyResetRef.current = window.setTimeout(() => {
                 setCopiedKey(null);
                 copyResetRef.current = null;
-            }, 3000);
+            }, 2000);
         } catch (err) {
             toast.error('Copy failed');
         }
@@ -251,7 +227,7 @@ export default function SnapshotViewerPage() {
 
     const getPanelWidth = () => {
         if (!showPanel) return 0;
-        return 420;
+        return 380;
     };
 
     const panelWidth = getPanelWidth();
@@ -316,7 +292,7 @@ export default function SnapshotViewerPage() {
         setSummaryLoading(true);
         setSummaryError(null);
         setShowPanel(true);
-        setActiveTab('insights');
+        setActiveTab('ai');
 
         try {
             const response = await fetch(`${apiUrl}/api/ai/summarize`, {
@@ -346,7 +322,6 @@ export default function SnapshotViewerPage() {
 
     const handleMouseUp = useCallback((e: MouseEvent) => {
         const target = e.target as HTMLElement;
-        // Exclude clicks on the new toolbar
         if (target.closest('.note-toolbar') || target.closest('.sidebar-panel')) {
             return;
         }
@@ -355,7 +330,6 @@ export default function SnapshotViewerPage() {
         if (!sel || sel.isCollapsed || !sel.toString().trim()) {
             setSelection(null);
             setShowNoteInput(false);
-            selectionRangeRef.current = null;
             return;
         }
 
@@ -371,8 +345,6 @@ export default function SnapshotViewerPage() {
             setSelection(null);
             return;
         }
-
-        selectionRangeRef.current = range.cloneRange();
 
         const rect = range.getBoundingClientRect();
         const rawText = range.toString();
@@ -423,7 +395,6 @@ export default function SnapshotViewerPage() {
                 const data = await response.json();
                 setNotes(prev => [data.note, ...prev]);
                 setSelection(null);
-                selectionRangeRef.current = null;
                 setShowNoteInput(false);
                 setNoteInput('');
                 setShowPanel(true);
@@ -432,8 +403,6 @@ export default function SnapshotViewerPage() {
                 fetchNotes();
             } else if (response.status === 401) {
                 router.push('/login');
-            } else if (response.status === 403) {
-                alert('You can only add notes to your own saved posts.');
             }
         } catch (err) {
             console.error('Failed to create note:', err);
@@ -488,7 +457,6 @@ export default function SnapshotViewerPage() {
     };
 
     const handleHighlightClick = (note: Note) => {
-        setHighlightedNoteId(note.id);
         setShowPanel(true);
         setActiveTab('notes');
         setTimeout(() => {
@@ -592,16 +560,14 @@ export default function SnapshotViewerPage() {
         const style = doc.createElement('style');
         style.textContent = `
             .note-highlight {
-                background: linear-gradient(to bottom, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.20) 100%);
-                border-bottom: 2px solid rgb(139, 92, 246);
+                background: #fef3c7;
+                border-bottom: 2px solid #f59e0b;
                 cursor: pointer;
-                transition: all 0.2s ease;
                 padding: 1px 0;
                 border-radius: 2px;
             }
             .note-highlight:hover {
-                background: linear-gradient(to bottom, rgba(139, 92, 246, 0.25) 0%, rgba(139, 92, 246, 0.30) 100%);
-                border-bottom-width: 3px;
+                background: #fde68a;
             }
         `;
         doc.head.appendChild(style);
@@ -634,22 +600,6 @@ export default function SnapshotViewerPage() {
         const container = contentRef.current;
         if (!container) return;
 
-        const STYLE_ID = 'active-selection-style';
-        if (!document.getElementById(STYLE_ID)) {
-            const styleEl = document.createElement('style');
-            styleEl.id = STYLE_ID;
-            styleEl.textContent = `
-                .active-selection {
-                    background: linear-gradient(to bottom, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.25) 100%);
-                    border-bottom: 2px solid rgb(99, 102, 241);
-                    border-radius: 2px;
-                    padding: 1px 0;
-                    transition: background 0.2s ease;
-                }
-            `;
-            document.head.appendChild(styleEl);
-        }
-
         const clearActiveSelection = () => {
             const existing = container.querySelectorAll('.active-selection');
             existing.forEach((el) => {
@@ -664,32 +614,31 @@ export default function SnapshotViewerPage() {
 
         clearActiveSelection();
 
-        if (!selection || !selectionRangeRef.current) {
-            return;
-        }
-
-        try {
-            const range = selectionRangeRef.current.cloneRange();
-            const wrapper = document.createElement('span');
-            wrapper.className = 'active-selection';
-            wrapper.setAttribute('data-active-selection', 'true');
-            wrapper.appendChild(range.extractContents());
-            range.insertNode(wrapper);
-        } catch (err) {
-            console.warn('Failed to apply active selection highlight:', err);
+        const styleEl = document.createElement('style');
+        styleEl.id = 'active-selection-style';
+        styleEl.textContent = `
+            .active-selection {
+                background: #e0f2fe;
+                border-bottom: 2px solid #0ea5e9;
+                border-radius: 2px;
+                padding: 1px 0;
+            }
+        `;
+        if (!document.getElementById('active-selection-style')) {
+            document.head.appendChild(styleEl);
         }
 
         return () => {
             clearActiveSelection();
         };
-    }, [selection, highlightedHtml]);
+    }, [highlightedHtml]);
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-zinc-100 flex items-center justify-center font-sans">
+            <div className="min-h-screen bg-white flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="h-6 w-6 text-violet-500 animate-spin" />
-                    <p className="text-sm text-zinc-500 font-medium">Loading snapshot...</p>
+                    <Loader2 className="h-5 w-5 text-gray-400 animate-spin" />
+                    <p className="text-sm text-gray-500">Loading...</p>
                 </div>
             </div>
         );
@@ -697,745 +646,395 @@ export default function SnapshotViewerPage() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-zinc-100 flex items-center justify-center font-sans">
-                <p className="text-zinc-500 text-sm font-medium">{error}</p>
+            <div className="min-h-screen bg-white flex items-center justify-center">
+                <p className="text-gray-500 text-sm">{error}</p>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-zinc-100 relative overflow-hidden font-sans">
-            {/* Top Control Bar - Simplified */}
-            <div className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-xl border-b border-zinc-200/50">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                    <div className="h-14 flex items-center gap-4">
-                        {/* Breadcrumb */}
-                        <div className="flex items-center gap-2 text-sm">
-                            <button
-                                onClick={() => router.push('/dashboard')}
-                                className="text-zinc-500 hover:text-zinc-900 transition-colors font-medium"
-                            >
-                                Dashboard
-                            </button>
-                            <ChevronRight className="h-4 w-4 text-zinc-300" />
-                            <span className="text-zinc-900 font-semibold">Snapshot</span>
-                        </div>
+        <div className="min-h-screen bg-white relative">
+            {/* Notion-style Header */}
+            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+                <div className="max-w-4xl mx-auto px-4 h-12 flex items-center">
+                    <button
+                        onClick={() => router.push('/dashboard')}
+                        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                        <span>Back</span>
+                    </button>
+                    <div className="ml-auto flex items-center gap-2">
+                        <button
+                            onClick={() => setShowPanel(!showPanel)}
+                            className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                                showPanel
+                                    ? 'bg-gray-100 text-gray-700'
+                                    : 'bg-gray-900 text-white hover:bg-gray-800'
+                            }`}
+                        >
+                            {showPanel ? (
+                                <>
+                                    <X className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Close</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles className="h-4 w-4" />
+                                    <span className="hidden sm:inline">AI & Notes</span>
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
-            </div>
+            </header>
 
-            {/* Spacer for fixed header */}
-            <div className="h-14" />
-
-            {/* Floating Panel Toggle Button - Redesigned */}
-            <button
-                onClick={() => setShowPanel(!showPanel)}
-                className={`
-                    fixed z-[60] h-12 px-4 rounded-2xl shadow-lg
-                    flex items-center justify-center gap-2
-                    transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
-                    ${showPanel
-                        ? 'bg-white text-zinc-700 border border-zinc-200 hover:shadow-xl'
-                        : 'bg-gradient-to-br from-violet-600 to-purple-600 text-white hover:scale-105'
-                    }
-                `}
-                style={{
-                    right: showPanel ? `${panelWidth + 16}px` : '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                }}
-                title={showPanel ? 'Hide panel' : 'Show panel'}
-            >
-                {showPanel ? (
-                    <>
-                        <PanelRightClose className="h-5 w-5" />
-                        <span className="text-sm font-semibold">Hide</span>
-                    </>
-                ) : (
-                    <PanelRightOpen className="h-5 w-5" />
-                )}
-            </button>
-
-            {/* Smart Inline Toolbar - Positioned to avoid covering text */}
+            {/* Note Toolbar */}
             {selection && currentUserId && (() => {
-                // Calculate position - try right side first, fall back to left
-                const toolbarWidth = showNoteInput ? 400 : 200;
+                const toolbarWidth = showNoteInput ? 360 : 180;
                 const spaceOnRight = window.innerWidth - selection.rect.right;
-                const spaceOnLeft = selection.rect.left;
                 const positionOnRight = spaceOnRight >= toolbarWidth + 24;
                 const left = positionOnRight
-                    ? Math.min(
-                        selection.rect.right + window.scrollX + 12,
-                        window.innerWidth - toolbarWidth - 12
-                    )
-                    : Math.max(
-                        12,
-                        selection.rect.left + window.scrollX - toolbarWidth - 12
-                    );
+                    ? Math.min(selection.rect.right + window.scrollX + 12, window.innerWidth - toolbarWidth - 12)
+                    : Math.max(12, selection.rect.left + window.scrollX - toolbarWidth - 12);
                 const verticalCenter = selection.rect.top + window.scrollY + selection.rect.height / 2;
-                const toolbarHeight = showNoteInput ? 220 : 48;
-                const top = Math.max(
-                    60,
-                    Math.min(
-                        verticalCenter - toolbarHeight / 2,
-                        window.innerHeight + window.scrollY - toolbarHeight - 12
-                    )
-                );
+                const toolbarHeight = showNoteInput ? 200 : 44;
+                const top = Math.max(60, Math.min(verticalCenter - toolbarHeight / 2, window.innerHeight + window.scrollY - toolbarHeight - 12));
 
                 return (
                     <div
                         className="note-toolbar fixed z-[70] animate-in fade-in duration-200"
                         style={{ left, top }}
                     >
-                        <div className={`
-                            bg-white rounded-2xl shadow-2xl shadow-zinc-900/10 border border-zinc-200/60 overflow-hidden
-                            transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
-                            ${showNoteInput ? 'w-[400px]' : 'w-[200px]'}
-                        `}>
-                            {/* Connection line to selection */}
-                            {!showNoteInput && (
-                                <div className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 border-zinc-200/60 ${
-                                    positionOnRight
-                                        ? '-left-3 border-l-2 border-t-2 rounded-tl-sm'
-                                        : '-right-3 border-r-2 border-t-2 rounded-tr-sm'
-                                }`} />
-                            )}
-
-                        {!showNoteInput ? (
-                            // Collapsed State - Quick Action Bar
-                            <div className="flex items-center gap-1 px-2 py-2">
-                                <button
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => {
-                                        setShowNoteInput(true);
-                                        // Auto-open panel to notes tab
-                                        setShowPanel(true);
-                                        setActiveTab('notes');
-                                    }}
-                                    className="flex-1 h-10 flex items-center justify-center gap-2 px-3 rounded-xl bg-violet-600 text-white hover:bg-violet-700 transition-all font-medium text-sm shadow-md shadow-violet-600/20"
-                                >
-                                    <Plus className="h-4 w-4" />
-                                    <span>Add Note</span>
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setSelection(null);
-                                        window.getSelection()?.removeAllRanges();
-                                    }}
-                                    className="h-10 w-10 flex items-center justify-center rounded-xl hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors"
-                                    title="Cancel"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-                        ) : (
-                            // Expanded State - Inline Note Input
-                            <div className="p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
-                                            <StickyNote className="h-4 w-4 text-white" />
-                                        </div>
-                                        <span className="text-sm font-bold text-zinc-900">New Note</span>
-                                    </div>
+                        <div className={`bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden ${showNoteInput ? 'w-[360px]' : 'w-[180px]'}`}>
+                            {!showNoteInput ? (
+                                <div className="flex items-center p-1.5">
+                                    <button
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => {
+                                            setShowNoteInput(true);
+                                            setShowPanel(true);
+                                            setActiveTab('notes');
+                                        }}
+                                        className="flex-1 h-8 flex items-center justify-center gap-1.5 px-3 rounded bg-gray-900 text-white text-sm hover:bg-gray-800 transition-colors"
+                                    >
+                                        <Plus className="h-3.5 w-3.5" />
+                                        <span>Add note</span>
+                                    </button>
                                     <button
                                         onClick={() => {
-                                            setShowNoteInput(false);
                                             setSelection(null);
-                                            setNoteInput('');
                                             window.getSelection()?.removeAllRanges();
                                         }}
-                                        className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors"
+                                        className="h-8 w-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400 transition-colors"
                                     >
-                                        <X className="h-4 w-4" />
+                                        <X className="h-3.5 w-3.5" />
                                     </button>
                                 </div>
-
-                                {/* Selected Text Preview */}
-                                <div className="mb-3 p-2.5 bg-zinc-50 rounded-xl border border-zinc-100">
-                                    <p className="text-xs text-zinc-500 line-clamp-2 font-serif italic leading-relaxed">
-                                        "{selection.text}"
-                                    </p>
-                                </div>
-
-                                {/* Input Field */}
-                                <textarea
-                                    value={noteInput}
-                                    onChange={(e) => setNoteInput(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            handleCreateNote();
-                                        }
-                                        if (e.key === 'Escape') {
-                                            setShowNoteInput(false);
-                                            setSelection(null);
-                                            setNoteInput('');
-                                            window.getSelection()?.removeAllRanges();
-                                        }
-                                    }}
-                                    autoFocus
-                                    rows={3}
-                                    placeholder="Write your thoughts..."
-                                    className="w-full px-3 py-2.5 text-sm text-zinc-800 bg-white border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 placeholder:text-zinc-400 transition-all shadow-sm"
-                                />
-
-                                {/* Action Bar */}
-                                <div className="mt-3 flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] text-zinc-400 font-medium">Press</span>
-                                        <kbd className="px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 bg-zinc-100 rounded border border-zinc-200">Enter</kbd>
-                                        <span className="text-[10px] text-zinc-400 font-medium">to save</span>
+                            ) : (
+                                <div className="p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-medium text-gray-700">New note</span>
+                                        <button
+                                            onClick={() => {
+                                                setShowNoteInput(false);
+                                                setSelection(null);
+                                                setNoteInput('');
+                                                window.getSelection()?.removeAllRanges();
+                                            }}
+                                            className="h-6 w-6 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400 transition-colors"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={handleCreateNote}
-                                        disabled={!noteInput.trim() || isCreatingNote}
-                                        className="h-9 px-4 text-sm font-semibold bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl hover:from-violet-700 hover:to-purple-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-lg shadow-violet-600/20"
-                                    >
-                                        {isCreatingNote ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <>
-                                                <Plus className="h-4 w-4" />
-                                                Save
-                                            </>
-                                        )}
-                                    </button>
+                                    <div className="mb-2 p-2 bg-gray-50 rounded text-xs text-gray-500 line-clamp-2">
+                                        "{selection.text}"
+                                    </div>
+                                    <textarea
+                                        value={noteInput}
+                                        onChange={(e) => setNoteInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleCreateNote();
+                                            }
+                                            if (e.key === 'Escape') {
+                                                setShowNoteInput(false);
+                                                setSelection(null);
+                                                setNoteInput('');
+                                                window.getSelection()?.removeAllRanges();
+                                            }
+                                        }}
+                                        autoFocus
+                                        rows={3}
+                                        placeholder="Write a note..."
+                                        className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-gray-200 placeholder:text-gray-400"
+                                    />
+                                    <div className="mt-2 flex items-center justify-between">
+                                        <span className="text-[10px] text-gray-400">Enter to save</span>
+                                        <button
+                                            onClick={handleCreateNote}
+                                            disabled={!noteInput.trim() || isCreatingNote}
+                                            className="h-7 px-3 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                                        >
+                                            {isCreatingNote ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                                            Save
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
                         </div>
                     </div>
                 );
             })()}
 
-            {/* Snapshot Content Container */}
-            <div className="relative">
+            {/* Main Content */}
+            <main className="max-w-4xl mx-auto">
                 <SnapshotContent
                     ref={contentRef}
                     html={highlightedHtml}
                     panelWidth={panelWidth}
                 />
-            </div>
+            </main>
 
-            {/* Side Panel - Completely Redesigned */}
+            {/* Side Panel - Notion Style */}
             <div
-                className={`
-                    sidebar-panel fixed top-14 right-0 bottom-0 z-40
-                    bg-gradient-to-b from-white to-zinc-50/80
-                    border-l border-zinc-200/60
-                    shadow-2xl shadow-zinc-900/5
-                    flex flex-col
-                    transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
-                `}
+                className="sidebar-panel fixed top-12 right-0 bottom-0 z-40 bg-white border-l border-gray-200 flex flex-col transition-all duration-300"
                 style={{
                     width: `${panelWidth}px`,
                     transform: showPanel ? 'translateX(0)' : 'translateX(100%)'
                 }}
             >
-                {/* Panel Header - Minimalist Tabs */}
-                <div className="border-b border-zinc-200/50 bg-white/80 backdrop-blur-xl">
-                    <div className="flex">
-                        <button
-                            onClick={() => {
-                                setActiveTab('insights');
-                                if (!summary && !summaryLoading) {
-                                    handleGenerateSummary();
-                                }
-                            }}
-                            className={`
-                                flex-1 h-14 text-sm font-semibold
-                                flex items-center justify-center gap-2
-                                transition-all duration-200 relative
-                                ${activeTab === 'insights'
-                                    ? 'text-violet-700'
-                                    : 'text-zinc-400 hover:text-zinc-600'
-                                }
-                            `}
-                        >
-                            <Brain className="h-4 w-4" />
-                            <span>AI Insights</span>
-                            {activeTab === 'insights' && (
-                                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-violet-500 rounded-full" />
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('notes')}
-                            className={`
-                                flex-1 h-14 text-sm font-semibold
-                                flex items-center justify-center gap-2 relative
-                                transition-all duration-200
-                                ${activeTab === 'notes'
-                                    ? 'text-amber-700'
-                                    : 'text-zinc-400 hover:text-zinc-600'
-                                }
-                            `}
-                        >
-                            <StickyNote className="h-4 w-4" />
-                            <span>Notes</span>
-                            {notes.length > 0 && (
-                                <span className={`h-5 min-w-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${activeTab === 'notes' ? 'bg-amber-500 text-white' : 'bg-zinc-200 text-zinc-600'}`}>
-                                    {notes.length}
-                                </span>
-                            )}
-                            {activeTab === 'notes' && (
-                                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-amber-500 rounded-full" />
-                            )}
-                        </button>
-                    </div>
+                {/* Panel Header */}
+                <div className="flex border-b border-gray-200">
+                    <button
+                        onClick={() => setActiveTab('ai')}
+                        className={`flex-1 h-11 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors relative ${
+                            activeTab === 'ai' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        <Sparkles className="h-4 w-4" />
+                        <span>AI</span>
+                        {activeTab === 'ai' && <span className="absolute bottom-0 left-0 right-0 h-px bg-gray-900" />}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('notes')}
+                        className={`flex-1 h-11 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors relative ${
+                            activeTab === 'notes' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        <MessageSquareText className="h-4 w-4" />
+                        <span>Notes</span>
+                        {notes.length > 0 && (
+                            <span className={`h-5 min-w-5 px-1 rounded-full text-[11px] flex items-center justify-center ${
+                                activeTab === 'notes' ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-600'
+                            }`}>
+                                {notes.length}
+                            </span>
+                        )}
+                        {activeTab === 'notes' && <span className="absolute bottom-0 left-0 right-0 h-px bg-gray-900" />}
+                    </button>
                 </div>
 
                 {/* Panel Content */}
                 <div className="flex-1 overflow-y-auto">
-                    {/* AI Insights Tab */}
-                    {activeTab === 'insights' && (
+                    {/* AI Tab */}
+                    {activeTab === 'ai' && (
                         <div className="p-4">
                             {!summary && !summaryLoading && !summaryError && (
-                                // Empty State - New Interactive Design
-                                <div className="flex flex-col items-center justify-center text-center py-10 px-4">
-                                    {/* Animated AI Orb */}
+                                <div className="flex flex-col items-center text-center py-12 px-4">
                                     <button
                                         onClick={handleGenerateSummary}
-                                        className="group relative mb-6"
+                                        className="mb-4 group"
                                     >
-                                        {/* Outer glow ring */}
-                                        <div className="absolute inset-0 -m-4 rounded-full bg-gradient-to-r from-violet-500/20 via-purple-500/30 to-fuchsia-500/20 blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse" />
-                                        {/* Spinning dashed ring */}
-                                        <div className="absolute inset-0 -m-2 rounded-full border-2 border-dashed border-violet-300/50 group-hover:border-violet-400/70 transition-all duration-500 animate-[spin_8s_linear_infinite]" />
-                                        {/* Main button */}
-                                        <div className="relative h-24 w-24 rounded-full bg-gradient-to-br from-violet-500 via-purple-600 to-fuchsia-600 flex items-center justify-center shadow-2xl shadow-violet-500/40 group-hover:shadow-violet-500/60 group-hover:scale-110 transition-all duration-300">
-                                            <Brain className="h-10 w-10 text-white group-hover:scale-110 transition-transform duration-300" />
+                                        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 group-hover:from-gray-200 group-hover:to-gray-300 flex items-center justify-center transition-all">
+                                            <Sparkles className="h-7 w-7 text-gray-600" />
                                         </div>
-                                        {/* Floating particles */}
-                                        <div className="absolute -top-2 -right-2 h-3 w-3 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0s' }} />
-                                        <div className="absolute -bottom-1 -left-3 h-2 w-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0.2s' }} />
-                                        <div className="absolute top-1/2 -right-4 h-2.5 w-2.5 rounded-full bg-fuchsia-400 animate-bounce" style={{ animationDelay: '0.4s' }} />
                                     </button>
-
-                                    <h3 className="text-lg font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent mb-2">
-                                        Unlock AI Insights
-                                    </h3>
-                                    <p className="text-sm text-zinc-500 max-w-[240px] leading-relaxed mb-4">
-                                        Get an intelligent analysis with summaries, key points, and takeaways
+                                    <h3 className="text-sm font-semibold text-gray-900 mb-1">Generate AI Summary</h3>
+                                    <p className="text-xs text-gray-500 max-w-[200px]">
+                                        Get an intelligent analysis with key points and takeaways
                                     </p>
-
-                                    {/* Feature hints */}
-                                    <div className="flex flex-wrap justify-center gap-2 mt-4">
-                                        {['Summary', 'Key Points', 'Topics', 'Sentiment'].map((feature, i) => (
-                                            <span
-                                                key={feature}
-                                                className="px-2.5 py-1 text-[10px] font-medium bg-zinc-100 text-zinc-600 rounded-full animate-in fade-in slide-in-from-bottom-2"
-                                                style={{ animationDelay: `${i * 100}ms` }}
-                                            >
-                                                {feature}
-                                            </span>
-                                        ))}
-                                    </div>
                                 </div>
                             )}
 
                             {summaryLoading && (
-                                // Loading State - New Skeleton Design
-                                <div className="space-y-4 py-4">
-                                    {/* Header skeleton */}
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                                            <Brain className="h-5 w-5 text-white animate-pulse" />
+                                <div className="space-y-3 py-4">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                                            <Sparkles className="h-4 w-4 text-gray-400 animate-pulse" />
                                         </div>
                                         <div className="flex-1">
-                                            <div className="h-4 w-24 bg-zinc-200 rounded animate-pulse mb-1" />
-                                            <div className="h-3 w-32 bg-zinc-100 rounded animate-pulse" />
+                                            <div className="h-3.5 w-24 bg-gray-200 rounded animate-pulse mb-1" />
+                                            <div className="h-3 w-32 bg-gray-100 rounded animate-pulse" />
                                         </div>
                                     </div>
-
-                                    {/* Insight card skeletons */}
-                                    {[
-                                        { title: 'Summary', lines: 3, icon: '📝' },
-                                        { title: 'Key Points', lines: 4, icon: '🎯' },
-                                        { title: 'Topics', lines: 3, icon: '🏷️' },
-                                    ].map((card, i) => (
-                                        <div
-                                            key={card.title}
-                                            className="bg-white rounded-2xl border border-zinc-200 p-4 animate-in fade-in slide-in-from-right-4"
-                                            style={{ animationDelay: `${i * 100}ms` }}
-                                        >
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <span className="text-sm">{card.icon}</span>
-                                                <div className="h-4 w-20 bg-zinc-200 rounded animate-pulse" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                {Array.from({ length: card.lines }).map((_, j) => (
-                                                    <div
-                                                        key={j}
-                                                        className="h-3 bg-zinc-100 rounded animate-pulse"
-                                                        style={{ width: `${60 + Math.random() * 40}%`, animationDelay: `${j * 150}ms` }}
-                                                    />
+                                    {['Summary', 'Key Points', 'Topics'].map((item, i) => (
+                                        <div key={item} className="bg-gray-50 rounded-lg p-4">
+                                            <div className="h-3.5 w-20 bg-gray-200 rounded animate-pulse mb-2" />
+                                            <div className="space-y-1.5">
+                                                {[1, 2, 3].map((j) => (
+                                                    <div key={j} className="h-2.5 bg-gray-100 rounded animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} />
                                                 ))}
                                             </div>
                                         </div>
                                     ))}
-
-                                    {/* Loading text */}
-                                    <div className="text-center mt-6">
-                                        <p className="text-sm text-zinc-500 animate-pulse">
-                                            AI is analyzing the content...
-                                        </p>
-                                    </div>
                                 </div>
                             )}
 
                             {summaryError && !summaryLoading && (
-                                // Error State - New Design
-                                <div className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 rounded-3xl border border-red-100 dark:border-red-900/30 p-6">
-                                    <div className="text-center">
-                                        <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-orange-500 text-white shadow-lg mb-4">
-                                            <X className="h-7 w-7" />
-                                        </div>
-                                        <h3 className="text-base font-bold text-red-900 dark:text-red-100 mb-2">
-                                            Analysis Failed
-                                        </h3>
-                                        <p className="text-sm text-red-600 dark:text-red-300 mb-6 max-w-[280px] mx-auto leading-relaxed">
-                                            {summaryError}
-                                        </p>
-                                        <button
-                                            onClick={handleGenerateSummary}
-                                            className="h-10 px-6 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white rounded-xl font-medium text-sm shadow-lg shadow-red-500/30 transition-all flex items-center gap-2 mx-auto"
-                                        >
-                                            <Loader2 className="h-4 w-4" />
-                                            Try Again
-                                        </button>
+                                <div className="text-center py-12">
+                                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500 mb-3">
+                                        <X className="h-5 w-5" />
                                     </div>
+                                    <h3 className="text-sm font-medium text-gray-900 mb-1">Generation Failed</h3>
+                                    <p className="text-xs text-gray-500 mb-4">{summaryError}</p>
+                                    <button
+                                        onClick={handleGenerateSummary}
+                                        className="px-4 py-2 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
+                                    >
+                                        Try Again
+                                    </button>
                                 </div>
                             )}
 
                             {summary && !summaryLoading && (
-                                // Markdown Cards Design with Proper Rendering
-                                <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    {(() => {
-                                        // Parse markdown into sections for card-based layout
-                                        const lines = summary.split('\n')
-                                        const sections: { type: string; title?: string; content: string[] }[] = []
-                                        let currentSection: { type: string; title?: string; content: string[] } | null = null
-                                        let currentContent: string[] = []
+                                <div className="space-y-3">
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                                                <Sparkles className="h-4 w-4 text-gray-600" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-gray-900">AI Summary</h3>
+                                                <p className="text-[10px] text-gray-400">Generated by AI</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => handleCopy('all', summary)}
+                                            className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                                            title={copiedKey === 'all' ? 'Copied' : 'Copy'}
+                                        >
+                                            {copiedKey === 'all' ? (
+                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            ) : (
+                                                <Copy className="h-4 w-4" />
+                                            )}
+                                        </button>
+                                    </div>
 
-                                        const flushSection = () => {
-                                            if (currentSection) {
-                                                sections.push({ ...currentSection, content: [...currentContent] })
-                                            }
-                                            currentContent = []
-                                        }
+                                    {/* Summary content */}
+                                    <div className="bg-gray-50 rounded-lg p-4">
+                                        <ReactMarkdown
+                                            components={{
+                                                p: ({ children }) => <p className="text-sm text-gray-700 leading-relaxed mb-2 last:mb-0">{children}</p>,
+                                                strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                                                ul: ({ children }) => <ul className="space-y-1 my-2">{children}</ul>,
+                                                ol: ({ children }) => <ol className="space-y-1 my-2">{children}</ol>,
+                                                li: ({ children }) => (
+                                                    <li className="text-sm text-gray-700 flex items-start gap-2">
+                                                        <span className="flex-shrink-0 w-1 h-1 rounded-full bg-gray-400 mt-1.5" />
+                                                        <span>{children}</span>
+                                                    </li>
+                                                ),
+                                                h1: ({ children }) => <h1 className="text-sm font-semibold text-gray-900 mb-2">{children}</h1>,
+                                                h2: ({ children }) => <h2 className="text-sm font-semibold text-gray-900 mb-2">{children}</h2>,
+                                                h3: ({ children }) => <h3 className="text-sm font-medium text-gray-900 mb-2">{children}</h3>,
+                                            }}
+                                        >
+                                            {summary}
+                                        </ReactMarkdown>
+                                    </div>
 
-                                        for (const line of lines) {
-                                            // Check for heading
-                                            const headingMatch = line.match(/^(#{1,3})\s+(.+)$/)
-                                            if (headingMatch) {
-                                                flushSection()
-                                                currentSection = {
-                                                    type: 'heading',
-                                                    title: headingMatch[2],
-                                                    content: []
-                                                }
-                                                continue
-                                            }
-
-                                            // Check for list item
-                                            if (line.match(/^[-*+]\s+/) || line.match(/^\d+\.\s+/)) {
-                                                if (!currentSection || currentSection.type !== 'list') {
-                                                    flushSection()
-                                                    currentSection = { type: 'list', content: [] }
-                                                }
-                                                currentContent.push(line)
-                                                continue
-                                            }
-
-                                            // Check for code block
-                                            if (line.startsWith('```')) {
-                                                if (!currentSection || currentSection.type !== 'code') {
-                                                    flushSection()
-                                                    currentSection = { type: 'code', content: [] }
-                                                }
-                                                currentContent.push(line)
-                                                continue
-                                            }
-
-                                            // Check for blockquote
-                                            if (line.startsWith('>')) {
-                                                if (!currentSection || currentSection.type !== 'quote') {
-                                                    flushSection()
-                                                    currentSection = { type: 'quote', content: [] }
-                                                }
-                                                currentContent.push(line)
-                                                continue
-                                            }
-
-                                            // Regular content
-                                            if (!currentSection || currentSection.type === 'list' || currentSection.type === 'code') {
-                                                flushSection()
-                                                currentSection = { type: 'content', content: [] }
-                                            }
-                                            currentContent.push(line)
-                                        }
-                                        flushSection()
-
-                                        // Render card-based sections
-                                        const getCardStyle = (index: number) => {
-                                            const styles = [
-                                                { bg: 'from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30', border: 'border-violet-100 dark:border-violet-900/30', icon: '📝', iconBg: 'bg-violet-500', titleColor: 'text-violet-900 dark:text-violet-100', contentColor: 'text-violet-800 dark:text-violet-200' },
-                                                { bg: 'from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30', border: 'border-emerald-100 dark:border-emerald-900/30', icon: '🎯', iconBg: 'bg-emerald-500', titleColor: 'text-emerald-900 dark:text-emerald-100', contentColor: 'text-emerald-800 dark:text-emerald-200' },
-                                                { bg: 'from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30', border: 'border-amber-100 dark:border-amber-900/30', icon: '💡', iconBg: 'bg-amber-500', titleColor: 'text-amber-900 dark:text-amber-100', contentColor: 'text-amber-800 dark:text-amber-200' },
-                                            ]
-                                            return styles[index % styles.length]
-                                        }
-
-                                        const markdownComponents: any = {
-                                            p: ({ children }: { children: React.ReactNode }) => (
-                                                <p className="text-sm leading-relaxed mb-3 last:mb-0">{children}</p>
-                                            ),
-                                            strong: ({ children }: { children: React.ReactNode }) => (
-                                                <strong className="font-bold text-inherit">{children}</strong>
-                                            ),
-                                            em: ({ children }: { children: React.ReactNode }) => (
-                                                <em className="font-medium opacity-80">{children}</em>
-                                            ),
-                                            ul: ({ children }: { children: React.ReactNode }) => (
-                                                <ul className="space-y-2 my-3">{children}</ul>
-                                            ),
-                                            ol: ({ children }: { children: React.ReactNode }) => (
-                                                <ol className="space-y-2 my-3">{children}</ol>
-                                            ),
-                                            li: ({ children }: { children: React.ReactNode }) => (
-                                                <li className="flex items-start gap-2 text-sm">
-                                                    <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-current mt-1.5 opacity-60"></span>
-                                                    <span className="flex-1">{children}</span>
-                                                </li>
-                                            ),
-                                            h1: ({ children }: { children: React.ReactNode }) => (
-                                                <h1 className="text-base font-bold mb-3">{children}</h1>
-                                            ),
-                                            h2: ({ children }: { children: React.ReactNode }) => (
-                                                <h2 className="text-sm font-bold mb-2">{children}</h2>
-                                            ),
-                                            h3: ({ children }: { children: React.ReactNode }) => (
-                                                <h3 className="text-sm font-semibold mb-2">{children}</h3>
-                                            ),
-                                            code: ({ children }: { children: React.ReactNode }) => (
-                                                <code className="px-1.5 py-0.5 rounded bg-white/60 dark:bg-black/20 text-xs font-mono border border-current/20">{children}</code>
-                                            ),
-                                            a: ({ href, children }: { href?: string; children: React.ReactNode }) => (
-                                                <a href={href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 opacity-80 hover:opacity-100 transition-opacity">{children}</a>
-                                            ),
-                                            blockquote: ({ children }: { children: React.ReactNode }) => (
-                                                <blockquote className="border-l-2 border-current/30 pl-3 py-2 my-3 italic opacity-80">{children}</blockquote>
-                                            ),
-                                        }
-
-                                        return (
-                                            <>
-                                                {/* Header with actions */}
-                                                <div className="flex items-center justify-between px-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-                                                            <Sparkles className="h-4.5 w-4.5 text-white" />
-                                                        </div>
-                                                        <div>
-                                                            <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">AI Insights</h3>
-                                                            <p className="text-[10px] text-zinc-500">Generated by Claude</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-0.5">
-                                                        <button
-                                                            onClick={() => {
-                                                                handleCopy('all', summary)
-                                                            }}
-                                                            className="h-8 w-8 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-                                                            title={copiedKey === 'all' ? 'Copied' : 'Copy all'}
-                                                        >
-                                                            {copiedKey === 'all' ? (
-                                                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                </svg>
-                                                            ) : (
-                                                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                                </svg>
-                                                            )}
-                                                        </button>
-                                                        <button
-                                                            onClick={handleGenerateSummary}
-                                                            className="h-8 w-8 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-                                                            title="Regenerate"
-                                                        >
-                                                            <Loader2 className="h-3.5 w-3.5" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* Markdown Content Cards */}
-                                                {sections.map((section, idx) => {
-                                                    const style = getCardStyle(idx)
-                                                    const cardContent = section.content.join('\n').trim()
-                                                    if (!cardContent) return null
-
-                                                    return (
-                                                        <div
-                                                            key={idx}
-                                                            className="group bg-gradient-to-br {style.bg} rounded-2xl border {style.border} overflow-hidden transition-all hover:shadow-lg"
-                                                        >
-                                                            <div className="p-4">
-                                                                <div className="flex items-center justify-between mb-3">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className={`h-7 w-7 rounded-lg {style.iconBg} flex items-center justify-center shadow-sm`}>
-                                                                            <span className="text-white text-sm">{style.icon}</span>
-                                                                        </div>
-                                                                        {section.title && (
-                                                                            <span className={`text-sm font-semibold {style.titleColor}`}>{section.title}</span>
-                                                                        )}
-                                                                        {!section.title && section.type === 'list' && (
-                                                                            <span className={`text-sm font-semibold {style.titleColor}`}>Key Points</span>
-                                                                        )}
-                                                                        {!section.title && section.type === 'content' && (
-                                                                            <span className={`text-sm font-semibold {style.titleColor}`}>Summary</span>
-                                                                        )}
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            handleCopy(`card-${idx}`, cardContent)
-                                                                        }}
-                                                                        className={`h-7 w-7 rounded-lg hover:bg-current/10 flex items-center justify-center {style.contentColor} opacity-0 group-hover:opacity-100 transition-all`}
-                                                                        title={copiedKey === `card-${idx}` ? 'Copied' : 'Copy'}
-                                                                    >
-                                                                        {copiedKey === `card-${idx}` ? (
-                                                                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                            </svg>
-                                                                        ) : (
-                                                                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                                            </svg>
-                                                                        )}
-                                                                    </button>
-                                                                </div>
-                                                                <div className={`text-sm leading-relaxed {style.contentColor} prose prose-sm prose-headings:font-semibold prose-a:text-current prose-a:opacity-80 hover:prose-a:opacity-100 prose-strong:text-current prose-code:bg-white/60 dark:prose-code:bg-black/20 prose-code:border prose-code:border-current/20`}>
-                                                                    <ReactMarkdown components={markdownComponents}>
-                                                                        {cardContent}
-                                                                    </ReactMarkdown>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
-
-                                                {/* Quick Actions Card */}
-                                                <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-2xl border border-amber-100 dark:border-amber-900/30 overflow-hidden">
-                                                    <div className="p-4">
-                                                        <div className="flex items-center gap-2 mb-3">
-                                                            <div className="h-7 w-7 rounded-lg bg-amber-500 flex items-center justify-center shadow-sm">
-                                                                <span className="text-white text-sm">⚡</span>
-                                                            </div>
-                                                            <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">Quick Actions</span>
-                                                        </div>
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <button
-                                                                onClick={() => {
-                                                                    handleGenerateSummary()
-                                                                    toast.info('Regenerating insights...')
-                                                                }}
-                                                                className="h-10 px-3 rounded-xl bg-white/80 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100/50 dark:hover:bg-amber-900/30 transition-all flex items-center justify-center gap-1.5"
-                                                            >
-                                                                <Loader2 className="h-3 w-3" />
-                                                                Regenerate
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    handleCopy('all', summary)
-                                                                }}
-                                                                className="h-10 px-3 rounded-xl bg-white/80 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100/50 dark:hover:bg-amber-900/30 transition-all flex items-center justify-center gap-1.5"
-                                                            >
-                                                                {copiedKey === 'all' ? (
-                                                                    <>
-                                                                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                        </svg>
-                                                                        Copied
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                                        </svg>
-                                                                        Copy All
-                                                                    </>
-                                                                )}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        )
-                                    })()}
+                                    {/* Actions */}
+                                    <div className="flex gap-2 pt-2">
+                                        <button
+                                            onClick={handleGenerateSummary}
+                                            className="flex-1 h-9 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors flex items-center justify-center gap-1.5"
+                                        >
+                                            <Loader2 className="h-3.5 w-3.5" />
+                                            Regenerate
+                                        </button>
+                                        <button
+                                            onClick={() => handleCopy('all', summary)}
+                                            className="flex-1 h-9 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center gap-1.5"
+                                        >
+                                            {copiedKey === 'all' ? (
+                                                <>
+                                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    Copied
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy className="h-3.5 w-3.5" />
+                                                    Copy All
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     )}
 
-                                                    {/* Notes Tab */}
-                                                    {activeTab === 'notes' && (
-                                                        <div className="p-5">
-                                                            {notesLoading && (
-                                                                <div className="flex items-center justify-center py-16">
-                                                                    <Loader2 className="h-6 w-6 text-zinc-300 animate-spin" />
-                                                                </div>
-                                                            )}
+                    {/* Notes Tab */}
+                    {activeTab === 'notes' && (
+                        <div className="p-4">
+                            {notesLoading && (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="h-5 w-5 text-gray-300 animate-spin" />
+                                </div>
+                            )}
 
-                                                            {!notesLoading && notes.length > 0 && (
-                                                                <div className="space-y-1">
-                                                                    {notes.map(note => (
-                                                                        <div
-                                                                            key={note.id}
-                                                                            id={`note-${note.id}`}
-                                                                        >
-                                                                            <NoteCard
-                                                                                note={note}
-                                                                                isOwner={isOwner}
-                                                                                onEdit={handleEditNote}
-                                                                                onDelete={handleDeleteNote}
-                                                                                onHighlightClick={handleHighlightClick}
-                                                                            />
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-
-                                                            {!notesLoading && notes.length === 0 && (
-                                                                <div className="flex flex-col items-center justify-center text-center py-16">
-                                                                    <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 border border-amber-200 flex items-center justify-center mb-5">
-                                                                        <StickyNote className="h-8 w-8 text-amber-500" />
-                                                                    </div>
-                                                                    <h3 className="text-sm font-bold text-zinc-900 mb-2">
-                                                                        No Notes Yet
-                                                                    </h3>
-                                                                    <p className="text-sm text-zinc-500 max-w-[200px] leading-relaxed mb-4">
-                                                                        {currentUserId
-                                                                            ? 'Select any text in the tweet to add your first note'
-                                                                            : 'Log in to add notes to this tweet'}
-                                                                    </p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Delete Confirmation Dialog */}
-                                            <DeleteConfirmDialog
-                                                isOpen={deleteDialogOpen}
-                                                onClose={() => {
-                                                    setDeleteDialogOpen(false);
-                                                    setNoteToDelete(null);
-                                                }}
-                                                onConfirm={confirmDelete}
-                                                isDeleting={isDeleting}
+                            {!notesLoading && notes.length > 0 && (
+                                <div className="space-y-3">
+                                    {notes.map(note => (
+                                        <div key={note.id} id={`note-${note.id}`}>
+                                            <NoteCard
+                                                note={note}
+                                                isOwner={isOwner}
+                                                onEdit={handleEditNote}
+                                                onDelete={handleDeleteNote}
+                                                onHighlightClick={handleHighlightClick}
                                             />
                                         </div>
-                                    );
-                                }
+                                    ))}
+                                </div>
+                            )}
+
+                            {!notesLoading && notes.length === 0 && (
+                                <div className="flex flex-col items-center text-center py-12">
+                                    <div className="h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center mb-3">
+                                        <MessageSquareText className="h-5 w-5 text-gray-400" />
+                                    </div>
+                                    <h3 className="text-sm font-medium text-gray-900 mb-1">No notes yet</h3>
+                                    <p className="text-xs text-gray-500 max-w-[180px]">
+                                        {currentUserId
+                                            ? 'Select any text to add a note'
+                                            : 'Log in to add notes'}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Delete Confirmation Dialog */}
+            <DeleteConfirmDialog
+                isOpen={deleteDialogOpen}
+                onClose={() => {
+                    setDeleteDialogOpen(false);
+                    setNoteToDelete(null);
+                }}
+                onConfirm={confirmDelete}
+                isDeleting={isDeleting}
+            />
+        </div>
+    );
+}

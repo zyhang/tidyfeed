@@ -15,6 +15,7 @@ import admin from './routes/admin';
 import ai from './routes/ai';
 import library from './routes/library';
 import notes from './routes/notes';
+import stripe from './routes/stripe';
 import { TikHubService } from './services/tikhub';
 import { getSetting } from './db/settings';
 import { checkQuota, incrementUsage, getUserPlan, getAllUsageInfo } from './services/subscription';
@@ -1989,6 +1990,7 @@ app.route('/api/library', library);
 
 // Mount notes routes
 app.route('/api/notes', notes);
+app.route('/api/stripe', stripe);
 
 export default app;
 
