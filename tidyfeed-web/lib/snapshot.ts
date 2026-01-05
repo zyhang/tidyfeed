@@ -563,23 +563,21 @@ function stripTrailingTcoUrls(text: string): string {
 }
 
 function formatTweetText(text: string, entities?: { urls: { url: string; expanded_url: string; display_url: string }[] }): string {
-	// Step 0: Remove trailing t.co URLs (Twitter's auto-appended links)
+	// Step 1: Remove trailing t.co URLs (Twitter's auto-appended links)
 	let formatted = stripTrailingTcoUrls(text);
 
-	// Step 1: Decode HTML entities if the text is already escaped (fixes &#039; issue)
+	// Step 2: Decode HTML entities if the text is already escaped (fixes &#039; issue)
 	formatted = decodeHtmlEntities(formatted);
 
-	// Step 2: Re-escape for safety
-	formatted = escapeHtml(formatted);
-
-	// Step 3: Replace URLs using entities if available (most robust)
+	// Step 3: Replace URLs using entities FIRST (before HTML escaping)
+	// This is crucial because urlEntity.url contains unescaped characters like &
 	if (entities && entities.urls && entities.urls.length > 0) {
 		entities.urls.forEach(urlEntity => {
 			// Generate a friendly display text for the link
-			const displayText = generateLinkDisplayText(urlEntity.expanded_url, urlEntity.display_url);
-			const linkHtml = `<a href="${urlEntity.expanded_url}" target="_blank" rel="noopener">${displayText}</a>`;
-			// Replace the t.co URL with the link
-			// We use split/join to replace all occurrences globally (though usually unique)
+			const displayText = escapeHtml(generateLinkDisplayText(urlEntity.expanded_url, urlEntity.display_url));
+			const expandedUrlEscaped = escapeHtml(urlEntity.expanded_url);
+			const linkHtml = `<a href="${expandedUrlEscaped}" target="_blank" rel="noopener">${displayText}</a>`;
+			// Replace the t.co URL with the link in the unescaped text
 			formatted = formatted.split(urlEntity.url).join(linkHtml);
 		});
 	} else {
@@ -592,9 +590,10 @@ function formatTweetText(text: string, entities?: { urls: { url: string; expande
 				// Trim trailing punctuation (common issue in mixed text)
 				const cleanUrl = match.replace(/[.,:;!?)}\]'">，。：；！？）】"]+$/, '');
 				const trailing = match.substring(cleanUrl.length);
-				// Generate friendly display text
-				const displayText = generateLinkDisplayText(cleanUrl, cleanUrl);
-				return `<a href="${cleanUrl}" target="_blank" rel="noopener">${displayText}</a>${trailing}`;
+				// Generate friendly display text and escape it
+				const displayText = escapeHtml(generateLinkDisplayText(cleanUrl, cleanUrl));
+				const cleanUrlEscaped = escapeHtml(cleanUrl);
+				return `<a href="${cleanUrlEscaped}" target="_blank" rel="noopener">${displayText}</a>${trailing}`;
 			}
 		);
 	}
@@ -610,6 +609,19 @@ function formatTweetText(text: string, entities?: { urls: { url: string; expande
 		/#(\w+)/g,
 		'<a href="https://x.com/hashtag/$1" target="_blank" rel="noopener">#$1</a>'
 	);
+
+	// Step 6: Final safety - escape any remaining text but protect our HTML links
+	// Split by HTML tags we created, escape the non-HTML parts, then rejoin
+	const parts = formatted.split(/(<a\b[^>]*>.*?<\/a>)/g);
+	const escapedParts = parts.map(part => {
+		// If it looks like an HTML tag we created, return as-is
+		if (part.startsWith('<a ') || part.startsWith('</a>')) {
+			return part;
+		}
+		// Otherwise escape it
+		return escapeHtml(part);
+	});
+	formatted = escapedParts.join('');
 
 	return formatted;
 }

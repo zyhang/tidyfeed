@@ -123,7 +123,37 @@ export default defineUnlistedScript(() => {
         try {
             const result = tweetResult?.result || tweetResult;
             const tweet = result?.tweet || result;
-            const userResults = tweet?.core?.user_results?.result;
+
+            // Path 1: Standard path (HomeTimeline, TweetDetail)
+            let userResults = tweet?.core?.user_results?.result;
+
+            // Path 2: Alternative path for Bookmarks
+            if (!userResults?.legacy) {
+                userResults = result?.core?.user_results?.result;
+            }
+
+            // Path 3: Direct user_results on result
+            if (!userResults?.legacy) {
+                userResults = tweetResult?.user_results?.result;
+            }
+
+            // Path 4: Look for user in legacy object directly
+            if (!userResults?.legacy && tweet?.legacy?.user) {
+                return {
+                    handle: tweet.legacy.user.screen_name || '',
+                    name: tweet.legacy.user.name || '',
+                    avatar: (tweet.legacy.user.profile_image_url_https || '').replace('_normal', '_bigger'),
+                };
+            }
+
+            // Path 5: Check for user directly on tweet
+            if (!userResults?.legacy && tweet?.user) {
+                return {
+                    handle: tweet.user.screen_name || tweet.user.legacy?.screen_name || '',
+                    name: tweet.user.name || tweet.user.legacy?.name || '',
+                    avatar: (tweet.user.profile_image_url_https || tweet.user.legacy?.profile_image_url_https || '').replace('_normal', '_bigger'),
+                };
+            }
 
             if (userResults?.legacy) {
                 // Get avatar URL and replace _normal with _bigger for higher resolution
@@ -134,6 +164,16 @@ export default defineUnlistedScript(() => {
                     avatar: avatarUrl.replace('_normal', '_bigger'),
                 };
             }
+
+            // Debug: Log when we can't find author info
+            if (debugMode) {
+                console.log(LOG_PREFIX, 'Could not find author info. Available keys:', {
+                    tweetResultKeys: Object.keys(tweetResult || {}),
+                    resultKeys: Object.keys(result || {}),
+                    tweetKeys: Object.keys(tweet || {}),
+                });
+            }
+
             return null;
         } catch {
             return null;
@@ -324,8 +364,8 @@ export default defineUnlistedScript(() => {
     (window as any).__tidyfeedTweetCache = mainWorldCache;
     (window as any).__tidyfeedGetTweet = (id: string) => mainWorldCache.get(id);
 
-    // Debug mode - set to false for production
-    const debugMode = false;
+    // Debug mode - enable to see Bookmarks extraction logging
+    const debugMode = true;
 
     window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
         const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
