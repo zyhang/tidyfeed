@@ -189,8 +189,8 @@ export default defineUnlistedScript(() => {
                     if (depth > 5) return null;
                     if (!obj || typeof obj !== 'object') return null;
 
-                    // Check if this looks like a user object
-                    if (obj.screen_name && obj.profile_image_url_https) {
+                    // Check if this looks like a user object (need all three fields)
+                    if (obj.screen_name && obj.name && obj.profile_image_url_https) {
                         return extractFromLegacy(obj);
                     }
 
@@ -198,14 +198,14 @@ export default defineUnlistedScript(() => {
                     for (const key in obj) {
                         if (key === 'legacy' || key === 'user_results' || key === 'user') {
                             const found = searchResult(obj[key], depth + 1);
-                            if (found?.handle && found?.avatar) return found;
+                            if (found?.handle && found?.name && found?.avatar) return found;
                         }
                     }
                     return null;
                 };
 
                 const found = searchResult(tweetResult);
-                if (found?.handle && found?.avatar) return found;
+                if (found?.handle && found?.name && found?.avatar) return found;
             }
 
             // Debug: Log when we can't find author info
@@ -289,6 +289,17 @@ export default defineUnlistedScript(() => {
 
             const authorInfo = extractAuthorInfo(tweetResults);
             const quotedTweet = extractQuotedTweet(tweetResults);
+
+            // Debug: Log author extraction issues
+            if (debugMode && (!authorInfo?.name || !authorInfo?.handle)) {
+                console.log(LOG_PREFIX, `⚠️ Incomplete author info for ${tweetId}:`, {
+                    authorInfo,
+                    hasName: !!authorInfo?.name,
+                    hasHandle: !!authorInfo?.handle,
+                    hasAvatar: !!authorInfo?.avatar,
+                    sampleKeys: Object.keys(tweetResults || {}).slice(0, 10)
+                });
+            }
 
             return {
                 id: tweetId,

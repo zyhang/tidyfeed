@@ -3,14 +3,73 @@ import { getAllCachedTweets } from './networkInterceptor';
 
 /**
  * Sync X Bookmarks to TidyFeed
- * 
+ *
  * Features:
  * - Injects "Sync to TidyFeed" button in Bookmarks header
  * - Auto-scrolls to load bookmarks
  * - Listens to intercepted network requests for reliable data
  * - Diffs against local storage to avoid duplicates
  * - Shows elegant progress UI
+ * - Falls back to DOM extraction when API data is incomplete
  */
+
+/**
+ * Extract author info from DOM for a specific tweet
+ * Used as fallback when GraphQL API response doesn't contain complete author data
+ */
+function extractAuthorFromDOM(tweetId: string): { name: string; handle: string; avatar: string } | null {
+    try {
+        // Find the tweet element by looking for the status link
+        const statusLinks = document.querySelectorAll(`a[href*="/status/${tweetId}"]`);
+        let tweetArticle: Element | null = null;
+
+        for (const link of statusLinks) {
+            // Walk up to find the containing article
+            let current: Element | null = link;
+            while (current && !current.closest('[data-testid="tweet"]')) {
+                current = current.parentElement;
+            }
+            tweetArticle = current?.closest('[data-testid="tweet"]') || null;
+            if (tweetArticle) break;
+        }
+
+        if (!tweetArticle) {
+            console.log(`[BookmarksSync] Could not find tweet DOM element for ${tweetId}`);
+            return null;
+        }
+
+        // Extract author name
+        const userNameEl = tweetArticle.querySelector('[data-testid="User-Name"] a span span');
+        const authorName = userNameEl?.textContent?.trim() || '';
+
+        // Extract handle
+        const handleLink = tweetArticle.querySelector('[data-testid="User-Name"] a[href^="/"]');
+        const handle = handleLink?.getAttribute('href')?.replace(/^\//, '') || '';
+
+        // Extract avatar
+        const avatarImg = tweetArticle.querySelector('img[src*="profile_images"]');
+        const avatar = avatarImg?.getAttribute('src')?.replace('_normal', '_bigger') || '';
+
+        if (authorName && handle && avatar) {
+            console.log(`[BookmarksSync] ✅ Extracted author from DOM for ${tweetId}:`, {
+                name: authorName,
+                handle,
+                avatarLength: avatar.length
+            });
+            return { name: authorName, handle, avatar };
+        }
+
+        console.log(`[BookmarksSync] ⚠️ Incomplete author from DOM for ${tweetId}:`, {
+            hasName: !!authorName,
+            hasHandle: !!handle,
+            hasAvatar: !!avatar
+        });
+        return null;
+    } catch (error) {
+        console.error(`[BookmarksSync] Error extracting author from DOM for ${tweetId}:`, error);
+        return null;
+    }
+}
 
 interface SyncProgress {
     total: number;
@@ -383,23 +442,45 @@ async function startSyncProcess(e: MouseEvent) {
 
 async function saveTweetToTidyFeed(tweet: any): Promise<boolean> {
     try {
-        // Data validation: Ensure author info is complete before saving
-        const authorName = tweet.authorName || '';
-        const authorHandle = tweet.authorHandle || '';
-        const authorAvatar = tweet.authorAvatar || '';
+        // Start with API-provided author info
+        let authorName = tweet.authorName || '';
+        let authorHandle = tweet.authorHandle || '';
+        let authorAvatar = tweet.authorAvatar || '';
 
-        // Check if we have minimal required author info
-        if (!authorName || !authorHandle) {
-            console.warn(`[TidyFeed] Skipping tweet ${tweet.id} due to missing author info:`, {
-                hasName: !!authorName,
-                hasHandle: !!authorHandle,
-                hasAvatar: !!authorAvatar
-            });
-            return false; // Skip this tweet, don't save incomplete data
+        // If author info is incomplete, try to extract from DOM
+        if (!authorName || !authorHandle || !authorAvatar) {
+            console.log(`[BookmarksSync] Author info incomplete for ${tweet.id}, trying DOM extraction...`);
+            const domAuthor = extractAuthorFromDOM(tweet.id);
+
+            if (domAuthor) {
+                // Fill in missing fields from DOM
+                if (!authorName) authorName = domAuthor.name;
+                if (!authorHandle) authorHandle = domAuthor.handle;
+                if (!authorAvatar) authorAvatar = domAuthor.avatar;
+
+                console.log(`[BookmarksSync] ✅ Successfully supplemented author info from DOM for ${tweet.id}`);
+            } else {
+                console.warn(`[BookmarksSync] ⚠️ Could not extract author from DOM for ${tweet.id}, will rely on Backend API`);
+            }
         }
 
-        // Even if avatar is missing, we can still save with name/handle
-        // The UI will show initials instead of avatar
+        // Validation: At minimum, we need a handle to construct the URL
+        // Backend will fetch complete author info from TikHub API if still missing
+        if (!authorHandle) {
+            console.warn(`[TidyFeed] Skipping tweet ${tweet.id} - no handle available from API or DOM`);
+            return false; // Skip this tweet
+        }
+
+        // Log what we're saving (after DOM extraction attempt)
+        console.log(`[TidyFeed] Saving tweet ${tweet.id}:`, {
+            hasName: !!authorName,
+            hasHandle: !!authorHandle,
+            hasAvatar: !!authorAvatar,
+            source: authorName ? 'API/DOM mixed' : 'Backend will fetch'
+        });
+
+        // Save with whatever author info we have (API + DOM extraction)
+        // Backend will still use TikHub API as final fallback if needed
         const result = await browser.runtime.sendMessage({
             type: 'TOGGLE_SAVE',
             action: 'save',
@@ -409,9 +490,9 @@ async function saveTweetToTidyFeed(tweet: any): Promise<boolean> {
                 author: {
                     name: authorName,
                     handle: authorHandle,
-                    avatar: authorAvatar // Will be empty string if not available
+                    avatar: authorAvatar
                 },
-                media: [], // Interceptor might not parse media URLs deeply yet?
+                media: [],
                 url: `https://x.com/${authorHandle}/status/${tweet.id}`
             }
         });

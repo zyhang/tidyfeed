@@ -7,6 +7,7 @@ import { Home, Tag, Settings, ChevronLeft, Menu, Hash, ChevronDown, ChevronRight
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { StorageIndicator } from "./StorageIndicator"
+import { UserNav } from "./user-nav"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -204,16 +205,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                 <StorageIndicator isCollapsed={isCollapsed} />
 
                 <div className="p-2">
-                    <a
-                        href={`${API_URL}/auth/logout`}
-                        className={cn(
-                            "flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground",
-                            isCollapsed && "justify-center px-2"
-                        )}
-                    >
-                        <LogOut className="h-5 w-5" />
-                        {!isCollapsed && <span>Sign Out</span>}
-                    </a>
+                    <UserNav isCollapsed={isCollapsed} />
                 </div>
             </div>
         </aside>
