@@ -38,9 +38,46 @@ function App() {
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
+        // For Chrome extensions, we need to manually read the auth_token cookie
+        // because credentials: 'include' doesn't work for chrome-extension:// protocol
+        let token: string | undefined;
+        try {
+          // Use getAll to find cookie across all allowable domains (api.tidyfeed.app or .tidyfeed.app)
+          const cookies = await browser.cookies.getAll({
+            name: 'auth_token'
+          });
+
+          if (cookies && cookies.length > 0) {
+            // Log what we found for debugging
+            console.log('[TidyFeed] Found auth_token cookies:', cookies.map(c => `${c.domain} (${c.secure ? 'secure' : 'insecure'})`));
+
+            // Use the first valid one we find
+            // In practice, there should only be one relevant one, usually on .tidyfeed.app
+            const validCookie = cookies.find(c => c.value && c.value.length > 0);
+            if (validCookie) {
+              token = validCookie.value;
+              console.log('[TidyFeed] Using auth_token from domain:', validCookie.domain);
+            }
+          } else {
+            console.log('[TidyFeed] No auth_token cookies found via getAll');
+          }
+        } catch (e) {
+          console.warn('[TidyFeed] Failed to read auth cookie:', e);
+        }
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json'
+        };
+
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
         const response = await fetch(`${BACKEND_URL}/auth/me`, {
           method: 'GET',
-          credentials: 'include', // Send HttpOnly cookies
+          headers,
+          // Still include credentials for fallback
+          credentials: 'include',
         });
 
         if (response.ok) {

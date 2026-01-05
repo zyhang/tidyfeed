@@ -585,7 +585,14 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 				createdAt: dbUser.created_at,
 				storageUsage: dbUser.storage_usage || 0,
 				savedPostsCount: savedCount?.count || 0,
-				preferences: dbUser.preferences ? JSON.parse(dbUser.preferences) : {},
+				preferences: (() => {
+					try {
+						return dbUser.preferences ? JSON.parse(dbUser.preferences) : {};
+					} catch (e) {
+						console.error('Failed to parse user preferences:', e);
+						return {};
+					}
+				})(),
 				customAiPrompt: dbUser.custom_ai_prompt
 			},
 		});

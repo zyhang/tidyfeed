@@ -10,7 +10,10 @@
       "Bash(cat:*)",
       "Bash(find:*)",
       "Bash(ls:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git -C /Users/yihang/Documents/Projects/tidyfeed/tidyfeed-backend log --oneline -5)",
+      "Bash(wrangler secret list:*)",
+      "Bash(git -C /Users/yihang/Documents/Projects/tidyfeed/tidyfeed-backend diff HEAD~1 src/index.ts)"
     ]
   }
 }
