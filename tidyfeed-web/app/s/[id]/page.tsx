@@ -319,7 +319,8 @@ export default function SnapshotViewerPage() {
 
     const handleMouseUp = useCallback((e: MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.closest('.note-action-btn') || target.closest('.note-input-popup') || target.closest('.sidebar-panel')) {
+        // Exclude clicks on the new toolbar
+        if (target.closest('.note-toolbar') || target.closest('.sidebar-panel')) {
             return;
         }
 
@@ -724,89 +725,131 @@ export default function SnapshotViewerPage() {
             {/* Spacer for fixed header */}
             <div className="h-14" />
 
-            {/* Floating Action Button for Text Selection */}
+            {/* Smart Inline Toolbar - Redesigned Interaction */}
             {selection && currentUserId && (
-                <button
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setShowNoteInput(true)}
-                    tabIndex={-1}
-                    className="note-action-btn fixed z-[70] h-12 w-12 bg-violet-600 text-white rounded-2xl shadow-xl shadow-violet-600/25 flex items-center justify-center hover:bg-violet-700 hover:shadow-2xl hover:shadow-violet-600/35 hover:scale-105 transition-all duration-200 animate-in fade-in zoom-in-50"
-                    style={{
-                        top: selection.rect.top + window.scrollY - 56,
-                        left: selection.rect.left + selection.rect.width / 2 - 24,
-                    }}
-                    title="Add a note"
-                >
-                    <MessageSquarePlus className="h-5 w-5" />
-                </button>
-            )}
-
-            {/* Note Input Popup */}
-            {selection && showNoteInput && currentUserId && (
                 <div
-                    className="note-input-popup fixed z-[80] bg-white rounded-2xl shadow-2xl shadow-zinc-900/10 border border-zinc-200/60 p-5 w-[400px] animate-in fade-in slide-in-from-top-2 duration-200"
+                    className="note-toolbar fixed z-[70] animate-in fade-in slide-in-from-top-1 duration-200"
                     style={{
-                        top: selection.rect.bottom + window.scrollY + 12,
-                        left: Math.max(12, Math.min(selection.rect.left + selection.rect.width / 2 - 200, window.innerWidth - 412)),
+                        top: Math.max(60, selection.rect.top + window.scrollY - 72),
+                        left: Math.max(12, Math.min(
+                            selection.rect.left + selection.rect.width / 2 - (showNoteInput ? 200 : 100),
+                            window.innerWidth - (showNoteInput ? 412 : 212)
+                        )),
                     }}
                 >
-                    <button
-                        onClick={() => {
-                            setShowNoteInput(false);
-                            setSelection(null);
-                            setNoteInput('');
-                            window.getSelection()?.removeAllRanges();
-                        }}
-                        className="absolute top-4 right-4 h-7 w-7 rounded-full flex items-center justify-center hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors"
-                    >
-                        <X className="h-4 w-4" />
-                    </button>
+                    <div className={`
+                        bg-white rounded-2xl shadow-2xl shadow-zinc-900/10 border border-zinc-200/60 overflow-hidden
+                        transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
+                        ${showNoteInput ? 'w-[400px]' : 'w-[200px]'}
+                    `}>
+                        {!showNoteInput ? (
+                            // Collapsed State - Quick Action Bar
+                            <div className="flex items-center gap-1 px-2 py-2">
+                                <button
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => {
+                                        setShowNoteInput(true);
+                                        // Auto-open panel to notes tab
+                                        setShowPanel(true);
+                                        setActiveTab('notes');
+                                    }}
+                                    className="flex-1 h-10 flex items-center justify-center gap-2 px-3 rounded-xl bg-violet-600 text-white hover:bg-violet-700 transition-all font-medium text-sm shadow-md shadow-violet-600/20"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    <span>Add Note</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setSelection(null);
+                                        window.getSelection()?.removeAllRanges();
+                                    }}
+                                    className="h-10 w-10 flex items-center justify-center rounded-xl hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors"
+                                    title="Cancel"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            // Expanded State - Inline Note Input
+                            <div className="p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
+                                            <StickyNote className="h-4 w-4 text-white" />
+                                        </div>
+                                        <span className="text-sm font-bold text-zinc-900">New Note</span>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setShowNoteInput(false);
+                                            setSelection(null);
+                                            setNoteInput('');
+                                            window.getSelection()?.removeAllRanges();
+                                        }}
+                                        className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
 
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="h-7 w-7 rounded-lg bg-violet-100 flex items-center justify-center">
-                            <StickyNote className="h-4 w-4 text-violet-600" />
-                        </div>
-                        <h3 className="text-sm font-bold text-zinc-900">Add Note</h3>
+                                {/* Selected Text Preview */}
+                                <div className="mb-3 p-2.5 bg-zinc-50 rounded-xl border border-zinc-100">
+                                    <p className="text-xs text-zinc-500 line-clamp-2 font-serif italic leading-relaxed">
+                                        "{selection.text}"
+                                    </p>
+                                </div>
+
+                                {/* Input Field */}
+                                <textarea
+                                    value={noteInput}
+                                    onChange={(e) => setNoteInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleCreateNote();
+                                        }
+                                        if (e.key === 'Escape') {
+                                            setShowNoteInput(false);
+                                            setSelection(null);
+                                            setNoteInput('');
+                                            window.getSelection()?.removeAllRanges();
+                                        }
+                                    }}
+                                    autoFocus
+                                    rows={3}
+                                    placeholder="Write your thoughts..."
+                                    className="w-full px-3 py-2.5 text-sm text-zinc-800 bg-white border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 placeholder:text-zinc-400 transition-all shadow-sm"
+                                />
+
+                                {/* Action Bar */}
+                                <div className="mt-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] text-zinc-400 font-medium">Press</span>
+                                        <kbd className="px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 bg-zinc-100 rounded border border-zinc-200">Enter</kbd>
+                                        <span className="text-[10px] text-zinc-400 font-medium">to save</span>
+                                    </div>
+                                    <button
+                                        onClick={handleCreateNote}
+                                        disabled={!noteInput.trim() || isCreatingNote}
+                                        className="h-9 px-4 text-sm font-semibold bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl hover:from-violet-700 hover:to-purple-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-lg shadow-violet-600/20"
+                                    >
+                                        {isCreatingNote ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <>
+                                                <Plus className="h-4 w-4" />
+                                                Save
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    <p className="text-xs text-zinc-500 mb-4 line-clamp-2 bg-zinc-50 rounded-lg px-3 py-2 border border-zinc-100">
-                        "{selection.text}"
-                    </p>
-
-                    <textarea
-                        value={noteInput}
-                        onChange={(e) => setNoteInput(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleCreateNote();
-                            }
-                            if (e.key === 'Escape') {
-                                setShowNoteInput(false);
-                                setSelection(null);
-                                setNoteInput('');
-                                window.getSelection()?.removeAllRanges();
-                            }
-                        }}
-                        autoFocus
-                        rows={3}
-                        placeholder="Write your thoughts..."
-                        className="w-full px-3 py-2.5 text-sm text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 placeholder:text-zinc-400 transition-all"
-                    />
-                    <div className="mt-4 flex items-center justify-between">
-                        <span className="text-[11px] text-zinc-400">Press Enter to save</span>
-                        <button
-                            onClick={handleCreateNote}
-                            disabled={!noteInput.trim() || isCreatingNote}
-                            className="h-9 px-5 text-sm font-semibold bg-violet-600 text-white rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-lg shadow-violet-600/20"
-                        >
-                            {isCreatingNote ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Plus className="h-4 w-4" />
-                            )}
-                            Save Note
-                        </button>
+                    {/* Arrow Pointer */}
+                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-2">
+                        <div className="absolute top-0 left-0 w-full h-full bg-white border-r border-b border-zinc-200/60 rounded-br-sm transform rotate-45" />
                     </div>
                 </div>
             )}
