@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { getToken, API_BASE_URL } from '@/lib/config'; // Note: I might need to check where API_BASE_URL is imported from. task said `src/lib/config.ts` has it.
+import { API_BASE_URL } from '@/lib/config';
+import { getToken } from '@/lib/auth';
 
 export default function AISettingsPage() {
     const [loading, setLoading] = useState(true);
@@ -24,7 +25,7 @@ export default function AISettingsPage() {
 
     const fetchConfig = async () => {
         try {
-            const token = localStorage.getItem('tidyfeed_token'); // Accessing localStorage directly or via auth helper
+            const token = getToken();
             if (!token) return;
 
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'}/api/admin/ai-config`, {
@@ -54,7 +55,7 @@ export default function AISettingsPage() {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const token = localStorage.getItem('tidyfeed_token');
+            const token = getToken();
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787'}/api/admin/ai-config`, {
                 method: 'PUT',
                 headers: {
