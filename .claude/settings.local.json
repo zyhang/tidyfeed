@@ -16,7 +16,8 @@
       "Bash(git -C /Users/yihang/Documents/Projects/tidyfeed/tidyfeed-backend diff HEAD~1 src/index.ts)",
       "Bash(npm run compile:*)",
       "Bash(npm run)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Skill(document-skills:canvas-design)"
     ]
   }
 }

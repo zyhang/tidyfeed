@@ -6,6 +6,7 @@ import { ProfileSection } from './_components/profile-section'
 import { PreferencesSection } from './_components/preferences-section'
 import { SocialAccountsSection } from './_components/social-accounts-section'
 import { AIInsightSection } from './_components/ai-insight-section'
+import { BillingSection } from './_components/billing-section'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -25,6 +26,7 @@ const TAB_ITEMS = [
     { id: 'preferences', label: 'Preferences' },
     { id: 'social', label: 'Social Accounts' },
     { id: 'ai', label: 'AI Insight' },
+    { id: 'billing', label: 'Billing' },
 ] as const
 
 type TabId = (typeof TAB_ITEMS)[number]['id']
@@ -138,6 +140,12 @@ export function SettingsPageClient() {
                                 customPrompt={user.customAiPrompt || ''}
                                 onUpdate={(newPrompt) => setUser({ ...user, customAiPrompt: newPrompt })}
                             />
+                        </div>
+                    )}
+
+                    {activeTab === 'billing' && (
+                        <div id="settings-panel-billing" role="tabpanel">
+                            <BillingSection />
                         </div>
                     )}
                 </div>

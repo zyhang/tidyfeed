@@ -18,7 +18,6 @@ import {
     Filter,
     Star,
     Quote,
-    Github,
     Twitter
 } from 'lucide-react'
 
@@ -813,7 +812,7 @@ export default function LandingPage() {
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         <Link href="/" className="flex items-center gap-2">
                             <Image
-                                src="/logo.jpg"
+                                src="/favicon.png"
                                 alt="TidyFeed Logo"
                                 width={28}
                                 height={28}
@@ -835,10 +834,7 @@ export default function LandingPage() {
                         </div>
 
                         <div className="flex items-center gap-4">
-                            <a href="https://github.com/tidyfeed" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors duration-200">
-                                <Github className="h-5 w-5" />
-                            </a>
-                            <a href="https://twitter.com/tidyfeed" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors duration-200">
+                            <a href="https://twitter.com/tidyfeedapp" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors duration-200">
                                 <Twitter className="h-5 w-5" />
                             </a>
                         </div>
