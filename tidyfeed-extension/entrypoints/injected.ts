@@ -53,6 +53,18 @@ export default defineUnlistedScript(() => {
     }
 
     /**
+     * Get the endpoint name from URL
+     */
+    function getEndpointName(url: string): string | null {
+        for (const pattern of INTERCEPT_PATTERNS) {
+            if (url.includes(pattern)) {
+                return pattern;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Safely get nested property value
      */
     function safeGet(obj: any, path: string[]): any {
@@ -290,12 +302,13 @@ export default defineUnlistedScript(() => {
     /**
      * Send extracted tweets to Content Script
      */
-    function sendToContentScript(tweets: ExtractedTweet[]): void {
+    function sendToContentScript(tweets: ExtractedTweet[], source: string): void {
         if (tweets.length === 0) return;
 
         window.postMessage({
             type: 'TIDYFEED_TWEET_DATA',
             tweets,
+            source, // e.g. 'Bookmarks', 'HomeTimeline', etc.
         }, '*');
 
         // Silently send to content script
@@ -350,7 +363,8 @@ export default defineUnlistedScript(() => {
                     }
 
                     if (tweets.length > 0) {
-                        sendToContentScript(tweets);
+                        const endpoint = getEndpointName(url);
+                        sendToContentScript(tweets, endpoint || 'unknown');
                     }
                 }).catch((error: any) => {
                     // Silently ignore JSON parse errors (some responses might not be JSON)
@@ -401,7 +415,8 @@ export default defineUnlistedScript(() => {
                     }
 
                     if (tweets.length > 0) {
-                        sendToContentScript(tweets);
+                        const endpoint = getEndpointName(url);
+                        sendToContentScript(tweets, endpoint || 'unknown');
                     }
                 } catch (e) {
                     // Ignore errors

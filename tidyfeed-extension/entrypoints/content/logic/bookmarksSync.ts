@@ -244,9 +244,17 @@ async function startSyncProcess(e: MouseEvent) {
 
     updateProgressUI(stats);
 
-    // 3.5. Process already-cached tweets from initial page load
-    const cachedTweets = getAllCachedTweets();
-    console.log(`[TidyFeed] Processing ${cachedTweets.length} cached tweets...`);
+    // 3.5. Process already-cached tweets from initial page load (Bookmarks only)
+    const cachedTweets = getAllCachedTweets('Bookmarks');
+    console.log(`[TidyFeed] Processing ${cachedTweets.length} cached bookmark tweets...`);
+    if (cachedTweets.length > 0) {
+        console.log('[TidyFeed] Sample cached tweet:', JSON.stringify({
+            id: cachedTweets[0].id,
+            authorName: cachedTweets[0].authorName,
+            authorHandle: cachedTweets[0].authorHandle,
+            authorAvatar: cachedTweets[0].authorAvatar,
+        }));
+    }
     for (const tweet of cachedTweets) {
         if (stopRequested) break;
         if (savedIds.includes(tweet.id)) {
@@ -254,12 +262,13 @@ async function startSyncProcess(e: MouseEvent) {
             consecutiveSkipped++;
         } else {
             try {
+                console.log(`[TidyFeed] Saving tweet ${tweet.id} with avatar: ${tweet.authorAvatar?.substring(0, 50)}...`);
                 const success = await saveTweetToTidyFeed({
                     id: tweet.id,
                     fullText: tweet.fullText,
                     authorName: tweet.authorName || '',
                     authorHandle: tweet.authorHandle || '',
-                    authorAvatar: '', // Cache doesn't store avatar
+                    authorAvatar: tweet.authorAvatar || '',
                 });
                 if (success) {
                     savedIds.push(tweet.id);
@@ -282,8 +291,13 @@ async function startSyncProcess(e: MouseEvent) {
     }
 
     // 4. Message Listener for Network Interceptor
+    let lastMessageTime = Date.now();
     const messageHandler = async (event: MessageEvent) => {
         if (!isSyncing || event.source !== window || event.data?.type !== 'TIDYFEED_TWEET_DATA') return;
+        // Only process Bookmarks source
+        if (event.data.source !== 'Bookmarks') return;
+
+        lastMessageTime = Date.now();
 
         const tweets = event.data.tweets as any[];
         let batchSaved = 0;
@@ -295,16 +309,8 @@ async function startSyncProcess(e: MouseEvent) {
                 consecutiveSkipped++;
             } else {
                 // New Tweet! Sync it.
-                // We just need the ID. The backend will fetch metadata or we optimistically rely on ID.
-                // Wait, the `injector.ts` sends full data. `bookmarksSync` receives `ExtractedTweet`.
-                // We should ideally send full data to `save` to avoid backend re-fetching if possible, 
-                // but `networkInterceptor` gives us nearly everything.
-
-                // For now, simpler approach: Just send ID to background queue.
-                // But `injector.ts` uses `TOGGLE_SAVE` which expects `postData`.
-                // We can construct `postData` from `ExtractedTweet`.
-
                 try {
+                    console.log(`[TidyFeed] Scroll: Saving ${tweet.id}, avatar: ${tweet.authorAvatar?.substring(0, 50) || 'EMPTY'}`);
                     const success = await saveTweetToTidyFeed(tweet);
                     if (success) {
                         savedIds.push(tweet.id);
@@ -332,7 +338,11 @@ async function startSyncProcess(e: MouseEvent) {
 
     window.addEventListener('message', messageHandler);
 
-    // 5. Scroll Loop
+    // 5. Scroll Loop with auto-stop detection
+    let scrollCount = 0;
+    const MAX_SCROLL_COUNT = 30; // Max 30 scrolls (60 seconds)
+    const NO_DATA_TIMEOUT = 8000; // Stop if no new data for 8 seconds
+
     const scrollInterval = setInterval(() => {
         if (stopRequested) {
             clearInterval(scrollInterval);
@@ -341,34 +351,64 @@ async function startSyncProcess(e: MouseEvent) {
             return;
         }
 
+        scrollCount++;
+
+        // Auto-stop conditions:
+        // 1. Too many scrolls (safety limit)
+        // 2. No new data received for a while
+        // 3. Reached the bottom of the page
+        const timeSinceLastMessage = Date.now() - lastMessageTime;
+        const atBottom = (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 100;
+
+        if (scrollCount >= MAX_SCROLL_COUNT || (timeSinceLastMessage > NO_DATA_TIMEOUT && scrollCount > 2)) {
+            clearInterval(scrollInterval);
+            window.removeEventListener('message', messageHandler);
+            finishSync(stats);
+            return;
+        }
+
+        if (atBottom && scrollCount > 3 && timeSinceLastMessage > 3000) {
+            // At bottom and no new data for 3 seconds
+            clearInterval(scrollInterval);
+            window.removeEventListener('message', messageHandler);
+            finishSync(stats);
+            return;
+        }
+
         // Scroll down
         window.scrollBy({ top: 1000, behavior: 'smooth' });
-
-        // Check if reached bottom
-        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
-            // Maybe wait a bit? X loads infinitely.
-        }
     }, 2000); // Scroll every 2s
 
 }
 
 async function saveTweetToTidyFeed(tweet: any): Promise<boolean> {
-    const result = await browser.runtime.sendMessage({
-        type: 'TOGGLE_SAVE',
-        action: 'save',
-        postData: {
-            x_id: tweet.id,
-            content: tweet.fullText,
-            author: {
-                name: tweet.authorName || '',
-                handle: tweet.authorHandle || '',
-                avatar: tweet.authorAvatar || ''
-            },
-            media: [], // Interceptor might not parse media URLs deeply yet?
-            url: `https://x.com/${tweet.authorHandle}/status/${tweet.id}`
+    try {
+        const result = await browser.runtime.sendMessage({
+            type: 'TOGGLE_SAVE',
+            action: 'save',
+            postData: {
+                x_id: tweet.id,
+                content: tweet.fullText,
+                author: {
+                    name: tweet.authorName || '',
+                    handle: tweet.authorHandle || '',
+                    avatar: tweet.authorAvatar || ''
+                },
+                media: [], // Interceptor might not parse media URLs deeply yet?
+                url: `https://x.com/${tweet.authorHandle}/status/${tweet.id}`
+            }
+        });
+        return result?.success || false;
+    } catch (error: any) {
+        // Handle extension context invalidation (e.g., after extension reload)
+        if (error?.message?.includes('Extension context invalidated')) {
+            console.warn('[TidyFeed] Extension was reloaded. Please refresh the page.');
+            stopSync('Extension reloaded. Refresh page.');
+            return false;
         }
-    });
-    return result.success;
+        console.error('[TidyFeed] Save error:', error);
+        return false;
+    }
 }
 
 // ... UI Functions (Popup) ...

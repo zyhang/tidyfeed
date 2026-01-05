@@ -2,9 +2,9 @@
 
 export const runtime = 'edge';
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo, forwardRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, X, Loader2, ChevronLeft, StickyNote, Plus, MessageSquarePlus, FileText, Brain, BookMarked } from 'lucide-react';
+import { Sparkles, X, Loader2, StickyNote, Plus, MessageSquarePlus, Brain, BookMarked, ChevronRight, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import NoteItem from '@/components/NoteItem';
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
@@ -28,14 +28,13 @@ interface SelectionInfo {
     rect: DOMRect;
 }
 
-// Memoized snapshot content component - only re-renders when html or panelWidth changes
-const SnapshotContent = memo(
+const SnapshotContent = React.memo(
     React.forwardRef<HTMLDivElement, { html: string; panelWidth: number }>(
         ({ html, panelWidth }, ref) => (
             <div
                 ref={ref}
                 className={`
-                    transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
+                    transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
                     min-h-screen
                 `}
                 style={{ marginRight: `${panelWidth}px` }}
@@ -46,7 +45,7 @@ const SnapshotContent = memo(
 );
 SnapshotContent.displayName = 'SnapshotContent';
 
-type PanelSection = 'content' | 'insights' | 'notes' | 'all';
+type TabType = 'all' | 'insights' | 'notes';
 
 export default function SnapshotViewerPage() {
     const params = useParams();
@@ -58,49 +57,39 @@ export default function SnapshotViewerPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Panel state - 'all' shows both insights and notes
     const [showPanel, setShowPanel] = useState(false);
-    const [panelSection, setPanelSection] = useState<PanelSection>('all');
+    const [activeTab, setActiveTab] = useState<TabType>('all');
 
-    // AI Summary state
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [summaryError, setSummaryError] = useState<string | null>(null);
 
-    // Notes state
     const [notes, setNotes] = useState<Note[]>([]);
     const [notesLoading, setNotesLoading] = useState(false);
     const [isOwner, setIsOwner] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-    // Text selection state
     const [selection, setSelection] = useState<SelectionInfo | null>(null);
     const [showNoteInput, setShowNoteInput] = useState(false);
     const [noteInput, setNoteInput] = useState('');
     const [isCreatingNote, setIsCreatingNote] = useState(false);
 
-    // Delete dialog state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [noteToDelete, setNoteToDelete] = useState<number | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // Highlighted note state
     const [highlightedNoteId, setHighlightedNoteId] = useState<number | null>(null);
     const selectionRangeRef = useRef<Range | null>(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app';
 
-    // Calculate panel width based on section
     const getPanelWidth = () => {
         if (!showPanel) return 0;
-        if (panelSection === 'content') return 0;
-        if (panelSection === 'all') return 480; // Wider panel for both sections
-        return 400; // Single section panel
+        return 440;
     };
 
     const panelWidth = getPanelWidth();
 
-    // Fetch snapshot HTML on mount
     useEffect(() => {
         if (!tweetId) return;
 
@@ -123,7 +112,6 @@ export default function SnapshotViewerPage() {
         fetchSnapshot();
     }, [tweetId]);
 
-    // Fetch notes on mount
     useEffect(() => {
         if (!tweetId) return;
         fetchNotes();
@@ -148,14 +136,13 @@ export default function SnapshotViewerPage() {
         }
     };
 
-    // Generate AI Summary
     const handleGenerateSummary = async () => {
         if (summaryLoading) return;
 
         setSummaryLoading(true);
         setSummaryError(null);
         setShowPanel(true);
-        setPanelSection('all');
+        setActiveTab('all');
 
         try {
             const response = await fetch(`${apiUrl}/api/ai/summarize`, {
@@ -183,17 +170,14 @@ export default function SnapshotViewerPage() {
         }
     };
 
-    // Handle text selection - show floating action button
     const handleMouseUp = useCallback((e: MouseEvent) => {
-        // Ignore if clicking on our UI elements - preserve existing selection
         const target = e.target as HTMLElement;
         if (target.closest('.note-action-btn') || target.closest('.note-input-popup') || target.closest('.sidebar-panel')) {
-            return; // Don't touch selection state at all
+            return;
         }
 
         const sel = window.getSelection();
         if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-            // Only clear selection if not clicking on note UI
             setSelection(null);
             setShowNoteInput(false);
             selectionRangeRef.current = null;
@@ -206,7 +190,6 @@ export default function SnapshotViewerPage() {
             return;
         }
 
-        // Check if selection is within the snapshot content
         const range = sel.getRangeAt(0);
         const container = contentRef.current;
         if (!container || !container.contains(range.commonAncestorContainer)) {
@@ -214,12 +197,9 @@ export default function SnapshotViewerPage() {
             return;
         }
 
-        // Persist the DOM range so we can re-apply a highlight even after focus moves
         selectionRangeRef.current = range.cloneRange();
 
         const rect = range.getBoundingClientRect();
-
-        // Calculate text offset (simplified - using character position in text content)
         const textContent = container.textContent || '';
         const offsetStart = textContent.indexOf(text);
         const offsetEnd = offsetStart + text.length;
@@ -230,11 +210,10 @@ export default function SnapshotViewerPage() {
             offsetEnd,
             rect,
         });
-        setShowNoteInput(false); // Reset input state when new selection
+        setShowNoteInput(false);
         setNoteInput('');
     }, []);
 
-    // Add event listeners
     useEffect(() => {
         document.addEventListener('mouseup', handleMouseUp);
         return () => {
@@ -242,7 +221,6 @@ export default function SnapshotViewerPage() {
         };
     }, [handleMouseUp]);
 
-    // Create note
     const handleCreateNote = async () => {
         if (!selection || !noteInput.trim() || isCreatingNote) return;
 
@@ -271,15 +249,12 @@ export default function SnapshotViewerPage() {
                 setShowNoteInput(false);
                 setNoteInput('');
                 setShowPanel(true);
-                setPanelSection('all');
-                // Clear browser selection
+                setActiveTab('all');
                 window.getSelection()?.removeAllRanges();
-                // Re-fetch to update isOwner status
                 fetchNotes();
             } else if (response.status === 401) {
                 router.push('/login');
             } else if (response.status === 403) {
-                // User is not the owner
                 alert('You can only add notes to your own saved posts.');
             }
         } catch (err) {
@@ -289,7 +264,6 @@ export default function SnapshotViewerPage() {
         }
     };
 
-    // Edit note
     const handleEditNote = async (id: number, content: string) => {
         const response = await fetch(`${apiUrl}/api/notes/${id}`, {
             method: 'PUT',
@@ -308,7 +282,6 @@ export default function SnapshotViewerPage() {
         }
     };
 
-    // Delete note
     const handleDeleteNote = (id: number) => {
         setNoteToDelete(id);
         setDeleteDialogOpen(true);
@@ -336,28 +309,23 @@ export default function SnapshotViewerPage() {
         }
     };
 
-    // Handle clicking on a highlighted note
     const handleHighlightClick = (note: Note) => {
         setHighlightedNoteId(note.id);
         setShowPanel(true);
-        setPanelSection('all');
-        // Scroll to note in sidebar after a short delay
+        setActiveTab('all');
         setTimeout(() => {
             const noteElement = document.getElementById(`note-${note.id}`);
             noteElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 300);
     };
 
-    // Apply highlighting to snapshot content - memoized to prevent re-computation on unrelated state changes
     const highlightedHtml = useMemo(() => {
         if (notes.length === 0 || !snapshotHtml) return snapshotHtml;
 
-        // Create a temporary DOM to manipulate
         const parser = new DOMParser();
         const doc = parser.parseFromString(snapshotHtml, 'text/html');
         const body = doc.body;
 
-        // Get text content and find positions
         const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
         const textNodes: Text[] = [];
         let node: Node | null;
@@ -365,7 +333,6 @@ export default function SnapshotViewerPage() {
             textNodes.push(node as Text);
         }
 
-        // Build full text content with node mapping
         let fullText = '';
         const nodeMapping: { node: Text; start: number; end: number }[] = [];
         for (const textNode of textNodes) {
@@ -374,14 +341,12 @@ export default function SnapshotViewerPage() {
             nodeMapping.push({ node: textNode, start, end: fullText.length });
         }
 
-        // Apply highlights in reverse order to not mess up offsets
         const sortedNotes = [...notes]
             .filter(n => n.selected_text && n.selected_text.length > 0)
             .sort((a, b) => {
-                // Find position of selected text in full text
                 const posA = fullText.indexOf(a.selected_text);
                 const posB = fullText.indexOf(b.selected_text);
-                return posB - posA; // Reverse order
+                return posB - posA;
             });
 
         for (const note of sortedNotes) {
@@ -389,21 +354,18 @@ export default function SnapshotViewerPage() {
             const pos = fullText.indexOf(textToFind);
             if (pos === -1) continue;
 
-            // Find which text nodes contain this range
             const startPos = pos;
             const endPos = pos + textToFind.length;
 
             for (const mapping of nodeMapping) {
                 if (mapping.end <= startPos || mapping.start >= endPos) continue;
 
-                // This node contains part of the highlight
                 const nodeText = mapping.node.textContent || '';
                 const localStart = Math.max(0, startPos - mapping.start);
                 const localEnd = Math.min(nodeText.length, endPos - mapping.start);
 
                 if (localStart >= localEnd) continue;
 
-                // Split the text node and wrap the highlighted part
                 const before = nodeText.slice(0, localStart);
                 const highlighted = nodeText.slice(localStart, localEnd);
                 const after = nodeText.slice(localEnd);
@@ -422,23 +384,23 @@ export default function SnapshotViewerPage() {
                 if (after) fragment.appendChild(doc.createTextNode(after));
 
                 parent.replaceChild(fragment, mapping.node);
-                break; // Only highlight first occurrence
+                break;
             }
         }
 
-        // Add highlight styles
         const style = doc.createElement('style');
         style.textContent = `
             .note-highlight {
-                background: linear-gradient(to bottom, rgba(147, 51, 234, 0.15) 0%, rgba(147, 51, 234, 0.25) 100%);
-                border-bottom: 2px solid rgba(147, 51, 234, 0.4);
+                background: linear-gradient(to bottom, rgba(139, 92, 246, 0.12) 0%, rgba(139, 92, 246, 0.18) 100%);
+                border-bottom: 2px solid rgba(139, 92, 246, 0.35);
                 cursor: pointer;
                 transition: all 0.2s ease;
                 padding: 1px 0;
+                border-radius: 2px;
             }
             .note-highlight:hover {
-                background: linear-gradient(to bottom, rgba(147, 51, 234, 0.25) 0%, rgba(147, 51, 234, 0.35) 100%);
-                border-bottom-color: rgba(147, 51, 234, 0.6);
+                background: linear-gradient(to bottom, rgba(139, 92, 246, 0.18) 0%, rgba(139, 92, 246, 0.25) 100%);
+                border-bottom-color: rgba(139, 92, 246, 0.5);
             }
         `;
         doc.head.appendChild(style);
@@ -446,7 +408,6 @@ export default function SnapshotViewerPage() {
         return doc.documentElement.outerHTML;
     }, [snapshotHtml, notes]);
 
-    // Handle clicks on highlighted text
     useEffect(() => {
         const handleHighlightClicks = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
@@ -468,20 +429,18 @@ export default function SnapshotViewerPage() {
         }
     }, [notes]);
 
-    // Keep the user's selection visually highlighted even after focus moves to the note UI
     useEffect(() => {
         const container = contentRef.current;
         if (!container) return;
 
-        // Ensure highlight styles exist once
         const STYLE_ID = 'active-selection-style';
         if (!document.getElementById(STYLE_ID)) {
             const styleEl = document.createElement('style');
             styleEl.id = STYLE_ID;
             styleEl.textContent = `
                 .active-selection {
-                    background: linear-gradient(to bottom, rgba(104, 117, 245, 0.12) 0%, rgba(104, 117, 245, 0.24) 100%);
-                    border-bottom: 2px solid rgba(104, 117, 245, 0.4);
+                    background: linear-gradient(to bottom, rgba(99, 102, 241, 0.10) 0%, rgba(99, 102, 241, 0.20) 100%);
+                    border-bottom: 2px solid rgba(99, 102, 241, 0.35);
                     border-radius: 2px;
                     padding: 1px 0;
                     transition: background 0.2s ease;
@@ -490,7 +449,6 @@ export default function SnapshotViewerPage() {
             document.head.appendChild(styleEl);
         }
 
-        // Cleanup any existing active selection spans
         const clearActiveSelection = () => {
             const existing = container.querySelectorAll('.active-selection');
             existing.forEach((el) => {
@@ -509,7 +467,6 @@ export default function SnapshotViewerPage() {
             return;
         }
 
-        // Apply a persistent wrapper around the selected range
         try {
             const range = selectionRangeRef.current.cloneRange();
             const wrapper = document.createElement('span');
@@ -528,7 +485,7 @@ export default function SnapshotViewerPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#f7f9f9] flex items-center justify-center">
+            <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center font-sans">
                 <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
             </div>
         );
@@ -536,139 +493,75 @@ export default function SnapshotViewerPage() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-[#f7f9f9] flex items-center justify-center">
+            <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center font-sans">
                 <p className="text-zinc-500 text-sm font-medium">{error}</p>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#f7f9f9] relative overflow-hidden">
-            {/* Section Toggle Buttons - Floating Top Right */}
-            <div className="fixed top-6 right-6 z-50 flex items-center gap-2">
-                {/* Content Focus Button */}
-                <button
-                    onClick={() => {
-                        setShowPanel(false);
-                        setPanelSection('content');
-                    }}
-                    title="Content Only"
-                    className={`
-                        h-11 px-4 rounded-xl shadow-lg font-medium text-sm
-                        flex items-center gap-2 transition-all duration-200
-                        border
-                        ${!showPanel
-                            ? 'bg-zinc-900 text-white border-zinc-800'
-                            : 'bg-white/90 backdrop-blur-sm text-zinc-600 border-zinc-200/80 hover:text-zinc-900 hover:bg-white'
-                        }
-                    `}
-                >
-                    <FileText className="h-4 w-4" />
-                    <span>Content</span>
-                </button>
+        <div className="min-h-screen bg-[#F8FAFC] relative overflow-hidden font-sans">
+            {/* Top Control Bar */}
+            <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-zinc-200">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                    <div className="h-14 flex items-center justify-between gap-4">
+                        {/* Left - Breadcrumb */}
+                        <div className="flex items-center gap-2 text-sm">
+                            <button
+                                onClick={() => router.push('/dashboard')}
+                                className="text-zinc-500 hover:text-zinc-900 transition-colors"
+                            >
+                                Dashboard
+                            </button>
+                            <ChevronRight className="h-4 w-4 text-zinc-300" />
+                            <span className="text-zinc-900 font-medium">Snapshot</span>
+                        </div>
 
-                {/* AI Insights Button */}
-                <button
-                    onClick={() => {
-                        setShowPanel(true);
-                        setPanelSection('insights');
-                        if (!summary && !summaryLoading) {
-                            handleGenerateSummary();
-                        }
-                    }}
-                    title="AI Insights"
-                    disabled={summaryLoading}
-                    className={`
-                        h-11 px-4 rounded-xl shadow-lg font-medium text-sm
-                        flex items-center gap-2 transition-all duration-200
-                        border
-                        ${showPanel && panelSection === 'insights'
-                            ? 'bg-violet-600 text-white border-violet-500'
-                            : summary && !summaryLoading
-                                ? 'bg-violet-50/90 text-violet-700 border-violet-200 hover:bg-violet-100'
-                                : 'bg-white/90 backdrop-blur-sm text-zinc-600 border-zinc-200/80 hover:text-violet-600 hover:bg-violet-50'
-                        }
-                        ${summaryLoading ? 'cursor-wait opacity-80' : 'cursor-pointer hover:scale-105 active:scale-95'}
-                    `}
-                >
-                    {summaryLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                        <Brain className="h-4 w-4" />
-                    )}
-                    <span className="hidden sm:inline">Insights</span>
-                </button>
-
-                {/* Notes Button */}
-                <button
-                    onClick={() => {
-                        setShowPanel(true);
-                        setPanelSection('notes');
-                    }}
-                    title="Notes"
-                    className={`
-                        h-11 px-4 rounded-xl shadow-lg font-medium text-sm
-                        flex items-center gap-2 transition-all duration-200
-                        border relative
-                        ${showPanel && panelSection === 'notes'
-                            ? 'bg-violet-600 text-white border-violet-500'
-                            : notes.length > 0
-                                ? 'bg-violet-50/90 text-violet-700 border-violet-200 hover:bg-violet-100'
-                                : 'bg-white/90 backdrop-blur-sm text-zinc-600 border-zinc-200/80 hover:text-violet-600 hover:bg-violet-50'
-                        }
-                        cursor-pointer hover:scale-105 active:scale-95
-                    `}
-                >
-                    <StickyNote className="h-4 w-4" />
-                    <span className="hidden sm:inline">Notes</span>
-                    {notes.length > 0 && (
-                        <span className="absolute -top-1 -right-1 h-5 min-w-5 px-1.5 rounded-full text-[11px] font-semibold flex items-center justify-center bg-violet-500 text-white">
-                            {notes.length}
-                        </span>
-                    )}
-                </button>
-
-                {/* All Sections Button */}
-                <button
-                    onClick={() => {
-                        setShowPanel(true);
-                        setPanelSection('all');
-                        if (!summary && !summaryLoading) {
-                            handleGenerateSummary();
-                        }
-                    }}
-                    title="View All Sections"
-                    disabled={summaryLoading}
-                    className={`
-                        h-11 w-11 rounded-xl shadow-lg
-                        flex items-center justify-center
-                        transition-all duration-200
-                        border
-                        ${showPanel && panelSection === 'all'
-                            ? 'bg-zinc-900 text-white border-zinc-800'
-                            : 'bg-white/90 backdrop-blur-sm text-zinc-600 border-zinc-200/80 hover:text-zinc-900 hover:bg-white'
-                        }
-                        ${summaryLoading ? 'cursor-wait opacity-80' : 'cursor-pointer hover:scale-105 active:scale-95'}
-                    `}
-                >
-                    {summaryLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                        <Sparkles className="h-4 w-4" />
-                    )}
-                </button>
+                        {/* Right - Controls */}
+                        <div className="flex items-center gap-2">
+                            {/* Panel Toggle */}
+                            <button
+                                onClick={() => setShowPanel(!showPanel)}
+                                className={`
+                                    h-9 px-4 rounded-xl text-sm font-medium
+                                    flex items-center gap-2 transition-all duration-200
+                                    border
+                                    ${showPanel
+                                        ? 'bg-zinc-900 text-white border-zinc-800'
+                                        : 'bg-white text-zinc-600 border-zinc-200 hover:text-zinc-900 hover:border-zinc-300'
+                                    }
+                                `}
+                            >
+                                {showPanel ? (
+                                    <>
+                                        <PanelRightClose className="h-4 w-4" />
+                                        <span className="hidden sm:inline">Hide Panel</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <PanelRightOpen className="h-4 w-4" />
+                                        <span className="hidden sm:inline">Show Panel</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            {/* Spacer for fixed header */}
+            <div className="h-14" />
 
             {/* Floating Action Button for Text Selection */}
             {selection && currentUserId && (
                 <button
-                    onMouseDown={(e) => e.preventDefault()} // Prevent losing text selection
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setShowNoteInput(true)}
-                    tabIndex={-1} // Prevent focus from stealing selection
-                    className="note-action-btn fixed z-[70] h-10 w-10 bg-violet-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-violet-700 hover:scale-110 transition-all duration-200 animate-in fade-in zoom-in-50"
+                    tabIndex={-1}
+                    className="note-action-btn fixed z-[70] h-11 w-11 bg-violet-600 text-white rounded-2xl shadow-lg shadow-violet-600/20 flex items-center justify-center hover:bg-violet-700 hover:shadow-xl hover:shadow-violet-600/30 hover:scale-105 transition-all duration-200 animate-in fade-in zoom-in-50"
                     style={{
-                        top: selection.rect.top + window.scrollY - 48,
-                        left: selection.rect.left + selection.rect.width / 2 - 20,
+                        top: selection.rect.top + window.scrollY - 52,
+                        left: selection.rect.left + selection.rect.width / 2 - 22,
                     }}
                     title="Add a note"
                 >
@@ -676,16 +569,15 @@ export default function SnapshotViewerPage() {
                 </button>
             )}
 
-            {/* Note Input Popup (shown after clicking action button) */}
+            {/* Note Input Popup */}
             {selection && showNoteInput && currentUserId && (
                 <div
-                    className="note-input-popup fixed z-[80] bg-white rounded-xl shadow-2xl border border-zinc-200 p-4 w-[340px] animate-in fade-in slide-in-from-top-2 duration-200"
+                    className="note-input-popup fixed z-[80] bg-white rounded-2xl shadow-2xl shadow-zinc-900/10 border border-zinc-200 p-5 w-[380px] animate-in fade-in slide-in-from-top-2 duration-200"
                     style={{
                         top: selection.rect.bottom + window.scrollY + 12,
-                        left: Math.max(12, Math.min(selection.rect.left + selection.rect.width / 2 - 170, window.innerWidth - 352)),
+                        left: Math.max(12, Math.min(selection.rect.left + selection.rect.width / 2 - 190, window.innerWidth - 392)),
                     }}
                 >
-                    {/* Close button */}
                     <button
                         onClick={() => {
                             setShowNoteInput(false);
@@ -693,10 +585,13 @@ export default function SnapshotViewerPage() {
                             setNoteInput('');
                             window.getSelection()?.removeAllRanges();
                         }}
-                        className="absolute top-3 right-3 h-6 w-6 rounded-full flex items-center justify-center hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors"
+                        className="absolute top-4 right-4 h-7 w-7 rounded-full flex items-center justify-center hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors"
                     >
-                        <X className="h-3.5 w-3.5" />
+                        <X className="h-4 w-4" />
                     </button>
+
+                    <h3 className="text-sm font-semibold text-zinc-900 mb-3">Add Note</h3>
+                    <p className="text-xs text-zinc-500 mb-3 line-clamp-2">{selection.text}</p>
 
                     <textarea
                         value={noteInput}
@@ -716,423 +611,307 @@ export default function SnapshotViewerPage() {
                         autoFocus
                         rows={3}
                         placeholder="Write your note..."
-                        className="w-full px-3 py-2.5 text-[14px] text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-300 placeholder:text-zinc-400"
+                        className="w-full px-3 py-2.5 text-sm text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-300 placeholder:text-zinc-400 transition-all"
                     />
                     <div className="mt-3 flex items-center justify-between">
-                        <span className="text-[11px] text-zinc-400">Press Enter to save, Esc to cancel</span>
+                        <span className="text-[11px] text-zinc-400">Press Enter to save</span>
                         <button
                             onClick={handleCreateNote}
                             disabled={!noteInput.trim() || isCreatingNote}
-                            className="h-8 px-4 text-[13px] font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                            className="h-9 px-4 text-sm font-medium bg-violet-600 text-white rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm shadow-violet-600/20"
                         >
                             {isCreatingNote ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                                <Plus className="h-3.5 w-3.5" />
+                                <Plus className="h-4 w-4" />
                             )}
-                            Add Note
+                            Save Note
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Snapshot Content Container - memoized to prevent selection loss */}
-            <SnapshotContent
-                ref={contentRef}
-                html={highlightedHtml}
-                panelWidth={panelWidth}
-            />
+            {/* Snapshot Content Container */}
+            <div className="relative">
+                <SnapshotContent
+                    ref={contentRef}
+                    html={highlightedHtml}
+                    panelWidth={panelWidth}
+                />
+            </div>
 
             {/* Side Panel */}
             <div
                 className={`
-                    sidebar-panel fixed top-0 right-0 h-full z-40
-                    bg-white/98 backdrop-blur-2xl border-l border-zinc-200/40
-                    shadow-2xl shadow-zinc-900/8
+                    sidebar-panel fixed top-14 right-0 bottom-0 z-40
+                    bg-white border-l border-zinc-200
+                    shadow-2xl shadow-zinc-900/5
                     flex flex-col
-                    transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
+                    transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
                 `}
                 style={{
                     width: `${panelWidth}px`,
                     transform: showPanel ? 'translateX(0)' : 'translateX(100%)'
                 }}
             >
-                {/* Panel Header */}
-                <div className="border-b border-zinc-100 bg-white/50 backdrop-blur-md sticky top-0 z-10">
-                    <div className="h-14 px-5 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            {panelSection === 'all' && (
-                                <>
-                                    <BookMarked className="h-4 w-4 text-violet-600" />
-                                    <h2 className="font-semibold text-[14px] text-zinc-900 tracking-tight">
-                                        All Sections
-                                    </h2>
-                                </>
-                            )}
-                            {panelSection === 'insights' && (
-                                <>
-                                    <Brain className="h-4 w-4 text-violet-600" />
-                                    <h2 className="font-semibold text-[14px] text-zinc-900 tracking-tight">
-                                        AI Insights
-                                    </h2>
-                                </>
-                            )}
-                            {panelSection === 'notes' && (
-                                <>
-                                    <StickyNote className="h-4 w-4 text-violet-600" />
-                                    <h2 className="font-semibold text-[14px] text-zinc-900 tracking-tight">
-                                        Notes {notes.length > 0 && `(${notes.length})`}
-                                    </h2>
-                                </>
-                            )}
+                {/* Panel Header with Tabs */}
+                <div className="border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
+                    <div className="px-5 pt-4">
+                        {/* Tab Navigation */}
+                        <div className="flex gap-1 bg-zinc-100 rounded-xl p-1">
+                            <button
+                                onClick={() => {
+                                    setActiveTab('all');
+                                    if (!summary && !summaryLoading) {
+                                        handleGenerateSummary();
+                                    }
+                                }}
+                                className={`
+                                    flex-1 h-9 px-3 rounded-lg text-sm font-medium
+                                    flex items-center justify-center gap-1.5
+                                    transition-all duration-200
+                                    ${activeTab === 'all'
+                                        ? 'bg-white text-zinc-900 shadow-sm'
+                                        : 'text-zinc-500 hover:text-zinc-700'
+                                    }
+                                `}
+                            >
+                                <BookMarked className="h-3.5 w-3.5" />
+                                <span>All</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setActiveTab('insights');
+                                    if (!summary && !summaryLoading) {
+                                        handleGenerateSummary();
+                                    }
+                                }}
+                                className={`
+                                    flex-1 h-9 px-3 rounded-lg text-sm font-medium
+                                    flex items-center justify-center gap-1.5
+                                    transition-all duration-200
+                                    ${activeTab === 'insights'
+                                        ? 'bg-white text-zinc-900 shadow-sm'
+                                        : 'text-zinc-500 hover:text-zinc-700'
+                                    }
+                                `}
+                            >
+                                <Brain className="h-3.5 w-3.5" />
+                                <span>Insights</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('notes')}
+                                className={`
+                                    relative flex-1 h-9 px-3 rounded-lg text-sm font-medium
+                                    flex items-center justify-center gap-1.5
+                                    transition-all duration-200
+                                    ${activeTab === 'notes'
+                                        ? 'bg-white text-zinc-900 shadow-sm'
+                                        : 'text-zinc-500 hover:text-zinc-700'
+                                    }
+                                `}
+                            >
+                                <StickyNote className="h-3.5 w-3.5" />
+                                <span>Notes</span>
+                                {notes.length > 0 && (
+                                    <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full text-[10px] font-semibold flex items-center justify-center bg-violet-500 text-white">
+                                        {notes.length}
+                                    </span>
+                                )}
+                            </button>
                         </div>
-                        <button
-                            onClick={() => setShowPanel(false)}
-                            className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-zinc-100/80 text-zinc-400 hover:text-zinc-600 transition-colors"
-                        >
-                            <X className="h-3.5 w-3.5" />
-                        </button>
                     </div>
                 </div>
 
                 {/* Panel Content */}
-                <div className="flex-1 overflow-y-auto ai-summary-scrollbar">
-                    {/* Show both sections in 'all' mode */}
-                    {panelSection === 'all' && (
-                        <div className="divide-y divide-zinc-100">
-                            {/* AI Insights Section */}
-                            <div className="px-5 py-6">
-                                {/* Loading State */}
-                                {summaryLoading && (
-                                    <div className="flex flex-col items-center justify-center py-12 space-y-3">
-                                        <div className="relative">
-                                            <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center animate-pulse">
-                                                <Brain className="h-5 w-5 text-violet-400" />
-                                            </div>
-                                            <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-white rounded-full flex items-center justify-center shadow-sm">
-                                                <Loader2 className="h-2 w-2 text-violet-600 animate-spin" />
-                                            </div>
-                                        </div>
-                                        <div className="text-center space-y-1">
-                                            <p className="text-sm font-medium text-zinc-800">Analyzing content...</p>
-                                            <p className="text-xs text-zinc-400">Extracting key insights</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Error State */}
-                                {summaryError && !summaryLoading && (
-                                    <div className="rounded-xl bg-red-50/50 border border-red-100 p-3 flex items-start gap-2">
-                                        <div className="h-5 w-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <X className="h-3 w-3 text-red-600" />
+                <div className="flex-1 overflow-y-auto px-5 py-5 bg-zinc-50/50">
+                    {(activeTab === 'all' || activeTab === 'insights') && (
+                        <div className={activeTab === 'all' ? 'mb-4' : ''}>
+                            {/* Bento Card - AI Insights */}
+                            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+                                <div className="px-5 py-4 border-b border-zinc-100">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
+                                            <Brain className="h-4 w-4 text-white" />
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-semibold text-red-900 mb-1">Analysis Failed</h3>
-                                            <p className="text-[13px] text-red-600 leading-relaxed">{summaryError}</p>
+                                            <h3 className="text-sm font-semibold text-zinc-900">AI Insights</h3>
+                                            <p className="text-xs text-zinc-500">Summary & analysis</p>
                                         </div>
                                     </div>
-                                )}
-
-                                {/* Summary Content */}
-                                {summary && !summaryLoading && (
-                                    <div className="content-appear">
-                                        <ReactMarkdown
-                                            components={{
-                                                p: ({ children }) => (
-                                                    <p className="text-[14px] leading-[1.8] text-zinc-700 mb-4 last:mb-0">{children}</p>
-                                                ),
-                                                strong: ({ children }) => (
-                                                    <strong className="font-semibold text-zinc-900">{children}</strong>
-                                                ),
-                                                em: ({ children }) => (
-                                                    <em className="text-zinc-600 not-italic font-medium">{children}</em>
-                                                ),
-                                                ul: ({ children }) => (
-                                                    <ul className="space-y-2 mb-4 pl-0">{children}</ul>
-                                                ),
-                                                ol: ({ children }) => (
-                                                    <ol className="space-y-2 mb-4 list-none ml-0">{children}</ol>
-                                                ),
-                                                li: ({ children }) => (
-                                                    <li className="flex gap-2 text-[14px] leading-[1.7] text-zinc-700">
-                                                        <span className="flex-shrink-0 mt-[7px] w-1.5 h-1.5 rounded-full bg-violet-400/60"></span>
-                                                        <span className="flex-1">{children}</span>
-                                                    </li>
-                                                ),
-                                                h2: ({ children }) => (
-                                                    <h2 className="text-[15px] font-bold text-zinc-900 mt-5 mb-3 tracking-tight">
-                                                        {children}
-                                                    </h2>
-                                                ),
-                                                h3: ({ children }) => (
-                                                    <h3 className="text-[14px] font-semibold text-zinc-900 mt-4 mb-2">{children}</h3>
-                                                ),
-                                                blockquote: ({ children }) => (
-                                                    <blockquote className="border-l-[3px] border-violet-300 pl-3 py-2 my-4 text-zinc-600 text-[14px] leading-[1.7] bg-violet-50/30 rounded-r-lg">
-                                                        {children}
-                                                    </blockquote>
-                                                ),
-                                                a: ({ href, children }) => (
-                                                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-700 underline underline-offset-2 decoration-violet-200/80 hover:decoration-violet-400 transition-colors">
-                                                        {children}
-                                                    </a>
-                                                ),
-                                                code: ({ children }) => (
-                                                    <code className="bg-zinc-100/80 px-2 py-1 rounded-md text-[13px] font-mono text-zinc-800 border border-zinc-200/40">{children}</code>
-                                                ),
-                                            }}
-                                        >{summary}</ReactMarkdown>
-                                    </div>
-                                )}
-
-                                {/* Empty State */}
-                                {!summary && !summaryLoading && !summaryError && (
-                                    <div className="flex flex-col items-center justify-center text-center py-12">
-                                        <button
-                                            onClick={handleGenerateSummary}
-                                            className="h-12 w-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 mb-3"
-                                        >
-                                            <Brain className="h-6 w-6 text-white" />
-                                        </button>
-                                        <p className="text-sm font-medium text-zinc-900 mb-1">Generate AI Insights</p>
-                                        <p className="text-xs text-zinc-500 max-w-[180px] leading-relaxed">
-                                            Get an AI-powered summary of this content
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Notes Section */}
-                            <div className="px-5 py-6">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <div className="h-7 w-7 rounded-lg bg-violet-50 flex items-center justify-center">
-                                        <StickyNote className="h-3.5 w-3.5 text-violet-600" />
-                                    </div>
-                                    <h3 className="font-semibold text-[13px] text-zinc-900 tracking-tight">
-                                        Notes {notes.length > 0 && `(${notes.length})`}
-                                    </h3>
                                 </div>
 
-                                {/* Loading State */}
-                                {notesLoading && (
-                                    <div className="flex items-center justify-center py-8">
-                                        <Loader2 className="h-5 w-5 text-zinc-400 animate-spin" />
-                                    </div>
-                                )}
-
-                                {/* Notes List */}
-                                {!notesLoading && notes.length > 0 && (
-                                    <div className="space-y-3">
-                                        {notes.map(note => (
-                                            <div
-                                                key={note.id}
-                                                id={`note-${note.id}`}
-                                                className={`transition-all duration-300 ${highlightedNoteId === note.id ? 'ring-2 ring-violet-400 ring-offset-2 rounded-xl' : ''}`}
-                                            >
-                                                <NoteItem
-                                                    note={note}
-                                                    isOwner={isOwner}
-                                                    onEdit={handleEditNote}
-                                                    onDelete={handleDeleteNote}
-                                                    onHighlightClick={handleHighlightClick}
-                                                />
+                                <div className="p-5">
+                                    {summaryLoading && (
+                                        <div className="flex flex-col items-center justify-center py-10 space-y-3">
+                                            <div className="relative">
+                                                <div className="h-11 w-11 rounded-xl bg-violet-50 flex items-center justify-center">
+                                                    <Brain className="h-5.5 w-5.5 text-violet-500 animate-pulse" />
+                                                </div>
+                                                <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-white rounded-full flex items-center justify-center shadow-sm border border-zinc-100">
+                                                    <Loader2 className="h-2.5 w-2.5 text-violet-600 animate-spin" />
+                                                </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Empty State */}
-                                {!notesLoading && notes.length === 0 && (
-                                    <div className="flex flex-col items-center justify-center text-center py-12">
-                                        <div className="h-12 w-12 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center mb-3">
-                                            <MessageSquarePlus className="h-6 w-6 text-zinc-300" />
+                                            <div className="text-center">
+                                                <p className="text-sm font-medium text-zinc-800">Analyzing content...</p>
+                                                <p className="text-xs text-zinc-500 mt-1">Extracting key insights</p>
+                                            </div>
                                         </div>
-                                        <p className="text-sm font-medium text-zinc-900 mb-1">No Notes Yet</p>
-                                        <p className="text-xs text-zinc-500 max-w-[200px] leading-relaxed">
-                                            {currentUserId
-                                                ? 'Select text to add notes'
-                                                : 'Log in to add notes'}
-                                        </p>
-                                    </div>
-                                )}
+                                    )}
+
+                                    {summaryError && !summaryLoading && (
+                                        <div className="rounded-xl bg-red-50/80 border border-red-100 p-4">
+                                            <div className="flex items-start gap-3">
+                                                <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                                                    <X className="h-4 w-4 text-red-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h3 className="text-sm font-semibold text-red-900 mb-1">Analysis Failed</h3>
+                                                    <p className="text-xs text-red-600 leading-relaxed">{summaryError}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {summary && !summaryLoading && (
+                                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                            <ReactMarkdown
+                                                components={{
+                                                    p: ({ children }) => (
+                                                        <p className="text-sm leading-[1.75] text-zinc-700 mb-4 last:mb-0">{children}</p>
+                                                    ),
+                                                    strong: ({ children }) => (
+                                                        <strong className="font-semibold text-zinc-900">{children}</strong>
+                                                    ),
+                                                    em: ({ children }) => (
+                                                        <em className="text-zinc-600 font-medium">{children}</em>
+                                                    ),
+                                                    ul: ({ children }) => (
+                                                        <ul className="space-y-2.5 mb-4 pl-0">{children}</ul>
+                                                    ),
+                                                    ol: ({ children }) => (
+                                                        <ol className="space-y-2.5 mb-4 pl-0">{children}</ol>
+                                                    ),
+                                                    li: ({ children }) => (
+                                                        <li className="flex gap-2.5 text-sm leading-[1.7] text-zinc-700">
+                                                            <span className="flex-shrink-0 mt-[6px] w-1 h-1 rounded-full bg-violet-400"></span>
+                                                            <span className="flex-1">{children}</span>
+                                                        </li>
+                                                    ),
+                                                    h2: ({ children }) => (
+                                                        <h2 className="text-sm font-bold text-zinc-900 mt-5 mb-3 flex items-center gap-2">
+                                                            {children}
+                                                        </h2>
+                                                    ),
+                                                    h3: ({ children }) => (
+                                                        <h3 className="text-sm font-semibold text-zinc-900 mt-4 mb-2">{children}</h3>
+                                                    ),
+                                                    blockquote: ({ children }) => (
+                                                        <blockquote className="border-l-2 border-violet-200 pl-3.5 py-2 my-4 text-zinc-600 text-sm leading-[1.75] bg-violet-50/50 rounded-r-lg">
+                                                            {children}
+                                                        </blockquote>
+                                                    ),
+                                                    a: ({ href, children }) => (
+                                                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-700 underline underline-offset-2 decoration-violet-200 hover:decoration-violet-400 transition-colors font-medium">
+                                                            {children}
+                                                        </a>
+                                                    ),
+                                                    code: ({ children }) => (
+                                                        <code className="bg-zinc-100 px-2 py-1 rounded-md text-xs font-mono text-zinc-800 border border-zinc-200">{children}</code>
+                                                    ),
+                                                }}
+                                            >{summary}</ReactMarkdown>
+                                        </div>
+                                    )}
+
+                                    {!summary && !summaryLoading && !summaryError && (
+                                        <div className="flex flex-col items-center justify-center text-center py-8">
+                                            <button
+                                                onClick={handleGenerateSummary}
+                                                className="h-13 w-13 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200 mb-4"
+                                            >
+                                                <Sparkles className="h-6 w-6 text-white" />
+                                            </button>
+                                            <p className="text-sm font-medium text-zinc-900 mb-1">Generate AI Insights</p>
+                                            <p className="text-xs text-zinc-500 max-w-[180px] leading-relaxed">
+                                                Get an AI-powered summary and analysis
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Show only insights in 'insights' mode */}
-                    {panelSection === 'insights' && (
-                        <div className="px-6 py-6">
-                            {/* Loading State */}
-                            {summaryLoading && (
-                                <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                                    <div className="relative">
-                                        <div className="h-12 w-12 rounded-xl bg-violet-50 flex items-center justify-center animate-pulse">
-                                            <Brain className="h-6 w-6 text-violet-400" />
+                    {(activeTab === 'all' || activeTab === 'notes') && (
+                        <div className={activeTab === 'all' ? '' : ''}>
+                            {/* Bento Card - Notes */}
+                            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+                                <div className="px-5 py-4 border-b border-zinc-100">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm">
+                                                <StickyNote className="h-4 w-4 text-white" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-zinc-900">Notes</h3>
+                                                <p className="text-xs text-zinc-500">
+                                                    {notes.length > 0 ? `${notes.length} note${notes.length > 1 ? 's' : ''}` : 'Add annotations'}
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-white rounded-full flex items-center justify-center shadow-sm">
-                                            <Loader2 className="h-2.5 w-2.5 text-violet-600 animate-spin" />
+                                    </div>
+                                </div>
+
+                                <div className="p-5">
+                                    {notesLoading && (
+                                        <div className="flex items-center justify-center py-8">
+                                            <Loader2 className="h-5 w-5 text-zinc-400 animate-spin" />
                                         </div>
-                                    </div>
-                                    <div className="text-center space-y-1">
-                                        <p className="text-sm font-medium text-zinc-800">Analyzing content...</p>
-                                        <p className="text-xs text-zinc-400">Extracting key insights from the thread</p>
-                                    </div>
-                                </div>
-                            )}
+                                    )}
 
-                            {/* Error State */}
-                            {summaryError && !summaryLoading && (
-                                <div className="rounded-xl bg-red-50/50 border border-red-100 p-4 flex items-start gap-3">
-                                    <div className="h-5 w-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <X className="h-3 w-3 text-red-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-red-900 mb-1">Analysis Failed</h3>
-                                        <p className="text-[13px] text-red-600 leading-relaxed">{summaryError}</p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Summary Content */}
-                            {summary && !summaryLoading && (
-                                <div className="content-appear">
-                                    <ReactMarkdown
-                                        components={{
-                                            p: ({ children }) => (
-                                                <p className="text-[15px] leading-[1.85] text-zinc-700 mb-5 last:mb-0 font-normal tracking-[0.01em]">{children}</p>
-                                            ),
-                                            strong: ({ children }) => (
-                                                <strong className="font-semibold text-zinc-900">{children}</strong>
-                                            ),
-                                            em: ({ children }) => (
-                                                <em className="text-zinc-600 not-italic font-medium">{children}</em>
-                                            ),
-                                            ul: ({ children }) => (
-                                                <ul className="space-y-3 mb-6 pl-0">{children}</ul>
-                                            ),
-                                            ol: ({ children }) => (
-                                                <ol className="space-y-3 mb-6 list-none ml-0 counter-reset-item">{children}</ol>
-                                            ),
-                                            li: ({ children }) => (
-                                                <li className="flex gap-3 text-[15px] leading-[1.8] text-zinc-700 tracking-[0.01em]">
-                                                    <span className="flex-shrink-0 mt-[10px] w-1.5 h-1.5 rounded-full bg-violet-400/60"></span>
-                                                    <span className="flex-1">{children}</span>
-                                                </li>
-                                            ),
-                                            h1: ({ children }) => (
-                                                <h1 className="text-[20px] font-bold text-zinc-900 mb-5 pb-3 border-b border-zinc-100 tracking-tight">{children}</h1>
-                                            ),
-                                            h2: ({ children }) => (
-                                                <h2 className="text-[16px] font-bold text-zinc-900 mt-8 mb-4 flex items-center gap-2 tracking-tight">
-                                                    {children}
-                                                </h2>
-                                            ),
-                                            h3: ({ children }) => (
-                                                <h3 className="text-[15px] font-semibold text-zinc-900 mt-6 mb-3">{children}</h3>
-                                            ),
-                                            blockquote: ({ children }) => (
-                                                <blockquote className="border-l-[3px] border-violet-300 pl-4 py-2 my-6 text-zinc-600 text-[15px] leading-[1.85] bg-violet-50/30 rounded-r-xl">
-                                                    {children}
-                                                </blockquote>
-                                            ),
-                                            a: ({ href, children }) => (
-                                                <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-700 underline underline-offset-4 decoration-violet-200/80 hover:decoration-violet-400 transition-colors font-medium">
-                                                    {children}
-                                                </a>
-                                            ),
-                                            code: ({ children }) => (
-                                                <code className="bg-zinc-100/80 px-2 py-1 rounded-md text-[13px] font-mono text-zinc-800 border border-zinc-200/40">{children}</code>
-                                            ),
-                                            hr: () => (
-                                                <hr className="my-8 border-zinc-100" />
-                                            ),
-                                        }}
-                                    >{summary}</ReactMarkdown>
-                                </div>
-                            )}
-
-                            {/* Empty State */}
-                            {!summary && !summaryLoading && !summaryError && (
-                                <div className="h-full flex flex-col items-center justify-center text-center opacity-60 mt-12 pb-32">
-                                    <div className="h-16 w-16 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center mb-4 rotate-3">
-                                        <Brain className="h-8 w-8 text-zinc-300" />
-                                    </div>
-                                    <p className="text-sm font-medium text-zinc-900 mb-1">Unlock Insights</p>
-                                    <p className="text-xs text-zinc-500 max-w-[200px] leading-relaxed">
-                                        Get a concise AI-generated summary of this thread and linked content.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Show only notes in 'notes' mode */}
-                    {panelSection === 'notes' && (
-                        <div className="px-6 py-6">
-                            {/* Loading State */}
-                            {notesLoading && (
-                                <div className="flex items-center justify-center py-12">
-                                    <Loader2 className="h-5 w-5 text-zinc-400 animate-spin" />
-                                </div>
-                            )}
-
-                            {/* Notes List */}
-                            {!notesLoading && notes.length > 0 && (
-                                <div className="space-y-3">
-                                    {notes.map(note => (
-                                        <div
-                                            key={note.id}
-                                            id={`note-${note.id}`}
-                                            className={`transition-all duration-300 ${highlightedNoteId === note.id ? 'ring-2 ring-violet-400 ring-offset-2 rounded-xl' : ''}`}
-                                        >
-                                            <NoteItem
-                                                note={note}
-                                                isOwner={isOwner}
-                                                onEdit={handleEditNote}
-                                                onDelete={handleDeleteNote}
-                                                onHighlightClick={handleHighlightClick}
-                                            />
+                                    {!notesLoading && notes.length > 0 && (
+                                        <div className="space-y-3">
+                                            {notes.map(note => (
+                                                <div
+                                                    key={note.id}
+                                                    id={`note-${note.id}`}
+                                                    className={`
+                                                        transition-all duration-200
+                                                        ${highlightedNoteId === note.id ? 'ring-2 ring-violet-400 ring-offset-2 rounded-xl' : ''}
+                                                    `}
+                                                >
+                                                    <NoteItem
+                                                        note={note}
+                                                        isOwner={isOwner}
+                                                        onEdit={handleEditNote}
+                                                        onDelete={handleDeleteNote}
+                                                        onHighlightClick={handleHighlightClick}
+                                                    />
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>
-                            )}
+                                    )}
 
-                            {/* Empty State */}
-                            {!notesLoading && notes.length === 0 && (
-                                <div className="h-full flex flex-col items-center justify-center text-center opacity-60 mt-12 pb-32">
-                                    <div className="h-16 w-16 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center mb-4 -rotate-3">
-                                        <MessageSquarePlus className="h-8 w-8 text-zinc-300" />
-                                    </div>
-                                    <p className="text-sm font-medium text-zinc-900 mb-1">No Notes Yet</p>
-                                    <p className="text-xs text-zinc-500 max-w-[220px] leading-relaxed">
-                                        {currentUserId
-                                            ? 'Select any text in the snapshot to add your first note.'
-                                            : 'Log in to add notes to this snapshot.'}
-                                    </p>
+                                    {!notesLoading && notes.length === 0 && (
+                                        <div className="flex flex-col items-center justify-center text-center py-8">
+                                            <div className="h-13 w-13 rounded-2xl bg-zinc-100 border border-zinc-200 flex items-center justify-center mb-3">
+                                                <MessageSquarePlus className="h-6 w-6 text-zinc-400" />
+                                            </div>
+                                            <p className="text-sm font-medium text-zinc-900 mb-1">No Notes Yet</p>
+                                            <p className="text-xs text-zinc-500 max-w-[180px] leading-relaxed">
+                                                {currentUserId
+                                                    ? 'Select text to add notes'
+                                                    : 'Log in to add notes'}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     )}
                 </div>
-
-                {/* Footer Gradient Fade */}
-                {((summary && (panelSection === 'insights' || panelSection === 'all')) || (notes.length > 0 && (panelSection === 'notes' || panelSection === 'all'))) && (
-                    <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" />
-                )}
             </div>
-
-            {/* Collapsed Panel Toggle */}
-            {!showPanel && (summary || notes.length > 0) && (
-                <button
-                    onClick={() => setShowPanel(true)}
-                    className="fixed top-24 right-0 z-40
-                               h-10 w-8 bg-white border border-r-0 border-zinc-200
-                               rounded-l-lg shadow-md flex items-center justify-center
-                               hover:w-10 hover:bg-zinc-50 transition-all duration-200 group"
-                >
-                    <ChevronLeft className="h-4 w-4 text-zinc-400 group-hover:text-zinc-600" />
-                </button>
-            )}
 
             {/* Delete Confirmation Dialog */}
             <DeleteConfirmDialog

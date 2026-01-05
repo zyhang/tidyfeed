@@ -15,6 +15,7 @@ export interface CachedTweet {
     fullText: string;
     authorHandle: string;
     authorName: string;
+    authorAvatar: string;
     isNoteTweet: boolean;
     timestamp: number;
 }
@@ -30,6 +31,9 @@ const CACHE_EXPIRY_MS = 60 * 60 * 1000;
 
 // Maximum cache size to prevent memory leaks
 const MAX_CACHE_SIZE = 5000;
+
+// Track tweet IDs by source for filtered retrieval
+const bookmarkTweetIds = new Set<string>();
 
 /**
  * Clean up expired entries from the cache
@@ -77,6 +81,7 @@ function handleTweetData(event: MessageEvent): void {
         fullText: string;
         authorHandle: string;
         authorName: string;
+        authorAvatar: string;
         isNoteTweet: boolean;
     }>;
 
@@ -101,9 +106,20 @@ function handleTweetData(event: MessageEvent): void {
             fullText: tweet.fullText,
             authorHandle: tweet.authorHandle || '',
             authorName: tweet.authorName || '',
+            authorAvatar: tweet.authorAvatar || '',
             isNoteTweet: tweet.isNoteTweet || false,
             timestamp: now,
         });
+    }
+
+    // Track source if provided
+    const source = data.source as string | undefined;
+    if (source === 'Bookmarks') {
+        for (const tweet of tweets) {
+            if (tweet.id) {
+                bookmarkTweetIds.add(tweet.id);
+            }
+        }
     }
 
     // Periodic cleanup
@@ -142,9 +158,13 @@ export function getCachedTweet(tweetId: string): CachedTweet | null {
 
 /**
  * Get all cached tweets
- * Used by bookmarksSync to process pre-loaded tweets
+ * @param source - Optional filter: 'Bookmarks' to get only bookmark tweets
  */
-export function getAllCachedTweets(): CachedTweet[] {
+export function getAllCachedTweets(source?: string): CachedTweet[] {
+    if (source === 'Bookmarks') {
+        // Only return tweets that came from the Bookmarks endpoint
+        return Array.from(tweetCache.values()).filter(t => bookmarkTweetIds.has(t.id));
+    }
     return Array.from(tweetCache.values());
 }
 

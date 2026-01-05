@@ -575,22 +575,26 @@ function formatTweetText(text: string, entities?: { urls: { url: string; expande
 	// Step 3: Replace URLs using entities if available (most robust)
 	if (entities && entities.urls && entities.urls.length > 0) {
 		entities.urls.forEach(urlEntity => {
-			const linkHtml = `<a href="${urlEntity.expanded_url}" target="_blank" rel="noopener">${urlEntity.display_url}</a>`;
+			// Generate a friendly display text for the link
+			const displayText = generateLinkDisplayText(urlEntity.expanded_url, urlEntity.display_url);
+			const linkHtml = `<a href="${urlEntity.expanded_url}" target="_blank" rel="noopener">${displayText}</a>`;
 			// Replace the t.co URL with the link
 			// We use split/join to replace all occurrences globally (though usually unique)
 			formatted = formatted.split(urlEntity.url).join(linkHtml);
 		});
 	} else {
-		// Fallback: Regex replacement with better punctuation handling
+		// Fallback: Regex replacement with intelligent display text
 		// Exclude trailing punctuation: , . : ; ! ? ) ] } ' " >
-		// Also exclude CJK punctuation: ， 。 ： ； ！？ ） 】 ”
+		// Also exclude CJK punctuation: ， 。 ： ； ！？ ） 】 "
 		formatted = formatted.replace(
 			/(https?:\/\/[a-zA-Z0-9.\-_/~%]+)/g, // Basic match
 			(match) => {
 				// Trim trailing punctuation (common issue in mixed text)
-				const cleanUrl = match.replace(/[.,:;!?)}\]'">，。：；！？）】”]+$/, '');
+				const cleanUrl = match.replace(/[.,:;!?)}\]'">，。：；！？）】"]+$/, '');
 				const trailing = match.substring(cleanUrl.length);
-				return `<a href="${cleanUrl}" target="_blank" rel="noopener">${cleanUrl}</a>${trailing}`;
+				// Generate friendly display text
+				const displayText = generateLinkDisplayText(cleanUrl, cleanUrl);
+				return `<a href="${cleanUrl}" target="_blank" rel="noopener">${displayText}</a>${trailing}`;
 			}
 		);
 	}
@@ -608,6 +612,40 @@ function formatTweetText(text: string, entities?: { urls: { url: string; expande
 	);
 
 	return formatted;
+}
+
+/**
+ * Generate friendly display text for links
+ * Prefers expanded_url title, falls back to display_url, then domain
+ */
+function generateLinkDisplayText(expandedUrl: string, displayUrl: string): string {
+	// If display_url is not a full URL, use it directly
+	if (!displayUrl.startsWith('http')) {
+		return displayUrl;
+	}
+
+	// Extract domain from expanded URL for cleaner display
+	try {
+		const urlObj = new URL(expandedUrl);
+		const domain = urlObj.hostname;
+
+		// For well-known sites, just show domain
+		// For others, show domain + path (truncated)
+		const path = urlObj.pathname;
+		if (path.length > 1) {
+			// Show domain + first part of path (max 30 chars total)
+			const maxLength = 30;
+			const display = domain + path;
+			return display.length > maxLength
+				? domain + path.substring(0, maxLength - domain.length - 3) + '...'
+				: display;
+		}
+
+		return domain;
+	} catch {
+		// Fallback to display_url if URL parsing fails
+		return displayUrl;
+	}
 }
 
 function decodeHtmlEntities(text: string): string {
