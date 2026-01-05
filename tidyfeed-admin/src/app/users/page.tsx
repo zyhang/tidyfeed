@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { API_BASE_URL } from '@/lib/config';
 import { clearAuth, getEmail, getToken, isAuthenticated } from '@/lib/auth';
-import { Settings, Users as UsersIcon } from 'lucide-react';
+import AdminNav from '@/components/admin-nav';
 
 type UserPlan = 'free' | 'pro' | 'ultra';
 
@@ -140,34 +139,6 @@ export default function UsersPage() {
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between">
                     <h1 className="text-xl font-bold">TidyFeed Admin</h1>
                     <div className="flex items-center gap-4">
-                        <Link
-                            href="/dashboard"
-                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            <UsersIcon className="h-4 w-4" />
-                            <span>Reports</span>
-                        </Link>
-                        <Link
-                            href="/users"
-                            className="flex items-center gap-1.5 text-sm text-foreground"
-                        >
-                            <UsersIcon className="h-4 w-4" />
-                            <span>Users</span>
-                        </Link>
-                        <Link
-                            href="/settings/system"
-                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            <Settings className="h-4 w-4" />
-                            <span>System Settings</span>
-                        </Link>
-                        <Link
-                            href="/settings/ai"
-                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            <Settings className="h-4 w-4" />
-                            <span>AI Settings</span>
-                        </Link>
                         <span className="text-sm text-muted-foreground">{email}</span>
                         <Button variant="outline" size="sm" onClick={handleLogout}>
                             Logout
@@ -176,104 +147,107 @@ export default function UsersPage() {
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h2 className="text-2xl font-semibold">Users</h2>
-                        <p className="text-sm text-muted-foreground">
-                            Manage user tiers and review account details.
-                        </p>
+            <div className="container mx-auto px-4 py-8 flex flex-col gap-6 lg:flex-row">
+                <AdminNav />
+                <main className="flex-1">
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 className="text-2xl font-semibold">Users</h2>
+                            <p className="text-sm text-muted-foreground">
+                                Manage user tiers and review account details.
+                            </p>
+                        </div>
+                        <Button onClick={fetchUsers} disabled={loading} variant="outline">
+                            {loading ? 'Loading...' : 'Refresh'}
+                        </Button>
                     </div>
-                    <Button onClick={fetchUsers} disabled={loading} variant="outline">
-                        {loading ? 'Loading...' : 'Refresh'}
-                    </Button>
-                </div>
 
-                <div className="border border-border rounded-lg overflow-hidden">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>User</TableHead>
-                                <TableHead>Join Time</TableHead>
-                                <TableHead>User Tier</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {users.length === 0 ? (
+                    <div className="border border-border rounded-lg overflow-hidden">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                                        {loading ? 'Loading users...' : 'No users found'}
-                                    </TableCell>
+                                    <TableHead>User</TableHead>
+                                    <TableHead>Join Time</TableHead>
+                                    <TableHead>User Tier</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
-                            ) : (
-                                users.map((user) => (
-                                    <TableRow key={user.id}>
-                                        <TableCell>
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-                                                    {user.avatar_url ? (
-                                                        <img
-                                                            src={user.avatar_url}
-                                                            alt={user.name || user.email}
-                                                            className="h-10 w-10 object-cover"
-                                                        />
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase()}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <div className="font-medium">{user.name || 'Unnamed user'}</div>
-                                                    <div className="text-sm text-muted-foreground">{user.email}</div>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">
-                                            {formatDate(user.created_at)}
-                                        </TableCell>
-                                        <TableCell>
-                                            <select
-                                                className="border border-border rounded-md bg-background px-2 py-1 text-sm"
-                                                value={selectedPlans[user.id] || 'free'}
-                                                onChange={(e) =>
-                                                    setSelectedPlans((prev) => ({
-                                                        ...prev,
-                                                        [user.id]: e.target.value as UserPlan,
-                                                    }))
-                                                }
-                                                disabled={updatingId === user.id}
-                                            >
-                                                {PLAN_OPTIONS.map((plan) => (
-                                                    <option key={plan} value={plan}>
-                                                        {plan}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                onClick={() => updatePlan(user.id)}
-                                                disabled={updatingId === user.id}
-                                            >
-                                                {updatingId === user.id ? 'Updating...' : 'Update Tier'}
-                                            </Button>
+                            </TableHeader>
+                            <TableBody>
+                                {users.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                            {loading ? 'Loading users...' : 'No users found'}
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
+                                ) : (
+                                    users.map((user) => (
+                                        <TableRow key={user.id}>
+                                            <TableCell>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                                                        {user.avatar_url ? (
+                                                            <img
+                                                                src={user.avatar_url}
+                                                                alt={user.name || user.email}
+                                                                className="h-10 w-10 object-cover"
+                                                            />
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase()}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-medium">{user.name || 'Unnamed user'}</div>
+                                                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {formatDate(user.created_at)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <select
+                                                    className="border border-border rounded-md bg-background px-2 py-1 text-sm"
+                                                    value={selectedPlans[user.id] || 'free'}
+                                                    onChange={(e) =>
+                                                        setSelectedPlans((prev) => ({
+                                                            ...prev,
+                                                            [user.id]: e.target.value as UserPlan,
+                                                        }))
+                                                    }
+                                                    disabled={updatingId === user.id}
+                                                >
+                                                    {PLAN_OPTIONS.map((plan) => (
+                                                        <option key={plan} value={plan}>
+                                                            {plan}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => updatePlan(user.id)}
+                                                    disabled={updatingId === user.id}
+                                                >
+                                                    {updatingId === user.id ? 'Updating...' : 'Update Tier'}
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
 
-                {usersCount > 0 && (
-                    <p className="mt-4 text-sm text-muted-foreground">
-                        Showing {usersCount} user{usersCount !== 1 ? 's' : ''}
-                    </p>
-                )}
-            </main>
+                    {usersCount > 0 && (
+                        <p className="mt-4 text-sm text-muted-foreground">
+                            Showing {usersCount} user{usersCount !== 1 ? 's' : ''}
+                        </p>
+                    )}
+                </main>
+            </div>
         </div>
     );
 }

@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Tag, Settings, ChevronLeft, Menu, Hash, ChevronDown, ChevronRight, Loader2, LogOut, FolderOpen, Video, Image } from "lucide-react"
+import { Home, Tag, ChevronLeft, Menu, Hash, ChevronDown, ChevronRight, Loader2, LogOut, FolderOpen, Video, Image } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { StorageIndicator } from "./StorageIndicator"
@@ -189,25 +189,10 @@ export function Sidebar({ className, ...props }: SidebarProps) {
 
             </nav>
 
-            {/* Settings */}
-            <div className="px-2 mb-2">
-                <Link
-                    href="/dashboard/settings"
-                    className={cn(
-                        "flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
-                        pathname === '/dashboard/settings' && "bg-accent text-accent-foreground",
-                        isCollapsed && "justify-center px-2"
-                    )}
-                >
-                    <Settings className="h-5 w-5" />
-                    {!isCollapsed && <span>Settings</span>}
-                </Link>
-            </div>
-
             <div className="border-t bg-background z-10">
                 <StorageIndicator isCollapsed={isCollapsed} />
 
-                <div className="p-2">
+                <div className="p-4 pt-2">
                     <UserNav isCollapsed={isCollapsed} />
                 </div>
             </div>

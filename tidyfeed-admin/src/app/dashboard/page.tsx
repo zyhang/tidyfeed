@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { API_BASE_URL } from '@/lib/config';
 import { getToken, getEmail, clearAuth, isAuthenticated } from '@/lib/auth';
-import { Settings, Users as UsersIcon } from 'lucide-react';
+import AdminNav from '@/components/admin-nav';
 
 interface Report {
     blocked_x_id: string;
@@ -95,27 +94,6 @@ export default function DashboardPage() {
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between">
                     <h1 className="text-xl font-bold">TidyFeed Admin</h1>
                     <div className="flex items-center gap-4">
-                        <Link
-                            href="/users"
-                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            <UsersIcon className="h-4 w-4" />
-                            <span>Users</span>
-                        </Link>
-                        <Link
-                            href="/settings/system"
-                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            <Settings className="h-4 w-4" />
-                            <span>System Settings</span>
-                        </Link>
-                        <Link
-                            href="/settings/ai"
-                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            <Settings className="h-4 w-4" />
-                            <span>AI Settings</span>
-                        </Link>
                         <span className="text-sm text-muted-foreground">{email}</span>
                         <Button variant="outline" size="sm" onClick={handleLogout}>
                             Logout
@@ -125,67 +103,70 @@ export default function DashboardPage() {
             </header>
 
             {/* Main Content */}
-            <main className="container mx-auto px-4 py-8">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-semibold">Reported Accounts</h2>
-                    <Button onClick={fetchReports} disabled={loading} variant="outline">
-                        {loading ? 'Loading...' : 'Refresh'}
-                    </Button>
-                </div>
+            <div className="container mx-auto px-4 py-8 flex flex-col gap-6 lg:flex-row">
+                <AdminNav />
+                <main className="flex-1">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-2xl font-semibold">Reported Accounts</h2>
+                        <Button onClick={fetchReports} disabled={loading} variant="outline">
+                            {loading ? 'Loading...' : 'Refresh'}
+                        </Button>
+                    </div>
 
-                {/* Reports Table */}
-                <div className="border border-border rounded-lg overflow-hidden">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Blocked User</TableHead>
-                                <TableHead>Report Count</TableHead>
-                                <TableHead>Reason</TableHead>
-                                <TableHead>Latest Report</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {reports.length === 0 ? (
+                    {/* Reports Table */}
+                    <div className="border border-border rounded-lg overflow-hidden">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                                        {loading ? 'Loading reports...' : 'No reports found'}
-                                    </TableCell>
+                                    <TableHead>Blocked User</TableHead>
+                                    <TableHead>Report Count</TableHead>
+                                    <TableHead>Reason</TableHead>
+                                    <TableHead>Latest Report</TableHead>
                                 </TableRow>
-                            ) : (
-                                reports.map((report) => (
-                                    <TableRow key={report.blocked_x_id}>
-                                        <TableCell>
-                                            <div>
-                                                <div className="font-medium">{report.blocked_x_name || 'Unknown'}</div>
-                                                <div className="text-sm text-muted-foreground font-mono">
-                                                    {truncateId(report.blocked_x_id)}
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-medium">
-                                                {report.report_count}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell className="max-w-[200px] truncate">
-                                            {report.reasons || '-'}
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">
-                                            {formatDate(report.latest_report)}
+                            </TableHeader>
+                            <TableBody>
+                                {reports.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                            {loading ? 'Loading reports...' : 'No reports found'}
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
+                                ) : (
+                                    reports.map((report) => (
+                                        <TableRow key={report.blocked_x_id}>
+                                            <TableCell>
+                                                <div>
+                                                    <div className="font-medium">{report.blocked_x_name || 'Unknown'}</div>
+                                                    <div className="text-sm text-muted-foreground font-mono">
+                                                        {truncateId(report.blocked_x_id)}
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-medium">
+                                                    {report.report_count}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="max-w-[200px] truncate">
+                                                {report.reasons || '-'}
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {formatDate(report.latest_report)}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
 
-                {reports.length > 0 && (
-                    <p className="mt-4 text-sm text-muted-foreground">
-                        Showing {reports.length} reported account{reports.length !== 1 ? 's' : ''}
-                    </p>
-                )}
-            </main>
+                    {reports.length > 0 && (
+                        <p className="mt-4 text-sm text-muted-foreground">
+                            Showing {reports.length} reported account{reports.length !== 1 ? 's' : ''}
+                        </p>
+                    )}
+                </main>
+            </div>
         </div>
     );
 }
