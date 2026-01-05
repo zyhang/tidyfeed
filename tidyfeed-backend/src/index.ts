@@ -551,9 +551,12 @@ const cookieAuthMiddleware = async (c: any, next: any) => {
 // Get current user info from cookie
 app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 	try {
+		console.log('[/auth/me] Handler started');
 		const payload = c.get('jwtPayload') as { sub: string; email: string; role: string };
+		console.log('[/auth/me] JWT payload:', { sub: payload.sub, email: payload.email });
 
 		// Fetch fresh user data from DB
+		console.log('[/auth/me] Fetching user from DB...');
 		const dbUser = await c.env.DB.prepare(
 			'SELECT id, email, name, avatar_url, created_at, storage_usage, preferences, custom_ai_prompt FROM users WHERE id = ?'
 		).bind(payload.sub).first<{
@@ -567,16 +570,33 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 			custom_ai_prompt: string;
 		}>();
 
+		console.log('[/auth/me] DB query complete, user found:', !!dbUser);
+
 		if (!dbUser) {
+			console.log('[/auth/me] User not found, returning 404');
 			return c.json({ error: 'User not found' }, 404);
 		}
 
 		// Fetch saved posts count
+		console.log('[/auth/me] Fetching saved posts count...');
 		const savedCount = await c.env.DB.prepare(
 			'SELECT COUNT(*) as count FROM saved_posts WHERE user_id = ?'
 		).bind(payload.sub).first<{ count: number }>();
 
-		return c.json({
+		console.log('[/auth/me] Saved posts count:', savedCount?.count);
+
+		// Parse preferences safely
+		let parsedPreferences = {};
+		try {
+			if (dbUser.preferences) {
+				parsedPreferences = JSON.parse(dbUser.preferences);
+			}
+		} catch (e) {
+			console.error('[/auth/me] Failed to parse preferences:', e);
+		}
+
+		console.log('[/auth/me] Building response...');
+		const response = {
 			user: {
 				id: dbUser.id,
 				email: dbUser.email,
@@ -585,19 +605,16 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 				createdAt: dbUser.created_at,
 				storageUsage: dbUser.storage_usage || 0,
 				savedPostsCount: savedCount?.count || 0,
-				preferences: (() => {
-					try {
-						return dbUser.preferences ? JSON.parse(dbUser.preferences) : {};
-					} catch (e) {
-						console.error('Failed to parse user preferences:', e);
-						return {};
-					}
-				})(),
+				preferences: parsedPreferences,
 				customAiPrompt: dbUser.custom_ai_prompt
 			},
-		});
-	} catch (error) {
-		console.error('Get user error:', error);
+		};
+
+		console.log('[/auth/me] Returning success response');
+		return c.json(response);
+	} catch (error: any) {
+		console.error('[/auth/me] CRITICAL ERROR:', error?.message || error);
+		console.error('[/auth/me] Error stack:', error?.stack);
 		return c.json({ error: 'Internal server error' }, 500);
 	}
 });

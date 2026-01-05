@@ -39,8 +39,7 @@ export default defineConfig((env) => {
         '*://cdn.syndication.twimg.com/*',
         '*://video.twimg.com/*',
         '*://pbs.twimg.com/*',
-        'https://tidyfeed.app/*',
-        'https://api.tidyfeed.app/*',
+        '*://*.tidyfeed.app/*', // Wildcard for all tidyfeed subdomains (cookie domain is .tidyfeed.app)
         'https://*.googleusercontent.com/*', // Google profile avatars
         // 'http://localhost:*/*', // Local development - Removed for Firefox validation
       ],
