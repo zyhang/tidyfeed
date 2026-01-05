@@ -7,6 +7,10 @@
 
 const LOG_PREFIX = '[TidyFeed NetworkInterceptor]';
 
+// H2 FIX: Security nonce to prevent postMessage spoofing
+// Generated once per page load and shared with injected script
+const SECURITY_NONCE = crypto.randomUUID();
+
 /**
  * Cached tweet data structure
  */
@@ -75,6 +79,12 @@ function handleTweetData(event: MessageEvent): void {
 
     const data = event.data;
     if (!data || data.type !== 'TIDYFEED_TWEET_DATA') return;
+
+    // H2 FIX: Validate security nonce to prevent spoofing
+    if (data.nonce !== SECURITY_NONCE) {
+        console.warn(LOG_PREFIX, 'Rejected message with invalid nonce (possible spoofing attempt)');
+        return;
+    }
 
     const tweets = data.tweets as Array<{
         id: string;
@@ -203,6 +213,7 @@ export function getCacheStats(): { size: number; oldestMs: number; newestMs: num
 /**
  * Inject the Main World script
  * Uses synchronous injection to ensure it runs before page makes API calls
+ * H2 FIX: Passes security nonce via data attribute
  */
 async function injectMainWorldScript(): Promise<void> {
     try {
@@ -214,6 +225,9 @@ async function injectMainWorldScript(): Promise<void> {
         const script = document.createElement('script');
         script.src = scriptUrl;
         script.async = false; // Ensure synchronous loading
+
+        // H2 FIX: Pass nonce via data attribute for security
+        script.setAttribute('data-tidyfeed-nonce', SECURITY_NONCE);
 
         // Insert at document_start (before any page scripts)
         const insertTarget = document.documentElement || document.head || document.body;

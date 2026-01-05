@@ -580,8 +580,14 @@ function stopSync(reason?: string) {
     if (msgEl && reason) msgEl.textContent = reason;
 }
 
-function finishSync(stats: SyncProgress) {
+async function finishSync(stats: SyncProgress) {
     isSyncing = false;
+
+    // M1 FIX: Persist updated saved_x_ids to storage after sync
+    const freshIds = await getSavedIds();
+    await browser.storage.local.set({ saved_x_ids: freshIds });
+    console.log('[TidyFeed] Persisted saved_x_ids to storage after sync, count:', freshIds.length);
+
     const popup = document.getElementById(PROGRESS_POPUP_ID);
     if (!popup) return;
 
@@ -611,37 +617,80 @@ async function getSavedIds(): Promise<string[]> {
 
 /**
  * Handle route changes to re-inject button
+ * M2 FIX: Observers and interval only run when on /i/bookmarks
  */
+let bookmarksSyncIntervalId: ReturnType<typeof setInterval> | null = null;
+let bookmarksSyncObserver: MutationObserver | null = null;
+let wasOnBookmarksPage = false;
+
 export function initBookmarksSync() {
     console.log('[TidyFeed] Initializing Bookmarks Sync Logic...');
-    // Initial check
-    injectSyncButton();
 
-    // Observer for navigation (SPA)
-    // X uses pushState, so we need to poll or observe body
+    // Track URL changes and manage observers accordingly
     let lastUrl = window.location.href;
 
-    // Also interval check for safety (catch URL changes that don't trigger mutation immediately)
+    const isOnBookmarksPage = () => window.location.pathname.includes('/i/bookmarks');
+
+    const startObservers = () => {
+        if (bookmarksSyncObserver || bookmarksSyncIntervalId) return; // Already running
+
+        console.log('[TidyFeed] Starting bookmarks observers...');
+
+        // Inject button immediately
+        injectSyncButton();
+
+        // Interval to ensure button stays injected after re-renders
+        bookmarksSyncIntervalId = setInterval(() => {
+            if (!isOnBookmarksPage()) {
+                stopObservers();
+                return;
+            }
+            injectSyncButton();
+        }, 2000); // Check every 2s instead of 1s for better performance
+
+        // Observer for DOM changes (header re-renders)
+        bookmarksSyncObserver = new MutationObserver(() => {
+            if (isOnBookmarksPage()) {
+                injectSyncButton();
+            }
+        });
+
+        bookmarksSyncObserver.observe(document.body, { childList: true, subtree: true });
+    };
+
+    const stopObservers = () => {
+        if (bookmarksSyncIntervalId) {
+            clearInterval(bookmarksSyncIntervalId);
+            bookmarksSyncIntervalId = null;
+        }
+        if (bookmarksSyncObserver) {
+            bookmarksSyncObserver.disconnect();
+            bookmarksSyncObserver = null;
+        }
+        console.log('[TidyFeed] Stopped bookmarks observers (left bookmarks page)');
+    };
+
+    // Initial check
+    if (isOnBookmarksPage()) {
+        wasOnBookmarksPage = true;
+        startObservers();
+    }
+
+    // Lightweight URL polling to detect navigation (runs on all X pages but is cheap)
     setInterval(() => {
         if (window.location.href !== lastUrl) {
             lastUrl = window.location.href;
-            injectSyncButton();
-        } else {
-            // Periodically ensure button exists if we are on the page
-            // This handles cases where X completely re-renders the DOM (e.g. back button)
-            if (window.location.pathname.includes('/i/bookmarks')) {
-                injectSyncButton();
+            const onBookmarks = isOnBookmarksPage();
+
+            if (onBookmarks && !wasOnBookmarksPage) {
+                // Entered bookmarks page
+                wasOnBookmarksPage = true;
+                startObservers();
+            } else if (!onBookmarks && wasOnBookmarksPage) {
+                // Left bookmarks page
+                wasOnBookmarksPage = false;
+                stopObservers();
             }
         }
-    }, 1000);
-
-    // Observer is still useful for immediate reaction to DOM changes (unmounting/remounting header)
-    const observer = new MutationObserver(() => {
-        if (window.location.pathname.includes('/i/bookmarks')) {
-            injectSyncButton();
-        }
-    });
-
-    // Use a lighter observation target if possible, but body is safest for full SPA route changes
-    observer.observe(document.body, { childList: true, subtree: true });
+    }, 500); // URL check is cheap, can run frequently
 }

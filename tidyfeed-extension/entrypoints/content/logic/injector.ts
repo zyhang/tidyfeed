@@ -370,7 +370,7 @@ function extractTweetData(article: HTMLElement): TweetData {
             break;
         }
     }
-    if (!tweetId) tweetId = Date.now().toString();
+    if (!tweetId) tweetId = ''; // No fallback - fail fast if ID cannot be extracted
 
     // Video check
     let hasVideo = false;

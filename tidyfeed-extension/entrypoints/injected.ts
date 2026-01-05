@@ -398,7 +398,16 @@ export default defineUnlistedScript(() => {
 
     /**
      * Send extracted tweets to Content Script
+     * H2 FIX: Includes security nonce from data attribute
      */
+    // Read nonce from script element data attribute (set by content script)
+    const scriptElement = document.currentScript as HTMLScriptElement | null;
+    const SECURITY_NONCE = scriptElement?.getAttribute('data-tidyfeed-nonce') || '';
+
+    if (!SECURITY_NONCE) {
+        console.warn(LOG_PREFIX, 'No security nonce found - messages may be rejected');
+    }
+
     function sendToContentScript(tweets: ExtractedTweet[], source: string): void {
         if (tweets.length === 0) return;
 
@@ -406,6 +415,7 @@ export default defineUnlistedScript(() => {
             type: 'TIDYFEED_TWEET_DATA',
             tweets,
             source, // e.g. 'Bookmarks', 'HomeTimeline', etc.
+            nonce: SECURITY_NONCE, // H2 FIX: Include nonce for validation
         }, '*');
 
         // Silently send to content script
@@ -421,8 +431,8 @@ export default defineUnlistedScript(() => {
     (window as any).__tidyfeedTweetCache = mainWorldCache;
     (window as any).__tidyfeedGetTweet = (id: string) => mainWorldCache.get(id);
 
-    // Debug mode - enable to see Bookmarks extraction logging
-    const debugMode = true;
+    // Debug mode - set to false for production builds
+    const debugMode = false;
 
     window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
         const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
