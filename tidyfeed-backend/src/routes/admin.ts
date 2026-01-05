@@ -1,6 +1,7 @@
 
 import { Hono } from 'hono';
 import { verify } from 'hono/jwt';
+import { isValidPlan } from '../services/subscription';
 
 type Bindings = {
     DB: D1Database;
@@ -198,6 +199,54 @@ admin.put('/system-settings', async (c) => {
         return c.json({ success: true, updated: updates.map((u) => u.key) });
     } catch (error) {
         console.error('Error updating system settings:', error);
+        return c.json({ error: 'Internal server error' }, 500);
+    }
+});
+
+// GET /api/admin/users
+admin.get('/users', async (c) => {
+    try {
+        const users = await c.env.DB.prepare(
+            `SELECT id, email, name, avatar_url, plan, created_at
+             FROM users
+             ORDER BY created_at DESC`
+        ).all<{
+            id: string;
+            email: string;
+            name: string | null;
+            avatar_url: string | null;
+            plan: string | null;
+            created_at: string;
+        }>();
+
+        return c.json({ users: users.results || [] });
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        return c.json({ error: 'Internal server error' }, 500);
+    }
+});
+
+// PUT /api/admin/users/:id/plan
+admin.put('/users/:id/plan', async (c) => {
+    try {
+        const userId = c.req.param('id');
+        const { plan } = await c.req.json<{ plan?: string }>();
+
+        if (!plan || !isValidPlan(plan)) {
+            return c.json({ error: 'Invalid plan' }, 400);
+        }
+
+        const result = await c.env.DB.prepare(
+            `UPDATE users SET plan = ?, plan_expires_at = NULL WHERE id = ?`
+        ).bind(plan, userId).run();
+
+        if (!result.success) {
+            return c.json({ error: 'Failed to update plan' }, 500);
+        }
+
+        return c.json({ success: true, plan });
+    } catch (error) {
+        console.error('Error updating user plan:', error);
         return c.json({ error: 'Internal server error' }, 500);
     }
 });

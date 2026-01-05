@@ -1174,8 +1174,13 @@ app.post('/api/posts', cookieAuthMiddleware, async (c) => {
 		}
 
 		// Check collection quota (Free: 100/month, Pro/Ultra: unlimited)
-		const collectionQuota = await checkQuota(c.env.DB, userId, 'collection');
-		if (!collectionQuota.allowed) {
+		let collectionQuota = null;
+		try {
+			collectionQuota = await checkQuota(c.env.DB, userId, 'collection');
+		} catch (quotaError) {
+			console.error('[SavePost] Quota check failed, skipping enforcement:', quotaError);
+		}
+		if (collectionQuota && !collectionQuota.allowed) {
 			const planInfo = await getUserPlan(c.env.DB, userId);
 			return c.json({
 				error: `Collection quota exceeded (${collectionQuota.limit} items/month for ${planInfo.plan} plan). Please upgrade to save more.`,
@@ -1220,20 +1225,39 @@ app.post('/api/posts', cookieAuthMiddleware, async (c) => {
 				`INSERT INTO saved_posts (user_id, x_post_id, content, author_info, media_urls, url, platform)
 				 VALUES (?, ?, ?, ?, ?, ?, ?)`
 			).bind(userId, x_id, content || null, authorInfo, mediaUrls, url || null, platform || 'x').run();
-
-			// Increment collection usage after successful save
-			await incrementUsage(c.env.DB, userId, 'collection');
-
-			// Trigger caching in background (non-blocking)
-			c.executionCtx.waitUntil(triggerCacheInBackground(c.env, x_id, userId));
-
-			return c.json({ success: true, message: 'Post saved' });
 		} catch (dbError: any) {
 			if (dbError.message?.includes('UNIQUE constraint failed')) {
 				return c.json({ success: true, message: 'Post already saved' });
 			}
-			throw dbError;
+			if (dbError.message?.includes('no such column: platform')) {
+				console.warn('[SavePost] Platform column missing, retrying legacy insert');
+				try {
+					await c.env.DB.prepare(
+						`INSERT INTO saved_posts (user_id, x_post_id, content, author_info, media_urls, url)
+						 VALUES (?, ?, ?, ?, ?, ?)`
+					).bind(userId, x_id, content || null, authorInfo, mediaUrls, url || null).run();
+				} catch (legacyError: any) {
+					if (legacyError.message?.includes('UNIQUE constraint failed')) {
+						return c.json({ success: true, message: 'Post already saved' });
+					}
+					throw legacyError;
+				}
+			} else {
+				throw dbError;
+			}
 		}
+
+		// Increment collection usage after successful save
+		try {
+			await incrementUsage(c.env.DB, userId, 'collection');
+		} catch (usageError) {
+			console.error('[SavePost] Usage increment failed:', usageError);
+		}
+
+		// Trigger caching in background (non-blocking)
+		c.executionCtx.waitUntil(triggerCacheInBackground(c.env, x_id, userId));
+
+		return c.json({ success: true, message: 'Post saved' });
 	} catch (error) {
 		console.error('Save post error:', error);
 		return c.json({ error: 'Internal server error' }, 500);

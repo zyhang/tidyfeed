@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { API_BASE_URL } from '@/lib/config';
 import { getToken, getEmail, clearAuth, isAuthenticated } from '@/lib/auth';
-import { Settings } from 'lucide-react';
+import { Settings, Users as UsersIcon } from 'lucide-react';
 
 interface Report {
     blocked_x_id: string;
@@ -95,6 +95,13 @@ export default function DashboardPage() {
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between">
                     <h1 className="text-xl font-bold">TidyFeed Admin</h1>
                     <div className="flex items-center gap-4">
+                        <Link
+                            href="/users"
+                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            <UsersIcon className="h-4 w-4" />
+                            <span>Users</span>
+                        </Link>
                         <Link
                             href="/settings/system"
                             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
