@@ -20,9 +20,19 @@ interface UserData {
     customAiPrompt: string
 }
 
+const TAB_ITEMS = [
+    { id: 'profile', label: 'Profile' },
+    { id: 'preferences', label: 'Preferences' },
+    { id: 'social', label: 'Social Accounts' },
+    { id: 'ai', label: 'AI Insight' },
+] as const
+
+type TabId = (typeof TAB_ITEMS)[number]['id']
+
 export function SettingsPageClient() {
     const [user, setUser] = useState<UserData | null>(null)
     const [loading, setLoading] = useState(true)
+    const [activeTab, setActiveTab] = useState<TabId>('profile')
 
     useEffect(() => {
         async function fetchUser() {
@@ -68,23 +78,69 @@ export function SettingsPageClient() {
                 </p>
             </div>
 
-            <div className="space-y-8">
-                <ProfileSection
-                    user={user}
-                    onUpdate={(newName) => setUser({ ...user, name: newName })}
-                />
+            <div className="rounded-2xl border bg-card/60 backdrop-blur">
+                <div className="border-b px-3 py-3 sm:px-6">
+                    <div
+                        role="tablist"
+                        aria-label="Settings tabs"
+                        className="flex flex-wrap items-center gap-2"
+                    >
+                        {TAB_ITEMS.map((tab) => {
+                            const isActive = activeTab === tab.id
+                            return (
+                                <button
+                                    key={tab.id}
+                                    role="tab"
+                                    aria-selected={isActive}
+                                    aria-controls={`settings-panel-${tab.id}`}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={
+                                        `px-3 py-1.5 text-sm font-medium rounded-full transition-colors ` +
+                                        (isActive
+                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground hover:bg-muted')
+                                    }
+                                >
+                                    {tab.label}
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+                <div className="p-6">
+                    {activeTab === 'profile' && (
+                        <div id="settings-panel-profile" role="tabpanel">
+                            <ProfileSection
+                                user={user}
+                                onUpdate={(newName) => setUser({ ...user, name: newName })}
+                            />
+                        </div>
+                    )}
 
-                <PreferencesSection
-                    preferences={user.preferences || {}}
-                    onUpdate={(newPrefs) => setUser({ ...user, preferences: newPrefs })}
-                />
+                    {activeTab === 'preferences' && (
+                        <div id="settings-panel-preferences" role="tabpanel">
+                            <PreferencesSection
+                                preferences={user.preferences || {}}
+                                onUpdate={(newPrefs) => setUser({ ...user, preferences: newPrefs })}
+                            />
+                        </div>
+                    )}
 
-                <SocialAccountsSection />
+                    {activeTab === 'social' && (
+                        <div id="settings-panel-social" role="tabpanel">
+                            <SocialAccountsSection />
+                        </div>
+                    )}
 
-                <AIInsightSection
-                    customPrompt={user.customAiPrompt || ''}
-                    onUpdate={(newPrompt) => setUser({ ...user, customAiPrompt: newPrompt })}
-                />
+                    {activeTab === 'ai' && (
+                        <div id="settings-panel-ai" role="tabpanel">
+                            <AIInsightSection
+                                customPrompt={user.customAiPrompt || ''}
+                                onUpdate={(newPrompt) => setUser({ ...user, customAiPrompt: newPrompt })}
+                            />
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     )
