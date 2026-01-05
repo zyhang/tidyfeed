@@ -1116,6 +1116,12 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 				// Delete tag references
 				await c.env.DB.prepare('DELETE FROM tweet_tag_refs WHERE tweet_id = ?').bind(xId).run();
 
+				// Delete snapshot notes associated with this tweet
+				const notesDeleteResult = await c.env.DB.prepare('DELETE FROM snapshot_notes WHERE tweet_id = ? AND user_id = ?').bind(xId, userId).run();
+				if (notesDeleteResult.meta.changes > 0) {
+					console.log(`[Cleanup] Deleted ${notesDeleteResult.meta.changes} notes for tweet ${xId}`);
+				}
+
 				// Delete all R2 images for this tweet
 				const imagesList = await c.env.MEDIA_BUCKET.list({ prefix: `images/${xId}/` });
 				for (const obj of imagesList.objects) {

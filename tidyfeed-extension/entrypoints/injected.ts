@@ -118,11 +118,26 @@ export default defineUnlistedScript(() => {
 
     /**
      * Extract author info from tweet result
+     * Enhanced with multiple fallback paths for different API response formats
      */
     function extractAuthorInfo(tweetResult: any): { handle: string; name: string; avatar: string } | null {
         try {
             const result = tweetResult?.result || tweetResult;
             const tweet = result?.tweet || result;
+
+            // Helper function to normalize avatar URL
+            const normalizeAvatar = (url: string | undefined): string => {
+                if (!url) return '';
+                // Replace _normal with _bigger for higher resolution
+                return url.replace('_normal', '_bigger').replace(/\.jpg$/, '_bigger.jpg');
+            };
+
+            // Helper function to extract from legacy user object
+            const extractFromLegacy = (legacy: any) => ({
+                handle: legacy.screen_name || '',
+                name: legacy.name || '',
+                avatar: normalizeAvatar(legacy.profile_image_url_https)
+            });
 
             // Path 1: Standard path (HomeTimeline, TweetDetail)
             let userResults = tweet?.core?.user_results?.result;
@@ -139,43 +154,74 @@ export default defineUnlistedScript(() => {
 
             // Path 4: Look for user in legacy object directly
             if (!userResults?.legacy && tweet?.legacy?.user) {
-                return {
-                    handle: tweet.legacy.user.screen_name || '',
-                    name: tweet.legacy.user.name || '',
-                    avatar: (tweet.legacy.user.profile_image_url_https || '').replace('_normal', '_bigger'),
-                };
+                const info = extractFromLegacy(tweet.legacy.user);
+                if (info.handle && info.avatar) return info;
             }
 
             // Path 5: Check for user directly on tweet
             if (!userResults?.legacy && tweet?.user) {
-                return {
-                    handle: tweet.user.screen_name || tweet.user.legacy?.screen_name || '',
-                    name: tweet.user.name || tweet.user.legacy?.name || '',
-                    avatar: (tweet.user.profile_image_url_https || tweet.user.legacy?.profile_image_url_https || '').replace('_normal', '_bigger'),
-                };
+                const legacy = tweet.user.legacy || tweet.user;
+                const info = extractFromLegacy(legacy);
+                if (info.handle && info.avatar) return info;
             }
 
-            if (userResults?.legacy) {
-                // Get avatar URL and replace _normal with _bigger for higher resolution
-                const avatarUrl = userResults.legacy.profile_image_url_https || '';
-                return {
-                    handle: userResults.legacy.screen_name || '',
-                    name: userResults.legacy.name || '',
-                    avatar: avatarUrl.replace('_normal', '_bigger'),
+            // Path 6: Try rest_id from user_results and fetch from legacy
+            if (userResults) {
+                // First check if legacy exists
+                if (userResults.legacy) {
+                    const info = extractFromLegacy(userResults.legacy);
+                    if (info.handle && info.avatar) return info;
+                }
+
+                // Path 7: Check for __typename as User and try alternative paths
+                if (userResults.__typename === 'User') {
+                    // Try to find legacy in nested structures
+                    if (userResults.rest_id && userResults.legacy?.screen_name) {
+                        const info = extractFromLegacy(userResults.legacy);
+                        if (info.handle && info.avatar) return info;
+                    }
+                }
+            }
+
+            // Path 8: Deep fallback - search entire result object for any user-like object
+            if (!userResults?.legacy) {
+                const searchResult = (obj: any, depth = 0): any => {
+                    if (depth > 5) return null;
+                    if (!obj || typeof obj !== 'object') return null;
+
+                    // Check if this looks like a user object
+                    if (obj.screen_name && obj.profile_image_url_https) {
+                        return extractFromLegacy(obj);
+                    }
+
+                    // Recursively search
+                    for (const key in obj) {
+                        if (key === 'legacy' || key === 'user_results' || key === 'user') {
+                            const found = searchResult(obj[key], depth + 1);
+                            if (found?.handle && found?.avatar) return found;
+                        }
+                    }
+                    return null;
                 };
+
+                const found = searchResult(tweetResult);
+                if (found?.handle && found?.avatar) return found;
             }
 
             // Debug: Log when we can't find author info
             if (debugMode) {
-                console.log(LOG_PREFIX, 'Could not find author info. Available keys:', {
+                console.log(LOG_PREFIX, 'Could not find complete author info. Available keys:', {
                     tweetResultKeys: Object.keys(tweetResult || {}),
                     resultKeys: Object.keys(result || {}),
                     tweetKeys: Object.keys(tweet || {}),
+                    // Log sample structure for debugging
+                    sampleStructure: JSON.stringify(tweetResult).substring(0, 300)
                 });
             }
 
             return null;
-        } catch {
+        } catch (error) {
+            console.error('[TidyFeed] Error in extractAuthorInfo:', error);
             return null;
         }
     }
