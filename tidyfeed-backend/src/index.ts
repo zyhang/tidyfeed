@@ -16,6 +16,7 @@ import ai from './routes/ai';
 import library from './routes/library';
 import notes from './routes/notes';
 import { TikHubService } from './services/tikhub';
+import { getSetting } from './db/settings';
 
 // Google OAuth JWKS endpoint for ID token verification
 const GOOGLE_JWKS = createRemoteJWKSet(
@@ -894,6 +895,12 @@ async function triggerCacheInBackground(
 	userId?: string
 ): Promise<void> {
 	try {
+		const autoCacheSetting = await getSetting(env.DB, 'auto_cache_on_save');
+		if (autoCacheSetting === 'false') {
+			console.log('[AutoCache] auto_cache_on_save disabled, skipping');
+			return;
+		}
+
 		// Check if already cached
 		const existing = await env.DB.prepare(
 			`SELECT snapshot_r2_key FROM cached_tweets WHERE tweet_id = ?`
@@ -959,15 +966,22 @@ async function triggerCacheInBackground(
 			}
 		}
 
-		// Fetch comments/replies (top 20)
+		const commentsLimitSetting = await getSetting(env.DB, 'cache_comments_limit');
+		const commentsLimit = Number.isFinite(Number(commentsLimitSetting))
+			? Math.max(0, Number(commentsLimitSetting))
+			: 20;
+
+		// Fetch comments/replies
 		let comments: any[] = [];
 		try {
-			const commentsResult = await tikhub.fetchTweetComments(tweetId, undefined, 20);
-			comments = commentsResult.comments || [];
-			// Add comment author avatars for caching
-			for (const comment of comments) {
-				if (comment.author?.profile_image_url) {
-					avatarUrls.push(comment.author.profile_image_url.replace('_normal', '_bigger'));
+			if (commentsLimit > 0) {
+				const commentsResult = await tikhub.fetchTweetComments(tweetId, undefined, commentsLimit);
+				comments = commentsResult.comments || [];
+				// Add comment author avatars for caching
+				for (const comment of comments) {
+					if (comment.author?.profile_image_url) {
+						avatarUrls.push(comment.author.profile_image_url.replace('_normal', '_bigger'));
+					}
 				}
 			}
 		} catch (err) {

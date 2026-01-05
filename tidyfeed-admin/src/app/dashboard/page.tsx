@@ -96,6 +96,13 @@ export default function DashboardPage() {
                     <h1 className="text-xl font-bold">TidyFeed Admin</h1>
                     <div className="flex items-center gap-4">
                         <Link
+                            href="/settings/system"
+                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            <Settings className="h-4 w-4" />
+                            <span>System Settings</span>
+                        </Link>
+                        <Link
                             href="/settings/ai"
                             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
                         >

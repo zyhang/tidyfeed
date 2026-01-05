@@ -9,6 +9,17 @@ type Bindings = {
 
 const admin = new Hono<{ Bindings: Bindings }>();
 
+const SYSTEM_SETTINGS = {
+    bot_enabled: { type: 'boolean', default: true },
+    storage_quota_mb: { type: 'number', default: 500 },
+    cache_ttl_hours: { type: 'number', default: 24 },
+    cache_comments_limit: { type: 'number', default: 20 },
+    auto_cache_on_save: { type: 'boolean', default: true },
+    regex_rules_url: { type: 'string', default: 'https://tidyfeed.app/regex_rules.json' },
+} as const;
+
+type SystemSettingKey = keyof typeof SYSTEM_SETTINGS;
+
 // Admin Authentication Middleware
 admin.use('*', async (c, next) => {
     const authHeader = c.req.header('Authorization');
@@ -97,6 +108,96 @@ admin.put('/ai-config', async (c) => {
         return c.json({ success: true, message: 'AI configuration updated' });
     } catch (error) {
         console.error('Error updating AI config:', error);
+        return c.json({ error: 'Internal server error' }, 500);
+    }
+});
+
+// GET /api/admin/system-settings
+admin.get('/system-settings', async (c) => {
+    try {
+        const keys = Object.keys(SYSTEM_SETTINGS);
+        const placeholders = keys.map(() => '?').join(',');
+        const rows = await c.env.DB.prepare(
+            `SELECT key, value FROM system_settings WHERE key IN (${placeholders})`
+        ).bind(...keys).all<{ key: string; value: string }>();
+
+        const result: Record<string, boolean | number | string> = {};
+        for (const [key, meta] of Object.entries(SYSTEM_SETTINGS)) {
+            result[key] = meta.default;
+        }
+
+        for (const row of rows.results || []) {
+            const meta = SYSTEM_SETTINGS[row.key as SystemSettingKey];
+            if (!meta) continue;
+            if (meta.type === 'boolean') {
+                result[row.key] = row.value === 'true';
+            } else if (meta.type === 'number') {
+                const num = Number(row.value);
+                result[row.key] = Number.isFinite(num) ? num : meta.default;
+            } else {
+                result[row.key] = row.value;
+            }
+        }
+
+        return c.json({ settings: result });
+    } catch (error) {
+        console.error('Error fetching system settings:', error);
+        return c.json({ error: 'Internal server error' }, 500);
+    }
+});
+
+// PUT /api/admin/system-settings
+admin.put('/system-settings', async (c) => {
+    try {
+        const body = await c.req.json();
+        const updates: { key: SystemSettingKey; value: string }[] = [];
+
+        for (const [key, rawValue] of Object.entries(body || {})) {
+            if (!(key in SYSTEM_SETTINGS)) continue;
+            const meta = SYSTEM_SETTINGS[key as SystemSettingKey];
+
+            if (meta.type === 'boolean') {
+                const boolValue = typeof rawValue === 'boolean'
+                    ? rawValue
+                    : rawValue === 'true'
+                        ? true
+                        : rawValue === 'false'
+                            ? false
+                            : null;
+                if (boolValue === null) {
+                    return c.json({ error: `Invalid value for ${key}` }, 400);
+                }
+                updates.push({ key: key as SystemSettingKey, value: String(boolValue) });
+            } else if (meta.type === 'number') {
+                const numValue = typeof rawValue === 'number' ? rawValue : Number(rawValue);
+                if (!Number.isFinite(numValue)) {
+                    return c.json({ error: `Invalid value for ${key}` }, 400);
+                }
+                updates.push({ key: key as SystemSettingKey, value: String(numValue) });
+            } else if (meta.type === 'string') {
+                if (typeof rawValue !== 'string') {
+                    return c.json({ error: `Invalid value for ${key}` }, 400);
+                }
+                updates.push({ key: key as SystemSettingKey, value: rawValue });
+            }
+        }
+
+        if (updates.length === 0) {
+            return c.json({ success: true, message: 'No updates' });
+        }
+
+        const statements = updates.map((item) =>
+            c.env.DB.prepare(
+                `INSERT INTO system_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`
+            ).bind(item.key, item.value)
+        );
+
+        await c.env.DB.batch(statements);
+
+        return c.json({ success: true, updated: updates.map((u) => u.key) });
+    } catch (error) {
+        console.error('Error updating system settings:', error);
         return c.json({ error: 'Internal server error' }, 500);
     }
 });

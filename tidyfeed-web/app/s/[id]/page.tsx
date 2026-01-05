@@ -678,11 +678,11 @@ export default function SnapshotViewerPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-zinc-100 relative overflow-hidden font-sans">
-            {/* Top Control Bar */}
+            {/* Top Control Bar - Simplified */}
             <div className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-xl border-b border-zinc-200/50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                    <div className="h-14 flex items-center justify-between gap-4">
-                        {/* Left - Breadcrumb */}
+                    <div className="h-14 flex items-center gap-4">
+                        {/* Breadcrumb */}
                         <div className="flex items-center gap-2 text-sm">
                             <button
                                 onClick={() => router.push('/dashboard')}
@@ -693,31 +693,6 @@ export default function SnapshotViewerPage() {
                             <ChevronRight className="h-4 w-4 text-zinc-300" />
                             <span className="text-zinc-900 font-semibold">Snapshot</span>
                         </div>
-
-                        {/* Right - Panel Toggle */}
-                        <button
-                            onClick={() => setShowPanel(!showPanel)}
-                            className={`
-                                h-9 px-4 rounded-full text-sm font-semibold
-                                flex items-center gap-2 transition-all duration-200
-                                ${showPanel
-                                    ? 'bg-zinc-900 text-white shadow-lg shadow-zinc-900/20'
-                                    : 'bg-white text-zinc-600 border border-zinc-200 hover:border-zinc-300 hover:text-zinc-900 shadow-sm'
-                                }
-                            `}
-                        >
-                            {showPanel ? (
-                                <>
-                                    <PanelRightClose className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Hide</span>
-                                </>
-                            ) : (
-                                <>
-                                    <PanelRightOpen className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Panel</span>
-                                </>
-                            )}
-                        </button>
                     </div>
                 </div>
             </div>
@@ -725,23 +700,80 @@ export default function SnapshotViewerPage() {
             {/* Spacer for fixed header */}
             <div className="h-14" />
 
-            {/* Smart Inline Toolbar - Redesigned Interaction */}
-            {selection && currentUserId && (
-                <div
-                    className="note-toolbar fixed z-[70] animate-in fade-in slide-in-from-top-1 duration-200"
-                    style={{
-                        top: Math.max(60, selection.rect.top + window.scrollY - 72),
-                        left: Math.max(12, Math.min(
-                            selection.rect.left + selection.rect.width / 2 - (showNoteInput ? 200 : 100),
-                            window.innerWidth - (showNoteInput ? 412 : 212)
-                        )),
-                    }}
-                >
-                    <div className={`
-                        bg-white rounded-2xl shadow-2xl shadow-zinc-900/10 border border-zinc-200/60 overflow-hidden
-                        transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
-                        ${showNoteInput ? 'w-[400px]' : 'w-[200px]'}
-                    `}>
+            {/* Floating Panel Toggle Button - Redesigned */}
+            <button
+                onClick={() => setShowPanel(!showPanel)}
+                className={`
+                    fixed z-[60] h-12 px-4 rounded-2xl shadow-lg
+                    flex items-center justify-center gap-2
+                    transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
+                    ${showPanel
+                        ? 'bg-white text-zinc-700 border border-zinc-200 hover:shadow-xl'
+                        : 'bg-gradient-to-br from-violet-600 to-purple-600 text-white hover:scale-105'
+                    }
+                `}
+                style={{
+                    right: showPanel ? `${panelWidth + 16}px` : '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                }}
+                title={showPanel ? 'Hide panel' : 'Show panel'}
+            >
+                {showPanel ? (
+                    <>
+                        <PanelRightClose className="h-5 w-5" />
+                        <span className="text-sm font-semibold">Hide</span>
+                    </>
+                ) : (
+                    <PanelRightOpen className="h-5 w-5" />
+                )}
+            </button>
+
+            {/* Smart Inline Toolbar - Positioned to avoid covering text */}
+            {selection && currentUserId && (() => {
+                // Calculate position - try right side first, fall back to left
+                const toolbarWidth = showNoteInput ? 400 : 200;
+                const spaceOnRight = window.innerWidth - selection.rect.right;
+                const spaceOnLeft = selection.rect.left;
+                const positionOnRight = spaceOnRight >= toolbarWidth + 24;
+                const left = positionOnRight
+                    ? Math.min(
+                        selection.rect.right + window.scrollX + 12,
+                        window.innerWidth - toolbarWidth - 12
+                    )
+                    : Math.max(
+                        12,
+                        selection.rect.left + window.scrollX - toolbarWidth - 12
+                    );
+                const verticalCenter = selection.rect.top + window.scrollY + selection.rect.height / 2;
+                const toolbarHeight = showNoteInput ? 220 : 48;
+                const top = Math.max(
+                    60,
+                    Math.min(
+                        verticalCenter - toolbarHeight / 2,
+                        window.innerHeight + window.scrollY - toolbarHeight - 12
+                    )
+                );
+
+                return (
+                    <div
+                        className="note-toolbar fixed z-[70] animate-in fade-in duration-200"
+                        style={{ left, top }}
+                    >
+                        <div className={`
+                            bg-white rounded-2xl shadow-2xl shadow-zinc-900/10 border border-zinc-200/60 overflow-hidden
+                            transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
+                            ${showNoteInput ? 'w-[400px]' : 'w-[200px]'}
+                        `}>
+                            {/* Connection line to selection */}
+                            {!showNoteInput && (
+                                <div className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 border-zinc-200/60 ${
+                                    positionOnRight
+                                        ? '-left-3 border-l-2 border-t-2 rounded-tl-sm'
+                                        : '-right-3 border-r-2 border-t-2 rounded-tr-sm'
+                                }`} />
+                            )}
+
                         {!showNoteInput ? (
                             // Collapsed State - Quick Action Bar
                             <div className="flex items-center gap-1 px-2 py-2">
@@ -845,14 +877,10 @@ export default function SnapshotViewerPage() {
                                 </div>
                             </div>
                         )}
+                        </div>
                     </div>
-
-                    {/* Arrow Pointer */}
-                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-2">
-                        <div className="absolute top-0 left-0 w-full h-full bg-white border-r border-b border-zinc-200/60 rounded-br-sm transform rotate-45" />
-                    </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* Snapshot Content Container */}
             <div className="relative">

@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import { TikHubService } from '../services/tikhub';
 import { generateTweetSnapshot } from '../services/snapshot';
 import { cacheMediaToR2, replaceMediaUrls } from '../services/imageCache';
+import { getSetting } from '../db/settings';
 
 type Bindings = {
     DB: D1Database;
@@ -150,12 +151,16 @@ caching.post('/cache', async (c) => {
         // Clean tweet ID (extract from URL if needed)
         const cleanTweetId = tweet_id.trim().match(/status\/(\d+)/)?.[1] || tweet_id.trim();
 
-        // Check if already cached and fresh (within 24 hours) - skip if force=true
+        const ttlSetting = await getSetting(c.env.DB, 'cache_ttl_hours');
+        const ttlHours = Number.isFinite(Number(ttlSetting)) ? Math.max(0, Number(ttlSetting)) : 24;
+        const ttlWindow = `-${ttlHours} hours`;
+
+        // Check if already cached and fresh - skip if force=true
         if (!force) {
             const existing = await c.env.DB.prepare(
                 `SELECT cached_at, snapshot_r2_key FROM cached_tweets 
-				 WHERE tweet_id = ? AND cached_at > datetime('now', '-24 hours')`
-            ).bind(cleanTweetId).first<{ cached_at: string; snapshot_r2_key: string }>();
+				 WHERE tweet_id = ? AND cached_at > datetime('now', ?)`
+            ).bind(cleanTweetId, ttlWindow).first<{ cached_at: string; snapshot_r2_key: string }>();
 
             if (existing?.snapshot_r2_key) {
                 return c.json({
@@ -175,10 +180,15 @@ caching.post('/cache', async (c) => {
             return c.json({ error: 'Failed to fetch tweet from TikHub' }, 502);
         }
 
+        const commentsLimitSetting = await getSetting(c.env.DB, 'cache_comments_limit');
+        const commentsLimit = Number.isFinite(Number(commentsLimitSetting))
+            ? Math.max(0, Number(commentsLimitSetting))
+            : 50;
+
         // Fetch comments if requested
         let comments: any[] = [];
-        if (include_comments) {
-            const commentsResult = await tikhub.fetchTweetComments(cleanTweetId);
+        if (include_comments && commentsLimit > 0) {
+            const commentsResult = await tikhub.fetchTweetComments(cleanTweetId, undefined, commentsLimit);
             comments = commentsResult.comments;
         }
 
