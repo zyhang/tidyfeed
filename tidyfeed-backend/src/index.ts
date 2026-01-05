@@ -774,8 +774,9 @@ const logoutHandler = (c: any) => {
 		cookieOptions.push('Domain=.tidyfeed.app');
 		cookieOptions.push('SameSite=None'); // Must match the setting
 	} else {
-		cookieOptions.push('SameSite=None');
-		cookieOptions.push('Secure');
+		// In dev, use Lax without Secure to match login cookie settings
+		// localhost doesn't support Secure/SameSite=None without https
+		cookieOptions.push('SameSite=Lax');
 	}
 
 	// For GET requests, redirect to home page
@@ -1178,13 +1179,20 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 		const userId = payload.sub;
 		const xId = c.req.param('x_id');
 
+		// Check if there are other saved posts referencing this tweet (for shared cache cleanup)
+		const otherPostsCount = await c.env.DB.prepare(
+			'SELECT COUNT(*) as count FROM saved_posts WHERE x_post_id = ? AND user_id != ?'
+		).bind(xId, userId).first<{ count: number }>();
+
+		const isLastReference = !otherPostsCount || otherPostsCount.count === 0;
+
 		// Check if there are associated video downloads to clean up
 		const savedPost = await c.env.DB.prepare('SELECT id FROM saved_posts WHERE user_id = ? AND x_post_id = ?').bind(userId, xId).first<{ id: number }>();
 
 		if (savedPost) {
-			// Find completed download associated with this post
+			// Find completed download associated with this post (user-initiated downloads only)
 			const download = await c.env.DB.prepare(
-				'SELECT r2_key, file_size FROM video_downloads WHERE saved_post_id = ? AND status = "completed"'
+				'SELECT r2_key, file_size FROM video_downloads WHERE saved_post_id = ? AND status = "completed" AND task_type = "user_download"'
 			).bind(savedPost.id).first<{ r2_key: string; file_size: number }>();
 
 			if (download) {
@@ -1198,7 +1206,7 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 					}
 				}
 
-				// Decrement Usage
+				// Decrement Usage (only for user-initiated downloads that were charged to this user)
 				if (download.file_size && download.file_size > 0) {
 					await c.env.DB.prepare(
 						'UPDATE users SET storage_usage = MAX(0, storage_usage - ?) WHERE id = ?'
@@ -1207,16 +1215,20 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 			}
 		}
 
-		// Decrement usage from cached tweet media
-		const cachedTweet = await c.env.DB.prepare(
-			'SELECT media_size FROM cached_tweets WHERE tweet_id = ?'
-		).bind(xId).first<{ media_size: number }>();
+		// Only decrement storage for cached media if this is the last reference
+		// Cached media is shared across users, so we shouldn't decrement if others still reference it
+		if (isLastReference) {
+			// Find and decrement snapshot_video storage that was charged to this user
+			const snapshotVideoDownload = await c.env.DB.prepare(
+				'SELECT file_size FROM video_downloads WHERE tweet_id = ? AND task_type = "snapshot_video" AND status = "completed"'
+			).bind(xId).first<{ file_size: number }>();
 
-		if (cachedTweet && cachedTweet.media_size && cachedTweet.media_size > 0) {
-			await c.env.DB.prepare(
-				'UPDATE users SET storage_usage = MAX(0, storage_usage - ?) WHERE id = ?'
-			).bind(cachedTweet.media_size, userId).run();
-			console.log(`[Delete] Decremented storage usage for user ${userId} by ${cachedTweet.media_size} bytes (cached media)`);
+			if (snapshotVideoDownload && snapshotVideoDownload.file_size && snapshotVideoDownload.file_size > 0) {
+				await c.env.DB.prepare(
+					'UPDATE users SET storage_usage = MAX(0, storage_usage - ?) WHERE id = ?'
+				).bind(snapshotVideoDownload.file_size, userId).run();
+				console.log(`[Delete] Decremented storage usage for user ${userId} by ${snapshotVideoDownload.file_size} bytes (snapshot_video)`);
+			}
 		}
 
 		// Delete the saved post
@@ -1229,47 +1241,51 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 		}
 
 		// Clean up cached content (background, non-blocking)
+		// Only clean up shared cache if this was the last reference
 		c.executionCtx.waitUntil((async () => {
 			try {
-				// Delete cached_tweets entry
-				await c.env.DB.prepare('DELETE FROM cached_tweets WHERE tweet_id = ?').bind(xId).run();
+				// Only delete shared cached content if no other users reference this tweet
+				if (isLastReference) {
+					// Delete cached_tweets entry
+					await c.env.DB.prepare('DELETE FROM cached_tweets WHERE tweet_id = ?').bind(xId).run();
 
-				// Delete tag references
-				await c.env.DB.prepare('DELETE FROM tweet_tag_refs WHERE tweet_id = ?').bind(xId).run();
+					// Delete tag references
+					await c.env.DB.prepare('DELETE FROM tweet_tag_refs WHERE tweet_id = ?').bind(xId).run();
 
-				// Delete snapshot notes associated with this tweet
+					// Delete all R2 images for this tweet
+					const imagesList = await c.env.MEDIA_BUCKET.list({ prefix: `images/${xId}/` });
+					for (const obj of imagesList.objects) {
+						await c.env.MEDIA_BUCKET.delete(obj.key);
+					}
+					console.log(`[Cleanup] Deleted ${imagesList.objects.length} cached images for tweet ${xId}`);
+
+					// Delete all R2 videos for this tweet (excluding user downloads which are handled above)
+					const videosList = await c.env.MEDIA_BUCKET.list({ prefix: `videos/${xId}/` });
+					for (const obj of videosList.objects) {
+						await c.env.MEDIA_BUCKET.delete(obj.key);
+					}
+					if (videosList.objects.length > 0) {
+						console.log(`[Cleanup] Deleted ${videosList.objects.length} cached videos for tweet ${xId}`);
+					}
+
+					// Mark snapshot_video downloads as 'invalid' for this tweet
+					const videoUpdateResult = await c.env.DB.prepare(
+						`UPDATE video_downloads SET status = 'invalid' WHERE tweet_id = ? AND task_type = 'snapshot_video'`
+					).bind(xId).run();
+					if (videoUpdateResult.meta.changes > 0) {
+						console.log(`[Cleanup] Marked ${videoUpdateResult.meta.changes} snapshot_video downloads as invalid for tweet ${xId}`);
+					}
+
+					// Delete R2 snapshot (shared content, only delete when last reference is removed)
+					await c.env.MEDIA_BUCKET.delete(`snapshots/${xId}.html`);
+					console.log(`[Cleanup] Deleted snapshot for tweet ${xId}`);
+				}
+
+				// Always delete this user's snapshot notes for this tweet (user-specific, not shared)
 				const notesDeleteResult = await c.env.DB.prepare('DELETE FROM snapshot_notes WHERE tweet_id = ? AND user_id = ?').bind(xId, userId).run();
 				if (notesDeleteResult.meta.changes > 0) {
-					console.log(`[Cleanup] Deleted ${notesDeleteResult.meta.changes} notes for tweet ${xId}`);
+					console.log(`[Cleanup] Deleted ${notesDeleteResult.meta.changes} notes for user ${userId} on tweet ${xId}`);
 				}
-
-				// Delete all R2 images for this tweet
-				const imagesList = await c.env.MEDIA_BUCKET.list({ prefix: `images/${xId}/` });
-				for (const obj of imagesList.objects) {
-					await c.env.MEDIA_BUCKET.delete(obj.key);
-				}
-				console.log(`[Cleanup] Deleted ${imagesList.objects.length} cached images for tweet ${xId}`);
-
-				// Delete all R2 videos for this tweet
-				const videosList = await c.env.MEDIA_BUCKET.list({ prefix: `videos/${xId}/` });
-				for (const obj of videosList.objects) {
-					await c.env.MEDIA_BUCKET.delete(obj.key);
-				}
-				if (videosList.objects.length > 0) {
-					console.log(`[Cleanup] Deleted ${videosList.objects.length} cached videos for tweet ${xId}`);
-				}
-
-				// Mark video_downloads as 'invalid' for this tweet
-				const videoUpdateResult = await c.env.DB.prepare(
-					`UPDATE video_downloads SET status = 'invalid' WHERE tweet_id = ?`
-				).bind(xId).run();
-				if (videoUpdateResult.meta.changes > 0) {
-					console.log(`[Cleanup] Marked ${videoUpdateResult.meta.changes} video_downloads as invalid for tweet ${xId}`);
-				}
-
-				// Delete R2 snapshot
-				await c.env.MEDIA_BUCKET.delete(`snapshots/${xId}.html`);
-				console.log(`[Cleanup] Deleted snapshot for tweet ${xId}`);
 			} catch (err) {
 				console.error(`[Cleanup] Error cleaning cached content for ${xId}:`, err);
 			}
@@ -1343,12 +1359,23 @@ app.get('/api/posts', cookieAuthMiddleware, async (c) => {
 		const posts = await c.env.DB.prepare(query).bind(...params).all<any>();
 
 		// Parse JSON fields and extract IDs for tag fetching
+		// Helper function for safe JSON parsing
+		const safeParse = (value: string | null) => {
+			if (!value) return null;
+			try {
+				return JSON.parse(value);
+			} catch (e) {
+				console.error('[API] Failed to parse JSON field:', e);
+				return null;
+			}
+		};
+
 		const formattedPosts = posts.results.map((post) => ({
 			id: post.id,
 			xId: post.x_post_id,
 			content: post.content,
-			author: post.author_info ? JSON.parse(post.author_info) : null,
-			media: post.media_urls ? JSON.parse(post.media_urls) : null,
+			author: safeParse(post.author_info),
+			media: safeParse(post.media_urls),
 			url: post.url,
 			platform: post.platform,
 			createdAt: post.created_at,

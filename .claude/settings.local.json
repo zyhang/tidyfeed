@@ -13,7 +13,10 @@
       "Bash(npm install:*)",
       "Bash(git -C /Users/yihang/Documents/Projects/tidyfeed/tidyfeed-backend log --oneline -5)",
       "Bash(wrangler secret list:*)",
-      "Bash(git -C /Users/yihang/Documents/Projects/tidyfeed/tidyfeed-backend diff HEAD~1 src/index.ts)"
+      "Bash(git -C /Users/yihang/Documents/Projects/tidyfeed/tidyfeed-backend diff HEAD~1 src/index.ts)",
+      "Bash(npm run compile:*)",
+      "Bash(npm run)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

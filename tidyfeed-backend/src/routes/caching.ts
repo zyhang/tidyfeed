@@ -52,7 +52,7 @@ caching.get('/:tweet_id/snapshot', async (c) => {
         return new Response(html, {
             headers: {
                 'Content-Type': 'text/html; charset=utf-8',
-                'Cache-Control': 'public, max-age=86400, immutable', // Cache for 24 hours
+                'Cache-Control': 'public, max-age=86400', // Cache for 24 hours (no immutable - snapshots can be regenerated)
             },
         });
     } catch (error) {
@@ -88,12 +88,25 @@ caching.get('/:tweet_id/cached', async (c) => {
             return c.json({ error: 'Cached tweet not found' }, 404);
         }
 
+        // Safely parse cached JSON data
+        let tweetData: any;
+        let commentsData: any = null;
+        try {
+            tweetData = JSON.parse(cached.cached_data as string);
+            if (cached.comments_data) {
+                commentsData = JSON.parse(cached.comments_data as string);
+            }
+        } catch (parseError) {
+            console.error('[Caching] Failed to parse cached tweet data:', parseError);
+            return c.json({ error: 'Corrupted cache data' }, 500);
+        }
+
         return c.json({
             success: true,
             tweet: {
                 tweetId: cached.tweet_id,
-                data: JSON.parse(cached.cached_data as string),
-                comments: cached.comments_data ? JSON.parse(cached.comments_data as string) : null,
+                data: tweetData,
+                comments: commentsData,
                 commentsCount: cached.comments_count,
                 hasMedia: !!cached.has_media,
                 hasVideo: !!cached.has_video,
