@@ -62,7 +62,7 @@ admin.get('/ai-config', async (c) => {
         const config = {
             prompt_template: '',
             output_format: '',
-            model: 'glm-4-flash'
+            model: 'glm-4.6'
         };
 
         if (settings.results) {

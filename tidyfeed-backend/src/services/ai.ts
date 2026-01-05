@@ -124,7 +124,7 @@ export class AIService {
         const config: AIConfig = {
             prompt_template: '',
             output_format: '',
-            model: 'glm-4-flash' // Default model
+            model: 'glm-4.6' // Default model
         };
 
         if (settings.results) {

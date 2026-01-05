@@ -17,7 +17,7 @@ export default function AISettingsPage() {
     const [saving, setSaving] = useState(false);
     const [email, setEmail] = useState<string | null>(null);
     const [config, setConfig] = useState({
-        model: 'glm-4-flash',
+        model: 'glm-4.6',
         prompt_template: '',
         output_format: ''
     });
@@ -45,7 +45,7 @@ export default function AISettingsPage() {
             if (res.ok) {
                 const data = await res.json();
                 setConfig({
-                    model: data.model || 'glm-4-flash',
+                    model: data.model || 'glm-4.6',
                     prompt_template: data.prompt_template || '',
                     output_format: data.output_format || ''
                 });
@@ -132,9 +132,7 @@ export default function AISettingsPage() {
                                     value={config.model}
                                     onChange={(e) => setConfig({ ...config, model: e.target.value })}
                                 >
-                                    <option value="glm-4-flash">GLM-4-Flash</option>
-                                    <option value="glm-4-plus">GLM-4-Plus</option>
-                                    <option value="gpt-4o">GPT-4o</option>
+                                    <option value="glm-4.6">GLM-4.6</option>
                                 </select>
                             </div>
 
