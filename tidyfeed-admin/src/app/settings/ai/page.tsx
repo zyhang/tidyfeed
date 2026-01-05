@@ -86,10 +86,6 @@ export default function AISettingsPage() {
         }
     };
 
-    if (loading) {
-        return <div className="p-8">Loading settings...</div>;
-    }
-
     return (
         <div className="min-h-screen bg-background">
             <header className="border-b border-border">
@@ -118,56 +114,62 @@ export default function AISettingsPage() {
                         <h2 className="text-3xl font-bold tracking-tight">AI Configuration</h2>
                     </div>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Model Settings</CardTitle>
-                            <CardDescription>Configure the AI model and generation parameters.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="model">Model</Label>
-                                <select
-                                    id="model"
-                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                    value={config.model}
-                                    onChange={(e) => setConfig({ ...config, model: e.target.value })}
-                                >
-                                    <option value="glm-4.6">GLM-4.6</option>
-                                </select>
-                            </div>
+                    {loading ? (
+                        <div className="rounded-lg border border-border bg-card p-8 text-sm text-muted-foreground">
+                            Loading settings...
+                        </div>
+                    ) : (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Model Settings</CardTitle>
+                                <CardDescription>Configure the AI model and generation parameters.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="model">Model</Label>
+                                    <select
+                                        id="model"
+                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={config.model}
+                                        onChange={(e) => setConfig({ ...config, model: e.target.value })}
+                                    >
+                                        <option value="glm-4.6">GLM-4.6</option>
+                                    </select>
+                                </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="prompt">Prompt Template</Label>
-                                <Textarea
-                                    id="prompt"
-                                    placeholder="Enter prompt template..."
-                                    className="min-h-[100px] font-mono text-sm"
-                                    value={config.prompt_template}
-                                    onChange={(e) => setConfig({ ...config, prompt_template: e.target.value })}
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Use {'{snapshot_url}'} as a placeholder for the tweet snapshot link.
-                                </p>
-                            </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="prompt">Prompt Template</Label>
+                                    <Textarea
+                                        id="prompt"
+                                        placeholder="Enter prompt template..."
+                                        className="min-h-[100px] font-mono text-sm"
+                                        value={config.prompt_template}
+                                        onChange={(e) => setConfig({ ...config, prompt_template: e.target.value })}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Use {'{snapshot_url}'} as a placeholder for the tweet snapshot link.
+                                    </p>
+                                </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="output">Output Format</Label>
-                                <Textarea
-                                    id="output"
-                                    placeholder="Enter expected markdown format..."
-                                    className="min-h-[150px] font-mono text-sm"
-                                    value={config.output_format}
-                                    onChange={(e) => setConfig({ ...config, output_format: e.target.value })}
-                                />
-                            </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="output">Output Format</Label>
+                                    <Textarea
+                                        id="output"
+                                        placeholder="Enter expected markdown format..."
+                                        className="min-h-[150px] font-mono text-sm"
+                                        value={config.output_format}
+                                        onChange={(e) => setConfig({ ...config, output_format: e.target.value })}
+                                    />
+                                </div>
 
-                            <div className="pt-4">
-                                <Button onClick={handleSave} disabled={saving}>
-                                    {saving ? 'Saving...' : 'Save Configuration'}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                <div className="pt-4">
+                                    <Button onClick={handleSave} disabled={saving}>
+                                        {saving ? 'Saving...' : 'Save Configuration'}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </main>
             </div>
         </div>

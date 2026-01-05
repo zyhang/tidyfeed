@@ -105,10 +105,6 @@ export default function SystemSettingsPage() {
         }
     };
 
-    if (loading) {
-        return <div className="p-8">Loading settings...</div>;
-    }
-
     return (
         <div className="min-h-screen bg-background">
             <header className="border-b border-border">
@@ -137,110 +133,118 @@ export default function SystemSettingsPage() {
                         <h2 className="text-3xl font-bold tracking-tight">System Settings</h2>
                     </div>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Bot Control</CardTitle>
-                            <CardDescription>Toggle the mention bot for daily operations.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <Label htmlFor="bot_enabled">Bot Enabled</Label>
-                                    <div className="text-xs text-muted-foreground">Enable or disable the bot worker.</div>
-                                </div>
-                                <input
-                                    id="bot_enabled"
-                                    type="checkbox"
-                                    className="h-4 w-4"
-                                    checked={settings.bot_enabled}
-                                    onChange={(e) => setSettings({ ...settings, bot_enabled: e.target.checked })}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
+                    {loading ? (
+                        <div className="rounded-lg border border-border bg-card p-8 text-sm text-muted-foreground">
+                            Loading settings...
+                        </div>
+                    ) : (
+                        <>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Bot Control</CardTitle>
+                                    <CardDescription>Toggle the mention bot for daily operations.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <Label htmlFor="bot_enabled">Bot Enabled</Label>
+                                            <div className="text-xs text-muted-foreground">Enable or disable the bot worker.</div>
+                                        </div>
+                                        <input
+                                            id="bot_enabled"
+                                            type="checkbox"
+                                            className="h-4 w-4"
+                                            checked={settings.bot_enabled}
+                                            onChange={(e) => setSettings({ ...settings, bot_enabled: e.target.checked })}
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Storage / Quota</CardTitle>
-                            <CardDescription>Controls for storage usage display.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="storage_quota_mb">Storage Quota (MB)</Label>
-                                <Input
-                                    id="storage_quota_mb"
-                                    type="number"
-                                    min={0}
-                                    value={settings.storage_quota_mb}
-                                    onChange={(e) => setSettings({ ...settings, storage_quota_mb: Number(e.target.value) })}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Storage / Quota</CardTitle>
+                                    <CardDescription>Controls for storage usage display.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="storage_quota_mb">Storage Quota (MB)</Label>
+                                        <Input
+                                            id="storage_quota_mb"
+                                            type="number"
+                                            min={0}
+                                            value={settings.storage_quota_mb}
+                                            onChange={(e) => setSettings({ ...settings, storage_quota_mb: Number(e.target.value) })}
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Snapshot Caching</CardTitle>
-                            <CardDescription>Operational parameters for snapshot caching.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="cache_ttl_hours">Cache TTL (hours)</Label>
-                                <Input
-                                    id="cache_ttl_hours"
-                                    type="number"
-                                    min={0}
-                                    value={settings.cache_ttl_hours}
-                                    onChange={(e) => setSettings({ ...settings, cache_ttl_hours: Number(e.target.value) })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="cache_comments_limit">Comments Limit</Label>
-                                <Input
-                                    id="cache_comments_limit"
-                                    type="number"
-                                    min={0}
-                                    value={settings.cache_comments_limit}
-                                    onChange={(e) => setSettings({ ...settings, cache_comments_limit: Number(e.target.value) })}
-                                />
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <Label htmlFor="auto_cache_on_save">Auto Cache on Save</Label>
-                                    <div className="text-xs text-muted-foreground">Trigger snapshot caching when a post is saved.</div>
-                                </div>
-                                <input
-                                    id="auto_cache_on_save"
-                                    type="checkbox"
-                                    className="h-4 w-4"
-                                    checked={settings.auto_cache_on_save}
-                                    onChange={(e) => setSettings({ ...settings, auto_cache_on_save: e.target.checked })}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Snapshot Caching</CardTitle>
+                                    <CardDescription>Operational parameters for snapshot caching.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cache_ttl_hours">Cache TTL (hours)</Label>
+                                        <Input
+                                            id="cache_ttl_hours"
+                                            type="number"
+                                            min={0}
+                                            value={settings.cache_ttl_hours}
+                                            onChange={(e) => setSettings({ ...settings, cache_ttl_hours: Number(e.target.value) })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cache_comments_limit">Comments Limit</Label>
+                                        <Input
+                                            id="cache_comments_limit"
+                                            type="number"
+                                            min={0}
+                                            value={settings.cache_comments_limit}
+                                            onChange={(e) => setSettings({ ...settings, cache_comments_limit: Number(e.target.value) })}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <Label htmlFor="auto_cache_on_save">Auto Cache on Save</Label>
+                                            <div className="text-xs text-muted-foreground">Trigger snapshot caching when a post is saved.</div>
+                                        </div>
+                                        <input
+                                            id="auto_cache_on_save"
+                                            type="checkbox"
+                                            className="h-4 w-4"
+                                            checked={settings.auto_cache_on_save}
+                                            onChange={(e) => setSettings({ ...settings, auto_cache_on_save: e.target.checked })}
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Regex Rules</CardTitle>
-                            <CardDescription>Configure the rules source for extension filtering.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <Label htmlFor="regex_rules_url">Rules URL</Label>
-                            <Input
-                                id="regex_rules_url"
-                                type="url"
-                                value={settings.regex_rules_url}
-                                onChange={(e) => setSettings({ ...settings, regex_rules_url: e.target.value })}
-                            />
-                        </CardContent>
-                    </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Regex Rules</CardTitle>
+                                    <CardDescription>Configure the rules source for extension filtering.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    <Label htmlFor="regex_rules_url">Rules URL</Label>
+                                    <Input
+                                        id="regex_rules_url"
+                                        type="url"
+                                        value={settings.regex_rules_url}
+                                        onChange={(e) => setSettings({ ...settings, regex_rules_url: e.target.value })}
+                                    />
+                                </CardContent>
+                            </Card>
 
-                    <div>
-                        <Button onClick={handleSave} disabled={saving}>
-                            {saving ? 'Saving...' : 'Save Settings'}
-                        </Button>
-                    </div>
+                            <div>
+                                <Button onClick={handleSave} disabled={saving}>
+                                    {saving ? 'Saving...' : 'Save Settings'}
+                                </Button>
+                            </div>
+                        </>
+                    )}
                 </main>
             </div>
         </div>

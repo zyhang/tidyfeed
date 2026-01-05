@@ -211,6 +211,8 @@ export default function SnapshotViewerPage() {
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [summaryError, setSummaryError] = useState<string | null>(null);
+    const [copiedKey, setCopiedKey] = useState<string | null>(null);
+    const copyResetRef = useRef<number | null>(null);
 
     const [notes, setNotes] = useState<Note[]>([]);
     const [notesLoading, setNotesLoading] = useState(false);
@@ -230,6 +232,22 @@ export default function SnapshotViewerPage() {
     const selectionRangeRef = useRef<Range | null>(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app';
+
+    const handleCopy = async (key: string, text: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedKey(key);
+            if (copyResetRef.current) {
+                window.clearTimeout(copyResetRef.current);
+            }
+            copyResetRef.current = window.setTimeout(() => {
+                setCopiedKey(null);
+                copyResetRef.current = null;
+            }, 3000);
+        } catch (err) {
+            toast.error('Copy failed');
+        }
+    };
 
     const getPanelWidth = () => {
         if (!showPanel) return 0;
@@ -259,6 +277,14 @@ export default function SnapshotViewerPage() {
 
         fetchSnapshot();
     }, [tweetId]);
+
+    useEffect(() => {
+        return () => {
+            if (copyResetRef.current) {
+                window.clearTimeout(copyResetRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (!tweetId) return;
@@ -1219,15 +1245,20 @@ export default function SnapshotViewerPage() {
                                                     <div className="flex items-center gap-0.5">
                                                         <button
                                                             onClick={() => {
-                                                                navigator.clipboard.writeText(summary)
-                                                                toast.success('All insights copied')
+                                                                handleCopy('all', summary)
                                                             }}
                                                             className="h-8 w-8 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-                                                            title="Copy all"
+                                                            title={copiedKey === 'all' ? 'Copied' : 'Copy all'}
                                                         >
-                                                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                            </svg>
+                                                            {copiedKey === 'all' ? (
+                                                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                </svg>
+                                                            ) : (
+                                                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                                </svg>
+                                                            )}
                                                         </button>
                                                         <button
                                                             onClick={handleGenerateSummary}
@@ -1268,14 +1299,20 @@ export default function SnapshotViewerPage() {
                                                                     </div>
                                                                     <button
                                                                         onClick={() => {
-                                                                            navigator.clipboard.writeText(cardContent)
-                                                                            toast.success('Copied to clipboard')
+                                                                            handleCopy(`card-${idx}`, cardContent)
                                                                         }}
                                                                         className={`h-7 w-7 rounded-lg hover:bg-current/10 flex items-center justify-center {style.contentColor} opacity-0 group-hover:opacity-100 transition-all`}
+                                                                        title={copiedKey === `card-${idx}` ? 'Copied' : 'Copy'}
                                                                     >
-                                                                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                                        </svg>
+                                                                        {copiedKey === `card-${idx}` ? (
+                                                                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                            </svg>
+                                                                        ) : (
+                                                                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                                            </svg>
+                                                                        )}
                                                                     </button>
                                                                 </div>
                                                                 <div className={`text-sm leading-relaxed {style.contentColor} prose prose-sm prose-headings:font-semibold prose-a:text-current prose-a:opacity-80 hover:prose-a:opacity-100 prose-strong:text-current prose-code:bg-white/60 dark:prose-code:bg-black/20 prose-code:border prose-code:border-current/20`}>
@@ -1310,15 +1347,25 @@ export default function SnapshotViewerPage() {
                                                             </button>
                                                             <button
                                                                 onClick={() => {
-                                                                    navigator.clipboard.writeText(summary)
-                                                                    toast.success('All insights copied')
+                                                                    handleCopy('all', summary)
                                                                 }}
                                                                 className="h-10 px-3 rounded-xl bg-white/80 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100/50 dark:hover:bg-amber-900/30 transition-all flex items-center justify-center gap-1.5"
                                                             >
-                                                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                                </svg>
-                                                                Copy All
+                                                                {copiedKey === 'all' ? (
+                                                                    <>
+                                                                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                        </svg>
+                                                                        Copied
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                                        </svg>
+                                                                        Copy All
+                                                                    </>
+                                                                )}
                                                             </button>
                                                         </div>
                                                     </div>
