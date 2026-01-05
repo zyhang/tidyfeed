@@ -563,6 +563,18 @@ function stripTrailingTcoUrls(text: string): string {
 }
 
 function formatTweetText(text: string, entities?: { urls: { url: string; expanded_url: string; display_url: string }[] }): string {
+	// Debug: Log input to diagnose link issues
+	if (entities?.urls && entities.urls.length > 0) {
+		console.log('[Snapshot] formatTweetText - entities found:', {
+			textLength: text.length,
+			urlsCount: entities.urls.length,
+			firstUrl: entities.urls[0],
+			textContainsTco: text.includes(entities.urls[0].url)
+		});
+	} else {
+		console.log('[Snapshot] formatTweetText - no entities found, will use fallback regex');
+	}
+
 	// Step 1: Remove trailing t.co URLs (Twitter's auto-appended links)
 	let formatted = stripTrailingTcoUrls(text);
 
@@ -577,6 +589,15 @@ function formatTweetText(text: string, entities?: { urls: { url: string; expande
 			const displayText = escapeHtml(generateLinkDisplayText(urlEntity.expanded_url, urlEntity.display_url));
 			const expandedUrlEscaped = escapeHtml(urlEntity.expanded_url);
 			const linkHtml = `<a href="${expandedUrlEscaped}" target="_blank" rel="noopener">${displayText}</a>`;
+
+			// Check if the t.co URL exists in the text before replacing
+			const urlExists = formatted.includes(urlEntity.url);
+			console.log('[Snapshot] Replacing URL:', {
+				url: urlEntity.url,
+				urlExists,
+				textBefore: formatted.substring(0, 100) + '...'
+			});
+
 			// Replace the t.co URL with the link in the unescaped text
 			formatted = formatted.split(urlEntity.url).join(linkHtml);
 		});

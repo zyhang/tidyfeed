@@ -221,6 +221,18 @@ export class TikHubService {
             if (Array.isArray(tweet.media)) mediaArray = tweet.media;
         }
 
+        // Debug: Log entities to help diagnose link issues
+        const urlsCount = Array.isArray(legacy.entities?.urls) ? legacy.entities.urls.length : 0;
+        console.log(`[TikHub] Parsed tweet ${tweet.rest_id || tweet.id}:`, {
+            hasText: !!(legacy.full_text || legacy.text || tweet.text),
+            urlsCount,
+            firstUrl: urlsCount > 0 ? {
+                url: legacy.entities.urls[0].url,
+                display_url: legacy.entities.urls[0].display_url,
+                expanded_url: legacy.entities.urls[0].expanded_url,
+            } : null,
+        });
+
         return {
             id: tweet.rest_id || tweet.id_str || tweet.id || tweet.tweet_id || '',
             text: legacy.full_text || legacy.text || tweet.text || '',
@@ -245,11 +257,11 @@ export class TikHubService {
             },
             source: legacy.source || '',
             entities: {
-                urls: (legacy.entities?.urls || []).map((u: any) => ({
+                urls: Array.isArray(legacy.entities?.urls) ? (legacy.entities.urls as any[]).map((u: any) => ({
                     url: u.url,
-                    expanded_url: u.expanded_url,
-                    display_url: u.display_url,
-                })),
+                    expanded_url: u.expanded_url || u.url,
+                    display_url: u.display_url || u.url,
+                })) : [],
             },
         };
     }
