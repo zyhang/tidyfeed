@@ -1,4 +1,5 @@
 import { getLocaleString } from './locale';
+import { getAllCachedTweets } from './networkInterceptor';
 
 /**
  * Sync X Bookmarks to TidyFeed
@@ -242,6 +243,43 @@ async function startSyncProcess(e: MouseEvent) {
     const MAX_CONSECUTIVE_SKIPPED = 20; // Stop after 1 page of duplicates
 
     updateProgressUI(stats);
+
+    // 3.5. Process already-cached tweets from initial page load
+    const cachedTweets = getAllCachedTweets();
+    console.log(`[TidyFeed] Processing ${cachedTweets.length} cached tweets...`);
+    for (const tweet of cachedTweets) {
+        if (stopRequested) break;
+        if (savedIds.includes(tweet.id)) {
+            stats.skipped++;
+            consecutiveSkipped++;
+        } else {
+            try {
+                const success = await saveTweetToTidyFeed({
+                    id: tweet.id,
+                    fullText: tweet.fullText,
+                    authorName: tweet.authorName || '',
+                    authorHandle: tweet.authorHandle || '',
+                    authorAvatar: '', // Cache doesn't store avatar
+                });
+                if (success) {
+                    savedIds.push(tweet.id);
+                    stats.synced++;
+                    consecutiveSkipped = 0;
+                }
+            } catch (err) {
+                console.error('[TidyFeed] Sync save error', err);
+            }
+        }
+        stats.total++;
+    }
+    updateProgressUI(stats);
+
+    // Check if we should stop early (all cached tweets were duplicates)
+    if (consecutiveSkipped >= MAX_CONSECUTIVE_SKIPPED) {
+        stopSync('No new bookmarks found.');
+        finishSync(stats);
+        return;
+    }
 
     // 4. Message Listener for Network Interceptor
     const messageHandler = async (event: MessageEvent) => {

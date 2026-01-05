@@ -141,6 +141,14 @@ export function getCachedTweet(tweetId: string): CachedTweet | null {
 }
 
 /**
+ * Get all cached tweets
+ * Used by bookmarksSync to process pre-loaded tweets
+ */
+export function getAllCachedTweets(): CachedTweet[] {
+    return Array.from(tweetCache.values());
+}
+
+/**
  * Check if a tweet is in the cache
  * @param tweetId - The tweet ID to check
  */
