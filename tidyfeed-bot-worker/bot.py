@@ -15,7 +15,6 @@ import sys
 import json
 import asyncio
 import logging
-import random
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any, Set
@@ -38,8 +37,7 @@ INTERNAL_SERVICE_KEY = os.environ.get('INTERNAL_SERVICE_KEY', '')
 BOT_USERNAME = os.environ.get('BOT_USERNAME', 'tidyfeedapp')
 BOT_COOKIES_PATH = os.environ.get('BOT_COOKIES_PATH', './cookies.json')
 
-POLL_MIN_SECONDS = int(os.environ.get('POLL_MIN_SECONDS', '45'))
-POLL_MAX_SECONDS = int(os.environ.get('POLL_MAX_SECONDS', '90'))
+POLL_SECONDS = int(os.environ.get('POLL_SECONDS', '60'))
 ERROR_SLEEP_SECONDS = 300
 
 PROCESSED_IDS_PATH = os.environ.get('PROCESSED_IDS_PATH', './processed_ids.json')
@@ -445,7 +443,7 @@ async def run_bot():
     logger.info('🤖 TidyFeed Bot Worker')
     logger.info(f'   API: {API_BASE_URL}')
     logger.info(f'   Bot: @{BOT_USERNAME}')
-    logger.info(f'   Poll interval: {POLL_MIN_SECONDS}-{POLL_MAX_SECONDS}s')
+    logger.info(f'   Poll interval: {POLL_SECONDS}s')
     logger.info(f'   Triggers: {TRIGGER_WORDS}')
     logger.info('=' * 60)
     
@@ -476,7 +474,7 @@ async def run_bot():
             # Check pause status
             if not check_bot_enabled():
                 logger.info('⏸️ Bot execution paused by system setting. Sleeping...')
-                await asyncio.sleep(POLL_MIN_SECONDS)
+                await asyncio.sleep(POLL_SECONDS)
                 continue
 
             processed = await bot.poll_once()
@@ -484,9 +482,8 @@ async def run_bot():
             if processed > 0:
                 logger.info(f'✅ Processed {processed} command(s)')
             
-            sleep_time = random.randint(POLL_MIN_SECONDS, POLL_MAX_SECONDS)
-            logger.debug(f'💤 Sleeping {sleep_time}s')
-            await asyncio.sleep(sleep_time)
+            logger.debug(f'💤 Sleeping {POLL_SECONDS}s')
+            await asyncio.sleep(POLL_SECONDS)
             
         except KeyboardInterrupt:
             logger.info('👋 Shutting down...')

@@ -5,6 +5,7 @@
 
 import { Hono } from 'hono';
 import { verify } from 'hono/jwt';
+import { checkStorageQuota, getUserPlan, PLAN_LIMITS } from '../services/subscription';
 
 type Bindings = {
     DB: D1Database;
@@ -98,18 +99,17 @@ downloads.post('/queue', cookieAuthMiddleware, async (c) => {
             return c.json({ error: 'cookies are required for video download' }, 400);
         }
 
-        // Check Storage Quota (1GB)
-        const usageResult = await c.env.DB.prepare(
-            `SELECT SUM(file_size) as usage 
-             FROM video_downloads 
-             WHERE user_id = ? 
-               AND status = 'completed'`
-        ).bind(userId).first<{ usage: number }>();
-        const currentUsage = usageResult?.usage || 0;
-        const STORAGE_LIMIT = 1073741824; // 1 GB
+        // Check Storage Quota (plan-based)
+        const storageQuota = await checkStorageQuota(c.env.DB, userId);
 
-        if (currentUsage >= STORAGE_LIMIT) {
-            return c.json({ error: 'Storage quota exceeded (1GB limit). Please delete some videos to free up space.' }, 403);
+        if (!storageQuota.allowed) {
+            const planInfo = await getUserPlan(c.env.DB, userId);
+            const limitMB = Math.round(storageQuota.limit / (1024 * 1024));
+            return c.json({
+                error: `Storage quota exceeded (${limitMB} MB limit for ${planInfo.plan} plan). Please delete some videos or upgrade your plan.`,
+                quota: storageQuota,
+                upgrade: planInfo.plan !== 'ultra'
+            }, 403);
         }
 
         // Check if this video has already been downloaded (completed)
@@ -312,18 +312,15 @@ downloads.get('/usage', cookieAuthMiddleware, async (c) => {
         const payload = c.get('jwtPayload') as { sub: string };
         const userId = payload.sub;
 
-        const usageResult = await c.env.DB.prepare(
-            `SELECT SUM(file_size) as usage 
-             FROM video_downloads 
-             WHERE user_id = ? 
-               AND status = 'completed'`
-        ).bind(userId).first<{ usage: number }>();
-
-        const STORAGE_LIMIT = 1073741824; // 1 GB
+        const storageQuota = await checkStorageQuota(c.env.DB, userId);
+        const planInfo = await getUserPlan(c.env.DB, userId);
 
         return c.json({
-            usage: usageResult?.usage || 0,
-            limit: STORAGE_LIMIT
+            usage: storageQuota.used,
+            limit: storageQuota.limit,
+            remaining: storageQuota.remaining,
+            plan: planInfo.plan,
+            allowed: storageQuota.allowed
         });
     } catch (error) {
         console.error('Get usage error:', error);

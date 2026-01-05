@@ -17,6 +17,7 @@ import library from './routes/library';
 import notes from './routes/notes';
 import { TikHubService } from './services/tikhub';
 import { getSetting } from './db/settings';
+import { checkQuota, incrementUsage, getUserPlan, getAllUsageInfo } from './services/subscription';
 
 // Google OAuth JWKS endpoint for ID token verification
 const GOOGLE_JWKS = createRemoteJWKSet(
@@ -731,6 +732,45 @@ app.patch('/api/user/settings', cookieAuthMiddleware, async (c) => {
 	}
 });
 
+// GET /api/user/plan - Get current user's plan and usage info
+app.get('/api/user/plan', cookieAuthMiddleware, async (c) => {
+	try {
+		const payload = c.get('jwtPayload') as { sub: string };
+		const userId = payload.sub;
+
+		const usageInfo = await getAllUsageInfo(c.env.DB, userId);
+
+		return c.json({
+			plan: usageInfo.plan.plan,
+			expiresAt: usageInfo.plan.expiresAt,
+			limits: usageInfo.plan.limits,
+			usage: {
+				collection: {
+					used: usageInfo.collection.used,
+					limit: usageInfo.collection.limit,
+					remaining: usageInfo.collection.remaining,
+					allowed: usageInfo.collection.allowed
+				},
+				aiSummary: {
+					used: usageInfo.aiSummary.used,
+					limit: usageInfo.aiSummary.limit,
+					remaining: usageInfo.aiSummary.remaining,
+					allowed: usageInfo.aiSummary.allowed
+				},
+				storage: {
+					used: usageInfo.storage.used,
+					limit: usageInfo.storage.limit,
+					remaining: usageInfo.storage.remaining,
+					allowed: usageInfo.storage.allowed
+				}
+			}
+		});
+	} catch (error) {
+		console.error('Get user plan error:', error);
+		return c.json({ error: 'Internal server error' }, 500);
+	}
+});
+
 // GET /api/auth/social-accounts - Fetch user's linked social accounts
 app.get('/api/auth/social-accounts', cookieAuthMiddleware, async (c) => {
 	try {
@@ -1133,6 +1173,17 @@ app.post('/api/posts', cookieAuthMiddleware, async (c) => {
 			return c.json({ error: 'x_id is required' }, 400);
 		}
 
+		// Check collection quota (Free: 100/month, Pro/Ultra: unlimited)
+		const collectionQuota = await checkQuota(c.env.DB, userId, 'collection');
+		if (!collectionQuota.allowed) {
+			const planInfo = await getUserPlan(c.env.DB, userId);
+			return c.json({
+				error: `Collection quota exceeded (${collectionQuota.limit} items/month for ${planInfo.plan} plan). Please upgrade to save more.`,
+				quota: collectionQuota,
+				upgrade: planInfo.plan !== 'ultra'
+			}, 403);
+		}
+
 		// Check if author info is complete, if not, fetch from TikHub API
 		let finalAuthor = author;
 		if (!author || !author.name || !author.handle) {
@@ -1169,6 +1220,9 @@ app.post('/api/posts', cookieAuthMiddleware, async (c) => {
 				`INSERT INTO saved_posts (user_id, x_post_id, content, author_info, media_urls, url, platform)
 				 VALUES (?, ?, ?, ?, ?, ?, ?)`
 			).bind(userId, x_id, content || null, authorInfo, mediaUrls, url || null, platform || 'x').run();
+
+			// Increment collection usage after successful save
+			await incrementUsage(c.env.DB, userId, 'collection');
 
 			// Trigger caching in background (non-blocking)
 			c.executionCtx.waitUntil(triggerCacheInBackground(c.env, x_id, userId));

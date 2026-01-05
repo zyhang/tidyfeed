@@ -7,6 +7,7 @@
 import { Hono } from 'hono';
 import { verify } from 'hono/jwt';
 import { AIService } from '../services/ai';
+import { checkQuota, incrementUsage, getUserPlan } from '../services/subscription';
 
 type Bindings = {
     DB: D1Database;
@@ -86,13 +87,24 @@ ai.post('/summarize', authMiddleware, async (c) => {
             return c.json({ error: 'Tweet not found in saved posts' }, 404);
         }
 
-        // Cache hit - return existing summary
+        // Cache hit - return existing summary (doesn't consume quota)
         if (savedPost.summary) {
             return c.json({
                 success: true,
                 cached: true,
                 summary: savedPost.summary
             });
+        }
+
+        // Cache miss - check AI quota before generating
+        const aiQuota = await checkQuota(c.env.DB, userId, 'ai_summary');
+        if (!aiQuota.allowed) {
+            const planInfo = await getUserPlan(c.env.DB, userId);
+            return c.json({
+                error: `AI summary quota exceeded (${aiQuota.limit} summaries/month for ${planInfo.plan} plan). Please upgrade to continue.`,
+                quota: aiQuota,
+                upgrade: planInfo.plan !== 'ultra'
+            }, 403);
         }
 
         // Cache miss - generate summary
@@ -128,6 +140,9 @@ ai.post('/summarize', authMiddleware, async (c) => {
         await c.env.DB.prepare(
             `UPDATE saved_posts SET summary = ? WHERE id = ?`
         ).bind(summary, savedPost.id).run();
+
+        // Increment AI usage after successful generation
+        await incrementUsage(c.env.DB, userId, 'ai_summary');
 
         return c.json({
             success: true,

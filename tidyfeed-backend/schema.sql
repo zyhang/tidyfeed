@@ -37,11 +37,14 @@ CREATE TABLE IF NOT EXISTS users (
     name TEXT,
     avatar_url TEXT,
     storage_usage INTEGER DEFAULT 0,
+    plan TEXT DEFAULT 'free',
+    plan_expires_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan);
 
 -- ============================================
 -- SAVED POSTS & TAGGING
@@ -206,6 +209,24 @@ CREATE TABLE IF NOT EXISTS system_settings (
     value TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ============================================
+-- USAGE TRACKING (Subscription quotas)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS usage_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    feature TEXT NOT NULL,  -- 'collection', 'ai_summary', 'storage'
+    period TEXT NOT NULL,   -- 'YYYY-MM' format for monthly tracking
+    count INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, feature, period)
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_records_lookup ON usage_records(user_id, feature, period);
 
 -- ============================================
 -- DEFAULT DATA
