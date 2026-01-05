@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { Loader2, User } from 'lucide-react'
+import { Loader2, User, Sparkles, Zap, Crown, ArrowRight, Gem } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -22,9 +24,63 @@ interface ProfileSectionProps {
     onUpdate: (newName: string) => void
 }
 
+interface PlanInfo {
+    plan: string
+    expiresAt: string | null
+    usage: {
+        collection: { used: number; limit: number; remaining: number; allowed: boolean }
+        aiSummary: { used: number; limit: number; remaining: number; allowed: boolean }
+        storage: { used: number; limit: number; remaining: number; allowed: boolean }
+    }
+}
+
+const planConfig = {
+    free: { name: 'Free', icon: Sparkles, color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
+    pro: { name: 'Pro', icon: Zap, color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' },
+    ultra: { name: 'Ultra', icon: Crown, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' }
+}
+
+function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
+
+function getPlanIcon(plan: string) {
+    switch (plan) {
+        case 'pro': return Zap
+        case 'ultra': return Crown
+        default: return Sparkles
+    }
+}
+
 export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
     const [name, setName] = useState(user.name)
     const [isSaving, setIsSaving] = useState(false)
+    const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null)
+    const [loadingPlan, setLoadingPlan] = useState(true)
+
+    useEffect(() => {
+        fetchPlanInfo()
+    }, [])
+
+    const fetchPlanInfo = async () => {
+        try {
+            const response = await fetch(`${API_URL}/api/user/plan`, {
+                credentials: 'include'
+            })
+            if (response.ok) {
+                const data = await response.json()
+                setPlanInfo(data)
+            }
+        } catch (error) {
+            console.error('Failed to fetch plan info:', error)
+        } finally {
+            setLoadingPlan(false)
+        }
+    }
 
     const handleSave = async () => {
         if (!name.trim()) return
@@ -54,8 +110,118 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
         }
     }
 
+    const PlanIcon = planInfo ? getPlanIcon(planInfo.plan) : Sparkles
+    const isPaidPlan = planInfo?.plan === 'pro' || planInfo?.plan === 'ultra'
+
     return (
         <div className="space-y-6">
+            {/* Subscription Plan Card */}
+            {loadingPlan ? (
+                <Card>
+                    <CardContent className="flex items-center justify-center h-32">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </CardContent>
+                </Card>
+            ) : planInfo ? (
+                <Card className={isPaidPlan ? 'border-violet-200 dark:border-violet-800 bg-gradient-to-br from-violet-50/50 to-purple-50/50 dark:from-violet-950/20 dark:to-purple-950/20' : ''}>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${planConfig[planInfo.plan as keyof typeof planConfig]?.color || planConfig.free.color}`}>
+                                    <PlanIcon className="h-6 w-6" />
+                                </div>
+                                <div>
+                                    <CardTitle className="capitalize">
+                                        {planConfig[planInfo.plan as keyof typeof planConfig]?.name || 'Free'} Plan
+                                    </CardTitle>
+                                    <CardDescription>
+                                        {isPaidPlan && planInfo.expiresAt
+                                            ? `Renews on ${new Date(planInfo.expiresAt).toLocaleDateString()}`
+                                            : 'Upgrade anytime for more features'
+                                        }
+                                    </CardDescription>
+                                </div>
+                            </div>
+                            <Badge variant={isPaidPlan ? 'default' : 'secondary'} className="capitalize">
+                                {planInfo.plan}
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {/* Usage Bars */}
+                        <div className="space-y-4 mb-6">
+                            {/* Collections */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Saved this month</span>
+                                    <span className="font-medium">
+                                        {planInfo.usage.collection.used}
+                                        {planInfo.usage.collection.limit !== Infinity && ` / ${planInfo.usage.collection.limit}`}
+                                    </span>
+                                </div>
+                                {planInfo.usage.collection.limit !== Infinity && (
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-violet-500 rounded-full transition-all"
+                                            style={{ width: `${Math.min(100, (planInfo.usage.collection.used / planInfo.usage.collection.limit) * 100)}%` }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Storage */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Storage used</span>
+                                    <span className="font-medium">
+                                        {formatBytes(planInfo.usage.storage.used)}
+                                        {planInfo.usage.storage.limit !== Infinity && ` / ${formatBytes(planInfo.usage.storage.limit)}`}
+                                    </span>
+                                </div>
+                                {planInfo.usage.storage.limit !== Infinity && (
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-amber-500 rounded-full transition-all"
+                                            style={{ width: `${Math.min(100, (planInfo.usage.storage.used / planInfo.usage.storage.limit) * 100)}%` }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* AI Summaries */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">AI summaries this month</span>
+                                    <span className="font-medium">
+                                        {planInfo.usage.aiSummary.used}
+                                        {planInfo.usage.aiSummary.limit !== Infinity && ` / ${planInfo.usage.aiSummary.limit}`}
+                                    </span>
+                                </div>
+                                {planInfo.usage.aiSummary.limit !== Infinity && (
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-emerald-500 rounded-full transition-all"
+                                            style={{ width: `${Math.min(100, (planInfo.usage.aiSummary.used / planInfo.usage.aiSummary.limit) * 100)}%` }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Upgrade Button */}
+                        {planInfo.plan !== 'ultra' && (
+                            <Link href="/pricing">
+                                <Button className="w-full bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white">
+                                    <Gem className="mr-2 h-4 w-4" />
+                                    Upgrade to {planInfo.plan === 'free' ? 'Pro' : 'Ultra'}
+                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </Link>
+                        )}
+                    </CardContent>
+                </Card>
+            ) : null}
+
             <Card>
                 <CardHeader>
                     <CardTitle>Profile</CardTitle>

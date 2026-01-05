@@ -13,8 +13,7 @@ primary_region = 'lax'
   API_BASE_URL = 'https://api.tidyfeed.app'
   BOT_COOKIES_PATH = '/data/cookies.json'
   LOG_LEVEL = 'INFO'
-  POLL_MAX_SECONDS = '90'
-  POLL_MIN_SECONDS = '45'
+  POLL_SECONDS = '60'
   PROCESSED_IDS_PATH = '/data/processed_ids.json'
 
 [[mounts]]
