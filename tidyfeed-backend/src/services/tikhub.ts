@@ -209,7 +209,7 @@ export class TikHubService {
     private parseTweetData(data: any): TikHubTweetData {
         // TikHub returns data in different structures depending on the endpoint
         // This handles common patterns
-        const tweet = data.tweet || data.data || data;
+        const tweet = data.tweet || data.data || data.result?.tweet || data.result || data;
         const user = tweet.user || tweet.author || {};
         const legacy = tweet.legacy || tweet;
         const noteTweet =
@@ -313,9 +313,13 @@ export class TikHubService {
     private parseQuotedTweet(tweet: any, legacy: any): TikHubTweetData | undefined {
         // Try various locations where quoted tweet data might be
         const quotedData =
+            legacy.quoted_status_result?.result?.tweet ||
             legacy.quoted_status_result?.result ||
+            legacy.quoted_status_result?.tweet ||
             legacy.quoted_status ||
+            tweet.quoted_status_result?.result?.tweet ||
             tweet.quoted_status_result?.result ||
+            tweet.quoted_status_result?.tweet ||
             tweet.quoted_status ||
             tweet.quoted_tweet ||
             legacy.quoted_tweet ||
