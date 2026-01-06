@@ -5,7 +5,7 @@
 
 import { Hono } from 'hono';
 import { verify } from 'hono/jwt';
-import { checkStorageQuota, getUserPlan, PLAN_LIMITS } from '../services/subscription';
+import { checkStorageQuota, getUserPlan, PLAN_LIMITS, recalculateStorageUsage, getStorageUsage } from '../services/subscription';
 
 type Bindings = {
     DB: D1Database;
@@ -328,6 +328,37 @@ downloads.get('/usage', cookieAuthMiddleware, async (c) => {
     }
 });
 
+/**
+ * POST /api/downloads/recalculate-storage
+ * Recalculate storage usage in real-time from actual files
+ * Auth: User (Cookie/Bearer)
+ */
+downloads.post('/recalculate-storage', cookieAuthMiddleware, async (c) => {
+    try {
+        const payload = c.get('jwtPayload') as { sub: string };
+        const userId = payload.sub;
+
+        // Recalculate storage usage
+        const updatedUsage = await recalculateStorageUsage(c.env.DB, userId);
+
+        // Get updated quota info
+        const storageQuota = await checkStorageQuota(c.env.DB, userId);
+        const planInfo = await getUserPlan(c.env.DB, userId);
+
+        return c.json({
+            usage: storageQuota.used,
+            limit: storageQuota.limit,
+            remaining: storageQuota.remaining,
+            plan: planInfo.plan,
+            allowed: storageQuota.allowed,
+            recalculated: true
+        });
+    } catch (error) {
+        console.error('Recalculate storage error:', error);
+        return c.json({ error: 'Internal server error' }, 500);
+    }
+});
+
 // ============================================
 // Internal Service Endpoints (Python Worker)
 // ============================================
@@ -486,16 +517,8 @@ downloads.post('/internal/complete', internalServiceAuth, async (c) => {
             )
         ];
 
-        // If completed successfully and file size is provided, increment user storage
-        if (status === 'completed' && file_size && file_size > 0) {
-            statements.push(
-                c.env.DB.prepare(
-                    `UPDATE users 
-                     SET storage_usage = storage_usage + ? 
-                     WHERE id = (SELECT user_id FROM video_downloads WHERE id = ?)`
-                ).bind(file_size, task_id)
-            );
-        }
+        // Note: Storage is now calculated in real-time via getStorageUsage()
+        // No need to increment storage_usage column here
 
         const results = await c.env.DB.batch(statements);
 

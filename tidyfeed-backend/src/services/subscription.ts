@@ -187,15 +187,65 @@ export async function checkQuota(
 }
 
 /**
- * Get storage usage for a user (bytes)
- * Uses the storage_usage column from users table which tracks all cached media (images, videos, etc.)
+ * Calculate real-time storage usage for a user (bytes)
+ * Sums up actual file sizes from:
+ * 1. Completed video downloads (user downloaded videos) from video_downloads
+ * 2. All cached media (images + avatars) from cached_tweets.media_size
+ *
+ * This provides accurate, up-to-date storage usage calculated in real-time.
  */
 export async function getStorageUsage(db: D1Database, userId: string): Promise<number> {
-    const result = await db.prepare(
-        'SELECT storage_usage as usage FROM users WHERE id = ?'
-    ).bind(userId).first<{ usage: number }>();
+    // Sum up all completed video file sizes for this user
+    // Includes user downloads (user_id = userId) and snapshot videos (task_type = 'snapshot_video')
+    const videoSizesResult = await db.prepare(`
+        SELECT COALESCE(SUM(vd.file_size), 0) as total_size
+        FROM video_downloads vd
+        WHERE vd.status = 'completed'
+          AND vd.file_size IS NOT NULL
+          AND vd.file_size > 0
+          AND (
+            -- User's direct downloads
+            vd.user_id = ?
+            OR
+            -- Snapshot videos for tweets this user has saved
+            vd.task_type = 'snapshot_video'
+            AND vd.tweet_id IN (
+                SELECT sp.x_post_id FROM saved_posts sp WHERE sp.user_id = ?
+            )
+          )
+    `).bind(userId, userId).first<{ total_size: number }>();
 
-    return result?.usage || 0;
+    const videoStorage = videoSizesResult?.total_size || 0;
+
+    // Sum up actual cached media sizes from cached_tweets
+    // This includes images, avatars, and card images that were cached for saved tweets
+    const mediaSizesResult = await db.prepare(`
+        SELECT COALESCE(SUM(ct.media_size), 0) as total_size
+        FROM cached_tweets ct
+        INNER JOIN saved_posts sp ON ct.tweet_id = sp.x_post_id
+        WHERE sp.user_id = ?
+          AND ct.media_size IS NOT NULL
+          AND ct.media_size > 0
+    `).bind(userId).first<{ total_size: number }>();
+
+    const mediaStorage = mediaSizesResult?.total_size || 0;
+
+    return videoStorage + mediaStorage;
+}
+
+/**
+ * Recalculate and update storage usage for a user
+ * Updates the cached storage_usage column in the users table
+ */
+export async function recalculateStorageUsage(db: D1Database, userId: string): Promise<number> {
+    const realTimeUsage = await getStorageUsage(db, userId);
+
+    // Update the cached storage_usage column
+    await db.prepare(
+        'UPDATE users SET storage_usage = ? WHERE id = ?'
+    ).bind(realTimeUsage, userId).run();
+
+    return realTimeUsage;
 }
 
 /**

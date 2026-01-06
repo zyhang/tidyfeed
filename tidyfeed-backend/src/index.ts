@@ -18,7 +18,7 @@ import notes from './routes/notes';
 import stripe from './routes/stripe';
 import { TikHubService } from './services/tikhub';
 import { getSetting } from './db/settings';
-import { checkQuota, incrementUsage, getUserPlan, getAllUsageInfo } from './services/subscription';
+import { checkQuota, incrementUsage, getUserPlan, getAllUsageInfo, getStorageUsage } from './services/subscription';
 
 // Google OAuth JWKS endpoint for ID token verification
 const GOOGLE_JWKS = createRemoteJWKSet(
@@ -588,6 +588,9 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 
 		console.log('[/auth/me] Saved posts count:', savedCount?.count);
 
+		// Calculate real-time storage usage
+		const storageUsage = await getStorageUsage(c.env.DB, payload.sub);
+
 		// Parse preferences safely
 		let parsedPreferences = {};
 		try {
@@ -606,7 +609,7 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 				name: dbUser.name,
 				avatarUrl: dbUser.avatar_url,
 				createdAt: dbUser.created_at,
-				storageUsage: dbUser.storage_usage || 0,
+				storageUsage,
 				savedPostsCount: savedCount?.count || 0,
 				preferences: parsedPreferences,
 				customAiPrompt: dbUser.custom_ai_prompt
@@ -1098,13 +1101,8 @@ async function triggerCacheInBackground(
 			totalSize
 		).run();
 
-		// Increment user storage usage if userId provided
-		if (userId && totalSize > 0) {
-			await env.DB.prepare(
-				'UPDATE users SET storage_usage = storage_usage + ? WHERE id = ?'
-			).bind(totalSize, userId).run();
-			console.log(`[AutoCache] Incremented storage usage for user ${userId} by ${totalSize} bytes`);
-		}
+		// Note: Storage is now calculated in real-time via getStorageUsage()
+		// No need to increment storage_usage column here
 
 		console.log(`[AutoCache] Successfully cached tweet ${tweetId} with ${urlMap.size} images and ${comments.length} comments`);
 
@@ -1313,29 +1311,16 @@ app.delete('/api/posts/x/:x_id', cookieAuthMiddleware, async (c) => {
 					}
 				}
 
-				// Decrement Usage (only for user-initiated downloads that were charged to this user)
-				if (download.file_size && download.file_size > 0) {
-					await c.env.DB.prepare(
-						'UPDATE users SET storage_usage = MAX(0, storage_usage - ?) WHERE id = ?'
-					).bind(download.file_size, userId).run();
-				}
+				// Note: Storage is now calculated in real-time via getStorageUsage()
+				// No need to decrement storage_usage column here
 			}
 		}
 
 		// Only decrement storage for cached media if this is the last reference
-		// Cached media is shared across users, so we shouldn't decrement if others still reference it
+		// Note: Storage is calculated in real-time, so no decrement needed
 		if (isLastReference) {
-			// Find and decrement snapshot_video storage that was charged to this user
-			const snapshotVideoDownload = await c.env.DB.prepare(
-				'SELECT file_size FROM video_downloads WHERE tweet_id = ? AND task_type = "snapshot_video" AND status = "completed"'
-			).bind(xId).first<{ file_size: number }>();
-
-			if (snapshotVideoDownload && snapshotVideoDownload.file_size && snapshotVideoDownload.file_size > 0) {
-				await c.env.DB.prepare(
-					'UPDATE users SET storage_usage = MAX(0, storage_usage - ?) WHERE id = ?'
-				).bind(snapshotVideoDownload.file_size, userId).run();
-				console.log(`[Delete] Decremented storage usage for user ${userId} by ${snapshotVideoDownload.file_size} bytes (snapshot_video)`);
-			}
+			// Note: Storage is now calculated in real-time via getStorageUsage()
+			// No need to decrement for snapshot videos here
 		}
 
 		// Delete the saved post
