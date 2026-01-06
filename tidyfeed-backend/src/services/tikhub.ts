@@ -212,11 +212,25 @@ export class TikHubService {
         const tweet = data.tweet || data.data || data;
         const user = tweet.user || tweet.author || {};
         const legacy = tweet.legacy || tweet;
+        const noteTweet =
+            tweet.note_tweet?.note_tweet_results?.result ||
+            tweet.note_tweet?.note_tweet_results ||
+            tweet.note_tweet ||
+            tweet.note_tweet_results?.result ||
+            tweet.note_tweet_results ||
+            legacy.note_tweet?.note_tweet_results?.result ||
+            legacy.note_tweet?.note_tweet_results ||
+            legacy.note_tweet ||
+            legacy.note_tweet_results?.result ||
+            legacy.note_tweet_results;
+
         const noteText =
-            tweet.note_tweet?.note_tweet_results?.result?.text ||
-            tweet.note_tweet?.text ||
-            legacy.note_tweet?.note_tweet_results?.result?.text ||
-            legacy.note_tweet?.text;
+            noteTweet?.text ||
+            noteTweet?.note_tweet_results?.result?.text ||
+            noteTweet?.result?.text ||
+            noteTweet?.note_tweet_results?.text;
+
+        const noteEntities = noteTweet?.entity_set || noteTweet?.note_tweet_results?.result?.entity_set || noteTweet?.result?.entity_set;
 
         // Create media array from possible locations
         let mediaArray: any[] = [];
@@ -239,12 +253,18 @@ export class TikHubService {
             if (Array.isArray(tweet.media)) mediaArray = tweet.media;
         }
 
+        const rawUrls = Array.isArray(noteEntities?.urls)
+            ? noteEntities.urls
+            : Array.isArray(legacy.entities?.urls)
+                ? legacy.entities.urls
+                : [];
+
         const entities = {
-            urls: Array.isArray(legacy.entities?.urls) ? (legacy.entities.urls as any[]).map((u: any) => ({
+            urls: rawUrls.map((u: any) => ({
                 url: u.url,
                 expanded_url: u.expanded_url || u.url,
                 display_url: u.display_url || u.url,
-            })) : [],
+            })),
         };
 
         // Debug: Log entities to help diagnose link issues
