@@ -10,7 +10,7 @@ export function useStorageValue<T>(key: string, defaultValue: T): T {
         // Initial read
         chrome.storage.local.get(key).then((result) => {
             if (result[key] !== undefined) {
-                setValue(result[key]);
+                setValue(result[key] as T);
             }
         });
 
@@ -20,7 +20,7 @@ export function useStorageValue<T>(key: string, defaultValue: T): T {
             areaName: string
         ) => {
             if (areaName === 'local' && changes[key]) {
-                setValue(changes[key].newValue);
+                setValue(changes[key].newValue as T);
             }
         };
 
