@@ -60,7 +60,8 @@ logger = logging.getLogger(__name__)
 
 def call_bot_save(handle: str, tweet_url: str, mention_id: str = None,
                   tweet_text: str = None, media_urls: list = None,
-                  author_handle: str = None, author_name: str = None) -> Dict[str, Any]:
+                  author_handle: str = None, author_name: str = None,
+                  avatar_url: str = None) -> Dict[str, Any]:
     """
     Call backend API to save tweet. Backend handles deduplication via mention_id.
     """
@@ -72,7 +73,8 @@ def call_bot_save(handle: str, tweet_url: str, mention_id: str = None,
             'tweet_text': tweet_text,
             'media_urls': media_urls or [],
             'author_handle': author_handle,
-            'author_name': author_name
+            'author_name': author_name,
+            'avatar_url': avatar_url
         }
         response = requests.post(
             f'{API_BASE_URL}/api/internal/bot-save',
@@ -280,8 +282,9 @@ class TidyFeedBot:
             target_text = target_tweet.get('text', '')
             target_author = target_tweet.get('author_handle', '')
             target_author_name = target_tweet.get('author_name', '')
+            target_avatar = target_tweet.get('avatar_url', '')
             target_media = target_tweet.get('media_urls', [])
-            
+
             logger.info(f'   Target author: @{target_author}')
             logger.info(f'   Target text: "{target_text[:60]}..."')
         else:
@@ -290,9 +293,10 @@ class TidyFeedBot:
             target_text = None
             target_author = None
             target_author_name = None
+            target_avatar = None
             target_media = []
             logger.warning(f'   ⚠️ Could not fetch target tweet, saving URL only')
-        
+
         # Call backend API with target tweet info (backend handles deduplication)
         result = call_bot_save(
             handle=sender,
@@ -301,7 +305,8 @@ class TidyFeedBot:
             tweet_text=target_text,
             media_urls=target_media,
             author_handle=target_author,
-            author_name=target_author_name
+            author_name=target_author_name,
+            avatar_url=target_avatar
         )
         
         if result.get('success'):
@@ -415,11 +420,17 @@ class TidyFeedBot:
                 if url:
                     media_urls.append(url)
             
+            # Get avatar URL (replace _normal with _bigger for higher quality)
+            avatar_url = user_legacy.get('profile_image_url_https', '')
+            if avatar_url:
+                avatar_url = avatar_url.replace('_normal', '_bigger')
+
             return {
                 'id': legacy.get('id_str', ''),
                 'text': legacy.get('full_text', ''),
                 'author_handle': user_legacy.get('screen_name', ''),
                 'author_name': user_legacy.get('name', ''),
+                'avatar_url': avatar_url,
                 'media_urls': media_urls
             }
         except Exception as e:

@@ -89,7 +89,7 @@ def get_firefox_cookies(domain='x.com'):
     return cookies
 
 
-def test_cookies(cookies):
+async def test_cookies(cookies):
     """Test if cookies work with twikit."""
     print("\n🧪 Testing cookies with twikit...")
     try:
@@ -97,13 +97,20 @@ def test_cookies(cookies):
         client = Client('en-US')
         client.set_cookies(cookies)
 
-        # Try to verify login
-        user = client.login_verifier()
-        if user:
-            print(f"✅ Authenticated as: @{user.screen_name}")
+        # Try to get user_id (validates cookies)
+        uid = await client.user_id()
+        if uid:
+            print(f"✅ Authenticated! User ID: {uid}")
+
+            # Try to get username
+            try:
+                user = await client.user()
+                print(f"✅ Account: @{user.screen_name} ({user.name})")
+            except:
+                pass
             return True
         else:
-            print("❌ Authentication failed - login_verifier returned None")
+            print("❌ Authentication failed - no user_id returned")
             return False
     except Exception as e:
         print(f"❌ Authentication failed: {e}")
@@ -139,7 +146,8 @@ def main():
         sys.exit(1)
 
     # Test cookies locally before saving
-    if not test_cookies(cookies):
+    import asyncio
+    if not asyncio.run(test_cookies(cookies)):
         print("\n❌ Cookies failed authentication test!")
         print("\nPossible issues:")
         print("   - You're not logged into x.com as @tidyfeedapp")

@@ -4,8 +4,14 @@ export const runtime = 'edge';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { X, Loader2, Plus, Sparkles, MessageSquareText, Trash2, Pencil, Copy, PanelLeft } from 'lucide-react';
+import {
+    ArrowLeft, Sparkles, MessageSquare, Trash2, Pencil, Copy, Check, ChevronRight,
+    Loader2, X, Highlighter, BookOpen, FileText, Zap, Clock
+} from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
 import { toast } from 'sonner';
 
@@ -23,6 +29,7 @@ interface Note {
     text_offset_end: number | null;
     created_at: string;
     updated_at: string;
+    highlight_color?: 'yellow' | 'purple' | 'blue' | 'green';
 }
 
 interface SelectionInfo {
@@ -34,38 +41,153 @@ interface SelectionInfo {
 
 type TabType = 'ai' | 'notes';
 
+// Agent execution step types
+interface AgentStep {
+    id: string;
+    label: string;
+    status: 'pending' | 'running' | 'completed' | 'error';
+}
+
 // ============================================================================
-// LINEAR-STYLE COMPONENTS
+// TABS COMPONENT
 // ============================================================================
 
-// Linear-style button variants
-const ButtonVariant = {
-    primary: 'bg-[#171717] text-white hover:bg-[#262626] data-[disabled]:opacity-50',
-    secondary: 'bg-[#f5f5f5] text-[#171717] hover:bg-[#e5e5e5]',
-    ghost: 'text-[#737373] hover:text-[#171717] hover:bg-[#f5f5f5]',
-    danger: 'bg-[#ef4444] text-white hover:bg-[#dc2626]',
-};
+interface TabsProps {
+    value: TabType;
+    onChange: (value: TabType) => void;
+    children: React.ReactNode;
+}
 
-const buttonStyles = 'h-8 px-3 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#171717]/10 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5';
+function Tabs({ value, onChange, children }: TabsProps) {
+    return (
+        <div className="flex flex-col h-full">
+            {React.Children.map(children, child => {
+                if (React.isValidElement(child)) {
+                    return React.cloneElement(child as React.ReactElement<any>, { value, onChange });
+                }
+                return child;
+            })}
+        </div>
+    );
+}
 
-function Button({ variant = 'secondary', className = '', children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof ButtonVariant }) {
+interface TabsListProps {
+    value: TabType;
+    onChange: (value: TabType) => void;
+    children: React.ReactNode;
+}
+
+function TabsList({ value, onChange, children }: TabsListProps) {
+    return (
+        <div className="flex border-b border-border/40 bg-muted/30">
+            {React.Children.map(children, child => {
+                if (React.isValidElement(child)) {
+                    return React.cloneElement(child as React.ReactElement<any>, { value, onChange });
+                }
+                return child;
+            })}
+        </div>
+    );
+}
+
+interface TabsTriggerProps {
+    value: TabType;
+    onChange: (value: TabType) => void;
+    children: React.ReactNode;
+    icon?: React.ReactNode;
+    count?: number;
+}
+
+function TabsTrigger({ value, onChange, children, icon, count }: TabsTriggerProps) {
+    const isActive = (childValue: TabType) => value === childValue;
+
     return (
         <button
-            className={`${buttonStyles} ${ButtonVariant[variant]} ${className}`}
-            {...props}
+            onClick={() => onChange(children as TabType)}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
+                isActive(children as TabType)
+                    ? 'text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
         >
-            {children}
+            {icon}
+            <span>{children}</span>
+            {count !== undefined && count > 0 && (
+                <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
+                    {count}
+                </Badge>
+            )}
+            {isActive(children as TabType) && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" />
+            )}
         </button>
     );
 }
 
-// Notion-style Note Card
-function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
+interface TabsContentProps {
+    value: TabType;
+    currentValue: TabType;
+    children: React.ReactNode;
+    className?: string;
+}
+
+function TabsContent({ value, currentValue, children, className = '' }: TabsContentProps) {
+    if (value !== currentValue) return null;
+    return (
+        <div className={`flex-1 overflow-y-auto ${className}`}>
+            {children}
+        </div>
+    );
+}
+
+// ============================================================================
+// SCROLL AREA COMPONENT (simplified)
+// ============================================================================
+
+interface ScrollAreaProps {
+    children: React.ReactNode;
+    className?: string;
+}
+
+function ScrollArea({ children, className = '' }: ScrollAreaProps) {
+    return (
+        <div className={`overflow-y-auto ${className}`}>
+            {children}
+        </div>
+    );
+}
+
+// ============================================================================
+// SEPARATOR COMPONENT
+// ============================================================================
+
+function Separator({ className = '' }: { className?: string }) {
+    return <div className={`h-px bg-border/40 ${className}`} />;
+}
+
+// ============================================================================
+// HIGHLIGHT NOTE CARD COMPONENT
+// ============================================================================
+
+const highlightColors = {
+    yellow: 'bg-yellow-100 border-l-yellow-400',
+    purple: 'bg-purple-100 border-l-purple-400',
+    blue: 'bg-blue-100 border-l-blue-400',
+    green: 'bg-green-100 border-l-green-400',
+};
+
+function HighlightNoteCard({
+    note,
+    isOwner,
+    onEdit,
+    onDelete,
+    onJumpToContext
+}: {
     note: Note;
     isOwner: boolean;
     onEdit: (id: number, content: string) => Promise<void>;
     onDelete: (id: number) => void;
-    onHighlightClick: (note: Note) => void;
+    onJumpToContext: (note: Note) => void;
 }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(note.note_content);
@@ -87,6 +209,10 @@ function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
         }
     };
 
+    const colorClass = note.highlight_color
+        ? highlightColors[note.highlight_color]
+        : highlightColors.yellow;
+
     const formatTime = (dateStr: string) => {
         const date = new Date(dateStr);
         const now = new Date();
@@ -95,27 +221,33 @@ function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
         const hours = Math.floor(diff / 3600000);
         const days = Math.floor(diff / 86400000);
         if (minutes < 1) return 'Just now';
-        if (minutes < 60) return `${minutes}m`;
-        if (hours < 24) return `${hours}h`;
+        if (minutes < 60) return `${minutes}m ago`;
+        if (hours < 24) return `${hours}h ago`;
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
     return (
-        <div className="group rounded-md border border-[#e9e9e7] bg-white overflow-hidden">
-            {/* Quote section */}
+        <Card className="overflow-hidden border-border/40 shadow-sm">
+            {/* Quote section with highlight */}
             <button
-                onClick={() => onHighlightClick(note)}
-                className="w-full text-left p-3 pb-2 border-b border-[#f1f1ef] hover:bg-[#f7f7f5] transition-colors"
+                onClick={() => onJumpToContext(note)}
+                className="w-full text-left p-4 pb-3 border-b border-border/40 hover:bg-muted/30 transition-colors group"
             >
-                <p className="text-sm text-[#787774] leading-relaxed line-clamp-2">
-                    "{note.selected_text}"
-                </p>
+                <div className={`pl-3 py-2 rounded-r-md ${colorClass}`}>
+                    <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3 font-medium">
+                        "{note.selected_text}"
+                    </p>
+                </div>
+                <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ChevronRight className="h-3 w-3" />
+                    <span>Jump to context</span>
+                </div>
             </button>
 
             {/* Note content */}
-            <div className="p-3">
+            <CardContent className="p-4 pt-3">
                 {isEditing ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         <textarea
                             value={editContent}
                             onChange={(e) => setEditContent(e.target.value)}
@@ -131,73 +263,150 @@ function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
                             }}
                             autoFocus
                             rows={3}
-                            className="w-full px-3 py-2 text-sm text-[#37352f] bg-white border border-[#e9e9e7] rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-[#37352f]/10 focus:border-[#37352f] placeholder:text-[#9b9a97]"
-                            placeholder="Your note..."
+                            className="w-full px-3 py-2 text-sm bg-background border border-input rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring/50 placeholder:text-muted-foreground"
+                            placeholder="Add your thoughts..."
                         />
                         <div className="flex items-center justify-end gap-2">
-                            <button
+                            <Button
+                                variant="ghost" size="sm"
                                 onClick={() => {
                                     setIsEditing(false);
                                     setEditContent(note.note_content);
                                 }}
                                 disabled={isSaving}
-                                className="h-7 px-3 text-xs text-[#787774] hover:text-[#37352f] hover:bg-[#f1f1ef] rounded-md transition-colors"
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                size="sm"
                                 onClick={handleSave}
                                 disabled={isSaving || !editContent.trim()}
-                                className="h-7 px-3 text-xs bg-[#37352f] text-white rounded-md hover:bg-[#2c2a29] disabled:opacity-50 transition-colors flex items-center gap-1"
                             >
-                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
                                 Save
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 ) : (
-                    <p className="text-sm text-[#37352f] leading-relaxed whitespace-pre-wrap">
+                    <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
                         {note.note_content}
                     </p>
                 )}
-            </div>
+            </CardContent>
 
             {/* Footer */}
-            <div className="px-3 py-2 flex items-center justify-between border-t border-[#f1f1ef] bg-[#f7f7f5]">
-                <span className="text-xs text-[#9b9a97]">
-                    {formatTime(note.created_at)}
-                </span>
+            <div className="px-4 py-2 flex items-center justify-between border-t border-border/40 bg-muted/20">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span>{formatTime(note.created_at)}</span>
+                </div>
 
                 {isOwner && !isEditing && (
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
                             onClick={() => setIsEditing(true)}
-                            className="p-1.5 rounded hover:bg-white hover:shadow-sm text-[#9b9a97] hover:text-[#37352f] transition-all"
                             title="Edit note"
                         >
                             <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
                             onClick={() => onDelete(note.id)}
-                            className="p-1.5 rounded hover:bg-[#ffe2dd] hover:shadow-sm text-[#9b9a97] hover:text-[#d44c47] transition-all"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             title="Delete note"
                         >
                             <Trash2 className="h-3 w-3" />
-                        </button>
+                        </Button>
                     </div>
                 )}
             </div>
-        </div>
+        </Card>
     );
 }
 
+// ============================================================================
+// AGENT EXECUTION VISUAL COMPONENT
+// ============================================================================
+
+function AgentExecutionCard({
+    steps,
+    title,
+    description
+}: {
+    steps: AgentStep[];
+    title: string;
+    description?: string;
+}) {
+    return (
+        <Card className="border-border/40 bg-muted/30">
+            <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-amber-500" />
+                    {title}
+                </CardTitle>
+                {description && (
+                    <p className="text-xs text-muted-foreground mt-1">{description}</p>
+                )}
+            </CardHeader>
+            <CardContent className="space-y-2">
+                {steps.map((step) => (
+                    <div
+                        key={step.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                            step.status === 'completed'
+                                ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900'
+                                : step.status === 'running'
+                                ? 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900'
+                                : step.status === 'error'
+                                ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900'
+                                : 'bg-background border-border/40'
+                        }`}
+                    >
+                        {step.status === 'completed' ? (
+                            <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                                <Check className="h-3 w-3 text-white" />
+                            </div>
+                        ) : step.status === 'running' ? (
+                            <div className="h-5 w-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
+                                <Loader2 className="h-3 w-3 text-white animate-spin" />
+                            </div>
+                        ) : step.status === 'error' ? (
+                            <div className="h-5 w-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                                <X className="h-3 w-3 text-white" />
+                            </div>
+                        ) : (
+                            <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                                <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+                            </div>
+                        )}
+                        <span className={`text-sm font-mono ${
+                            step.status === 'completed' ? 'text-green-700 dark:text-green-400' :
+                            step.status === 'running' ? 'text-amber-700 dark:text-amber-400' :
+                            step.status === 'error' ? 'text-red-700 dark:text-red-400' :
+                            'text-muted-foreground'
+                        }`}>
+                            {step.label}
+                        </span>
+                    </div>
+                ))}
+            </CardContent>
+        </Card>
+    );
+}
+
+// ============================================================================
+// SNAPSHOT CONTENT COMPONENT
+// ============================================================================
+
 const SnapshotContent = React.memo(
-    React.forwardRef<HTMLDivElement, { html: string; panelWidth: number }>(
-        ({ html, panelWidth }, ref) => (
+    React.forwardRef<HTMLDivElement, { html: string }>(
+        ({ html }, ref) => (
             <div
                 ref={ref}
-                className="transition-all duration-200 ease-out"
-                style={{ marginRight: `${panelWidth}px` }}
+                className="prose prose-slate max-w-none"
                 dangerouslySetInnerHTML={{ __html: html }}
             />
         )
@@ -218,8 +427,9 @@ export default function SnapshotViewerPage() {
     const [snapshotHtml, setSnapshotHtml] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [redirectToDashboard, setRedirectToDashboard] = useState(false);
 
-    const [showPanel, setShowPanel] = useState(false);
+    const [showPanel, setShowPanel] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>('notes');
 
     const [summary, setSummary] = useState<string | null>(null);
@@ -227,6 +437,13 @@ export default function SnapshotViewerPage() {
     const [summaryError, setSummaryError] = useState<string | null>(null);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
     const copyResetRef = useRef<number | null>(null);
+
+    // Agent steps for AI generation
+    const [agentSteps, setAgentSteps] = useState<AgentStep[]>([
+        { id: '1', label: 'Analyzing content structure...', status: 'pending' },
+        { id: '2', label: 'Extracting key information...', status: 'pending' },
+        { id: '3', label: 'Generating summary...', status: 'pending' },
+    ]);
 
     const [notes, setNotes] = useState<Note[]>([]);
     const [notesLoading, setNotesLoading] = useState(false);
@@ -248,6 +465,7 @@ export default function SnapshotViewerPage() {
         try {
             await navigator.clipboard.writeText(text);
             setCopiedKey(key);
+            toast.success('Copied to clipboard');
             if (copyResetRef.current) {
                 window.clearTimeout(copyResetRef.current);
             }
@@ -260,24 +478,25 @@ export default function SnapshotViewerPage() {
         }
     };
 
-    const getPanelWidth = () => {
-        if (!showPanel) return 0;
-        return 384;
-    };
-
-    const panelWidth = getPanelWidth();
-
     useEffect(() => {
         if (!tweetId) return;
 
         const fetchSnapshot = async () => {
             try {
+                setLoading(true);
+                setError(null);
+                setRedirectToDashboard(false);
                 const response = await fetch(`/api/s/${tweetId}`);
                 if (response.ok) {
                     const html = await response.text();
                     setSnapshotHtml(html);
                 } else {
-                    setError('Failed to load snapshot');
+                    if (response.status === 404) {
+                        setError('Snapshot not found. Redirecting to dashboard...');
+                        setRedirectToDashboard(true);
+                    } else {
+                        setError('Failed to load snapshot');
+                    }
                 }
             } catch (err) {
                 setError('Error loading snapshot');
@@ -296,6 +515,17 @@ export default function SnapshotViewerPage() {
             }
         };
     }, []);
+
+    useEffect(() => {
+        if (!redirectToDashboard) return;
+        const timeout = window.setTimeout(() => {
+            router.push('/dashboard');
+        }, 2000);
+
+        return () => {
+            window.clearTimeout(timeout);
+        };
+    }, [redirectToDashboard, router]);
 
     useEffect(() => {
         if (!tweetId) return;
@@ -329,6 +559,34 @@ export default function SnapshotViewerPage() {
         setShowPanel(true);
         setActiveTab('ai');
 
+        // Reset and start agent steps
+        setAgentSteps([
+            { id: '1', label: 'Analyzing content structure...', status: 'pending' },
+            { id: '2', label: 'Extracting key information...', status: 'pending' },
+            { id: '3', label: 'Generating summary...', status: 'pending' },
+        ]);
+
+        // Simulate agent execution steps
+        setTimeout(() => {
+            setAgentSteps(prev => prev.map(s =>
+                s.id === '1' ? { ...s, status: 'running' as const } : s
+            ));
+        }, 300);
+
+        setTimeout(() => {
+            setAgentSteps(prev => prev.map(s =>
+                s.id === '1' ? { ...s, status: 'completed' as const } :
+                s.id === '2' ? { ...s, status: 'running' as const } : s
+            ));
+        }, 1500);
+
+        setTimeout(() => {
+            setAgentSteps(prev => prev.map(s =>
+                s.id === '2' ? { ...s, status: 'completed' as const } :
+                s.id === '3' ? { ...s, status: 'running' as const } : s
+            ));
+        }, 3000);
+
         try {
             const response = await fetch(`${apiUrl}/api/ai/summarize`, {
                 method: 'POST',
@@ -342,14 +600,17 @@ export default function SnapshotViewerPage() {
             if (response.ok) {
                 const data = await response.json();
                 setSummary(data.summary);
+                setAgentSteps(prev => prev.map(s => ({ ...s, status: 'completed' as const })));
             } else if (response.status === 401) {
                 router.push('/login');
             } else {
                 const data = await response.json();
                 setSummaryError(data.error || 'Failed to generate summary');
+                setAgentSteps(prev => prev.map(s => ({ ...s, status: 'error' as const })));
             }
         } catch (err) {
             setSummaryError('Error connecting to AI service');
+            setAgentSteps(prev => prev.map(s => ({ ...s, status: 'error' as const })));
         } finally {
             setSummaryLoading(false);
         }
@@ -357,7 +618,7 @@ export default function SnapshotViewerPage() {
 
     const handleMouseUp = useCallback((e: MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.closest('.note-toolbar') || target.closest('.sidebar-panel')) {
+        if (target.closest('.selection-toolbar') || target.closest('.sidebar-panel')) {
             return;
         }
 
@@ -436,11 +697,13 @@ export default function SnapshotViewerPage() {
                 setActiveTab('notes');
                 window.getSelection()?.removeAllRanges();
                 fetchNotes();
+                toast.success('Note added successfully');
             } else if (response.status === 401) {
                 router.push('/login');
             }
         } catch (err) {
             console.error('Failed to create note:', err);
+            toast.error('Failed to add note');
         } finally {
             setIsCreatingNote(false);
         }
@@ -459,6 +722,7 @@ export default function SnapshotViewerPage() {
         if (response.ok) {
             const data = await response.json();
             setNotes(prev => prev.map(n => n.id === id ? data.note : n));
+            toast.success('Note updated');
         } else {
             throw new Error('Failed to edit note');
         }
@@ -483,21 +747,26 @@ export default function SnapshotViewerPage() {
                 setNotes(prev => prev.filter(n => n.id !== noteToDelete));
                 setDeleteDialogOpen(false);
                 setNoteToDelete(null);
+                toast.success('Note deleted');
             }
         } catch (err) {
             console.error('Failed to delete note:', err);
+            toast.error('Failed to delete note');
         } finally {
             setIsDeleting(false);
         }
     };
 
-    const handleHighlightClick = (note: Note) => {
-        setShowPanel(true);
-        setActiveTab('notes');
-        setTimeout(() => {
-            const noteElement = document.getElementById(`note-${note.id}`);
-            noteElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 300);
+    const handleJumpToContext = (note: Note) => {
+        // Scroll to highlighted text
+        const noteElement = document.querySelector(`[data-note-id="${note.id}"]`);
+        if (noteElement) {
+            noteElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            noteElement.classList.add('ring-2', 'ring-primary');
+            setTimeout(() => {
+                noteElement.classList.remove('ring-2', 'ring-primary');
+            }, 2000);
+        }
     };
 
     const highlightedHtml = useMemo(() => {
@@ -573,7 +842,10 @@ export default function SnapshotViewerPage() {
                 const after = nodeText.slice(localEnd);
 
                 const wrapper = doc.createElement('span');
-                wrapper.className = 'note-highlight';
+                const colorClass = note.highlight_color
+                    ? highlightColors[note.highlight_color].split(' ')[0]
+                    : 'bg-yellow-200';
+                wrapper.className = `${colorClass} rounded-sm px-0.5 cursor-pointer transition-colors hover:opacity-80`;
                 wrapper.setAttribute('data-note-id', note.id.toString());
                 wrapper.textContent = highlighted;
 
@@ -592,81 +864,8 @@ export default function SnapshotViewerPage() {
             applyHighlight(note, range.start, range.end);
         }
 
-        const style = doc.createElement('style');
-        style.textContent = `
-            .note-highlight {
-                background: #fbf3db;
-                border-bottom: 2px solid #d3c5a5;
-                cursor: pointer;
-                padding: 1px 0;
-                border-radius: 2px;
-            }
-            .note-highlight:hover {
-                background: #f5eda8;
-            }
-        `;
-        doc.head.appendChild(style);
-
         return doc.documentElement.outerHTML;
     }, [snapshotHtml, notes]);
-
-    useEffect(() => {
-        const handleHighlightClicks = (e: MouseEvent) => {
-            const target = e.target as HTMLElement;
-            if (target.classList.contains('note-highlight')) {
-                const noteId = target.getAttribute('data-note-id');
-                if (noteId) {
-                    const note = notes.find(n => n.id === parseInt(noteId));
-                    if (note) {
-                        handleHighlightClick(note);
-                    }
-                }
-            }
-        };
-
-        const container = contentRef.current;
-        if (container) {
-            container.addEventListener('click', handleHighlightClicks);
-            return () => container.removeEventListener('click', handleHighlightClicks);
-        }
-    }, [notes]);
-
-    useEffect(() => {
-        const container = contentRef.current;
-        if (!container) return;
-
-        const clearActiveSelection = () => {
-            const existing = container.querySelectorAll('.active-selection');
-            existing.forEach((el) => {
-                const parent = el.parentNode;
-                if (!parent) return;
-                while (el.firstChild) {
-                    parent.insertBefore(el.firstChild, el);
-                }
-                parent.removeChild(el);
-            });
-        };
-
-        clearActiveSelection();
-
-        const styleEl = document.createElement('style');
-        styleEl.id = 'active-selection-style';
-        styleEl.textContent = `
-            .active-selection {
-                background: #def7ec;
-                border-bottom: 2px solid #0f7b6c;
-                border-radius: 2px;
-                padding: 1px 0;
-            }
-        `;
-        if (!document.getElementById('active-selection-style')) {
-            document.head.appendChild(styleEl);
-        }
-
-        return () => {
-            clearActiveSelection();
-        };
-    }, [highlightedHtml]);
 
     // ============================================================================
     // LOADING & ERROR STATES
@@ -674,10 +873,10 @@ export default function SnapshotViewerPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-white flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="h-5 w-5 text-[#9b9a97] animate-spin" />
-                    <p className="text-sm text-[#9b9a97]">Loading...</p>
+            <div className="h-screen flex items-center justify-center bg-background">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
+                    <p className="text-sm text-muted-foreground">Loading snapshot...</p>
                 </div>
             </div>
         );
@@ -685,13 +884,22 @@ export default function SnapshotViewerPage() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-white flex items-center justify-center">
-                <div className="text-center">
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#ffe2dd] text-[#d44c47] mb-3">
-                        <X className="h-4 w-4" />
-                    </div>
-                    <p className="text-sm text-[#9b9a97]">{error}</p>
-                </div>
+            <div className="h-screen flex items-center justify-center bg-background">
+                <Card className="max-w-md">
+                    <CardContent className="pt-6 text-center">
+                        <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                            <X className="h-6 w-6 text-destructive" />
+                        </div>
+                        <h3 className="font-semibold mb-2">Failed to Load</h3>
+                        <p className="text-sm text-muted-foreground mb-4">{error}</p>
+                        <Button
+                            onClick={() => redirectToDashboard ? router.push('/dashboard') : router.back()}
+                            variant="outline"
+                        >
+                            {redirectToDashboard ? 'Go to Dashboard' : 'Go Back'}
+                        </Button>
+                    </CardContent>
+                </Card>
             </div>
         );
     }
@@ -701,117 +909,351 @@ export default function SnapshotViewerPage() {
     // ============================================================================
 
     return (
-        <div className="min-h-screen bg-white">
-            {/* Notion-style Header */}
-            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-[#e9e9e7]">
-                <div className="max-w-6xl mx-auto px-5 h-12 flex items-center">
-                    {/* Left: Back button */}
-                    <button
+        <div className="h-screen flex flex-col bg-background">
+            {/* Header */}
+            <header className="h-14 border-b border-border/40 bg-background flex items-center px-4 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
                         onClick={() => router.back()}
-                        className="flex items-center gap-1.5 text-[#787774] hover:text-[#37352f] transition-colors text-sm font-medium"
                     >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                        <span>Back</span>
-                    </button>
-
-                    {/* Center: Breadcrumb-like title */}
-                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
-                        <span className="text-sm text-[#787774]">TidyFeed</span>
-                        <svg className="h-3 w-3 text-[#9b9a97]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        <span className="text-sm text-[#9b9a97]">Snapshot</span>
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">TidyFeed</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">Snapshot</span>
                     </div>
+                </div>
 
-                    {/* Right: AI Chat toggle */}
-                    <div className="ml-auto flex items-center">
-                        <button
-                            onClick={() => setShowPanel(!showPanel)}
-                            className={`flex items-center gap-2 px-3 h-8 rounded-md text-sm font-medium transition-all ${
-                                showPanel
-                                    ? 'bg-[#f1f1ef] text-[#37352f]'
-                                    : 'bg-[#37352f] text-white hover:bg-[#2c2a29]'
-                            }`}
-                        >
-                            {showPanel ? (
-                                <>
-                                    <X className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">Close</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Sparkles className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">AI</span>
-                                </>
-                            )}
-                        </button>
-                    </div>
+                <div className="ml-auto flex items-center gap-2">
+                    <Button
+                        variant={showPanel ? 'secondary' : 'default'}
+                        size="sm"
+                        onClick={() => setShowPanel(!showPanel)}
+                    >
+                        {showPanel ? (
+                            <>
+                                <X className="h-4 w-4 mr-1" />
+                                Hide Panel
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="h-4 w-4 mr-1" />
+                                AI & Notes
+                            </>
+                        )}
+                    </Button>
                 </div>
             </header>
 
-            {/* Note Toolbar */}
+            {/* Main Content Area - Split Pane */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Left Panel - Content Viewer (65-70%) */}
+                <div
+                    className={`transition-all duration-300 ease-in-out ${
+                        showPanel ? 'flex-1 max-w-[70%]' : 'w-full max-w-full'
+                    }`}
+                >
+                    <ScrollArea className="h-full">
+                        <div className="max-w-3xl mx-auto px-8 py-8">
+                            {/* Document toolbar */}
+                            <div className="flex items-center justify-between mb-8 pb-4 border-b border-border/40">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <FileText className="h-4 w-4" />
+                                    <span>Snapshot View</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-xs">
+                                        Read-only
+                                    </Badge>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <article className="min-h-[50vh]">
+                                <SnapshotContent ref={contentRef} html={highlightedHtml} />
+                            </article>
+                        </div>
+                    </ScrollArea>
+                </div>
+
+                {/* Right Panel - Sidebar (30-35%) */}
+                <div
+                    className={`border-l border-border/40 bg-muted/20 transition-all duration-300 ease-in-out ${
+                        showPanel ? 'w-[30%] min-w-[350px] max-w-[450px]' : 'w-0'
+                    }`}
+                >
+                    <div className="sidebar-panel h-full flex flex-col">
+                        <Tabs value={activeTab} onChange={setActiveTab}>
+                            <TabsList value={activeTab} onChange={setActiveTab}>
+                                <TabsTrigger value="ai" onChange={setActiveTab} icon={<Sparkles className="h-4 w-4" />}>
+                                    AI Insight
+                                </TabsTrigger>
+                                <TabsTrigger value="notes" onChange={setActiveTab} icon={<MessageSquare className="h-4 w-4" />} count={notes.length}>
+                                    Highlights
+                                </TabsTrigger>
+                            </TabsList>
+
+                            {/* AI Insight Tab Content */}
+                            <TabsContent value="ai" currentValue={activeTab} className="p-4">
+                                {!summary && !summaryLoading && !summaryError && (
+                                    <div className="flex flex-col items-center text-center py-12 px-6">
+                                        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-950/30 dark:to-orange-950/30 flex items-center justify-center mb-4">
+                                            <Sparkles className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+                                        </div>
+                                        <h3 className="font-semibold text-foreground mb-2">AI-Powered Insights</h3>
+                                        <p className="text-sm text-muted-foreground max-w-xs mb-6">
+                                            Get intelligent summaries, extract key points, and understand the core message of this content.
+                                        </p>
+                                        <Button onClick={handleGenerateSummary} size="default">
+                                            <Zap className="h-4 w-4 mr-2" />
+                                            Generate Summary
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {summaryLoading && (
+                                    <div className="space-y-4 py-4">
+                                        <div className="flex items-center gap-3 px-2">
+                                            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-950/30 dark:to-orange-950/30 flex items-center justify-center">
+                                                <Sparkles className="h-5 w-5 text-amber-600 animate-pulse" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium">AI Agent Working</p>
+                                                <p className="text-xs text-muted-foreground">Analyzing content...</p>
+                                            </div>
+                                        </div>
+                                        <AgentExecutionCard
+                                            steps={agentSteps}
+                                            title="Execution Progress"
+                                            description="Running AI analysis pipeline"
+                                        />
+                                    </div>
+                                )}
+
+                                {summaryError && !summaryLoading && (
+                                    <div className="flex flex-col items-center text-center py-12 px-6">
+                                        <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+                                            <X className="h-6 w-6 text-destructive" />
+                                        </div>
+                                        <h3 className="font-semibold text-foreground mb-2">Generation Failed</h3>
+                                        <p className="text-sm text-muted-foreground mb-6 max-w-xs">{summaryError}</p>
+                                        <Button onClick={handleGenerateSummary} variant="outline">
+                                            <Sparkles className="h-4 w-4 mr-2" />
+                                            Try Again
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {summary && !summaryLoading && (
+                                    <div className="space-y-4 py-4">
+                                        <div className="flex items-center justify-between px-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-8 w-8 rounded-lg bg-green-100 dark:bg-green-950/30 flex items-center justify-center">
+                                                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                                </div>
+                                                <span className="font-medium text-sm">Summary Complete</span>
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                onClick={() => handleCopy('summary', summary)}
+                                            >
+                                                {copiedKey === 'summary' ? (
+                                                    <Check className="h-4 w-4 text-green-600" />
+                                                ) : (
+                                                    <Copy className="h-4 w-4" />
+                                                )}
+                                            </Button>
+                                        </div>
+
+                                        <AgentExecutionCard
+                                            steps={agentSteps}
+                                            title="Completed Steps"
+                                        />
+
+                                        <Card className="border-border/40">
+                                            <CardContent className="p-4">
+                                                <div className="prose prose-sm max-w-none dark:prose-invert">
+                                                    <ReactMarkdown
+                                                        components={{
+                                                            p: ({ children }) => <p className="text-foreground leading-relaxed mb-3 last:mb-0">{children}</p>,
+                                                            strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+                                                            ul: ({ children }) => <ul className="space-y-2 my-3 pl-4">{children}</ul>,
+                                                            ol: ({ children }) => <ol className="space-y-2 my-3 pl-4">{children}</ol>,
+                                                            li: ({ children }) => (
+                                                                <li className="text-foreground flex items-start gap-2">
+                                                                    <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-foreground/60 mt-2" />
+                                                                    <span>{children}</span>
+                                                                </li>
+                                                            ),
+                                                            h1: ({ children }) => <h1 className="text-base font-semibold text-foreground mb-2 mt-4">{children}</h1>,
+                                                            h2: ({ children }) => <h2 className="text-base font-semibold text-foreground mb-2 mt-4">{children}</h2>,
+                                                            h3: ({ children }) => <h3 className="text-sm font-semibold text-foreground mb-2 mt-3">{children}</h3>,
+                                                        }}
+                                                    >
+                                                        {summary}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="flex-1"
+                                                onClick={handleGenerateSummary}
+                                                disabled={summaryLoading}
+                                            >
+                                                <Loader2 className="h-4 w-4 mr-2" />
+                                                Regenerate
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                className="flex-1"
+                                                onClick={() => handleCopy('summary', summary)}
+                                            >
+                                                {copiedKey === 'summary' ? (
+                                                    <>
+                                                        <Check className="h-4 w-4 mr-2" />
+                                                        Copied
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy className="h-4 w-4 mr-2" />
+                                                        Copy
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </TabsContent>
+
+                            {/* Highlight Notes Tab Content */}
+                            <TabsContent value="notes" currentValue={activeTab} className="p-4">
+                                {notesLoading && (
+                                    <div className="flex items-center justify-center py-20">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+                                            <p className="text-sm text-muted-foreground">Loading highlights...</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!notesLoading && notes.length > 0 && (
+                                    <ScrollArea className="h-full">
+                                        <div className="space-y-3 pb-4">
+                                            {notes.map(note => (
+                                                <HighlightNoteCard
+                                                    key={note.id}
+                                                    note={note}
+                                                    isOwner={isOwner}
+                                                    onEdit={handleEditNote}
+                                                    onDelete={handleDeleteNote}
+                                                    onJumpToContext={handleJumpToContext}
+                                                />
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+                                )}
+
+                                {!notesLoading && notes.length === 0 && (
+                                    <div className="flex flex-col items-center text-center py-16 px-6">
+                                        <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-950/30 dark:to-pink-950/30 flex items-center justify-center mb-4">
+                                            <Highlighter className="h-7 w-7 text-purple-600 dark:text-purple-400" />
+                                        </div>
+                                        <h3 className="font-semibold text-foreground mb-2">No Highlights Yet</h3>
+                                        <p className="text-sm text-muted-foreground max-w-xs mb-6">
+                                            {currentUserId
+                                                ? 'Select any text in the article to create a highlight with notes.'
+                                                : 'Log in to add highlights and notes.'}
+                                        </p>
+                                        {currentUserId && (
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                <BookOpen className="h-4 w-4" />
+                                                <span>Highlight text to get started</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </TabsContent>
+                        </Tabs>
+                    </div>
+                </div>
+            </div>
+
+            {/* Selection Toolbar */}
             {selection && currentUserId && (() => {
-                const toolbarWidth = showNoteInput ? 360 : 180;
+                const toolbarWidth = showNoteInput ? 380 : 200;
                 const spaceOnRight = window.innerWidth - selection.rect.right;
                 const positionOnRight = spaceOnRight >= toolbarWidth + 24;
                 const left = positionOnRight
                     ? Math.min(selection.rect.right + window.scrollX + 12, window.innerWidth - toolbarWidth - 12)
                     : Math.max(12, selection.rect.left + window.scrollX - toolbarWidth - 12);
                 const verticalCenter = selection.rect.top + window.scrollY + selection.rect.height / 2;
-                const toolbarHeight = showNoteInput ? 200 : 42;
-                const top = Math.max(60, Math.min(verticalCenter - toolbarHeight / 2, window.innerHeight + window.scrollY - toolbarHeight - 12));
+                const toolbarHeight = showNoteInput ? 220 : 48;
+                const top = Math.max(70, Math.min(verticalCenter - toolbarHeight / 2, window.innerHeight + window.scrollY - toolbarHeight - 12));
 
                 return (
                     <div
-                        className="note-toolbar fixed z-[70] animate-in fade-in slide-in-from-bottom-2 duration-200"
+                        className="selection-toolbar fixed z-50 animate-in fade-in zoom-in-95 duration-200"
                         style={{ left, top }}
                     >
-                        <div className={`bg-white rounded-md border border-[#e9e9e7] shadow-lg overflow-hidden ${showNoteInput ? 'w-[360px]' : 'w-[180px]'}`}>
+                        <Card className="shadow-lg border-border/60 overflow-hidden">
                             {!showNoteInput ? (
-                                <div className="flex items-center p-1 gap-1">
-                                    <button
-                                        onMouseDown={(e) => e.preventDefault()}
+                                <div className="flex items-center p-1.5 gap-1.5 bg-background">
+                                    <Button
+                                        size="sm"
                                         onClick={() => {
                                             setShowNoteInput(true);
                                             setShowPanel(true);
                                             setActiveTab('notes');
                                         }}
-                                        className="flex-1 h-8 flex items-center justify-center gap-1.5 px-2 rounded bg-[#37352f] text-white text-xs hover:bg-[#2c2a29] transition-colors font-medium"
+                                        className="h-9"
                                     >
-                                        <Plus className="h-3.5 w-3.5" />
-                                        <span>Add note</span>
-                                    </button>
-                                    <button
+                                        <Highlighter className="h-4 w-4 mr-1.5" />
+                                        Add Note
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon-sm"
                                         onClick={() => {
                                             setSelection(null);
                                             window.getSelection()?.removeAllRanges();
                                         }}
-                                        className="h-8 w-8 flex items-center justify-center rounded hover:bg-[#f1f1ef] text-[#9b9a97] hover:text-[#37352f] transition-colors"
                                     >
-                                        <X className="h-3.5 w-3.5" />
-                                    </button>
+                                        <X className="h-4 w-4" />
+                                    </Button>
                                 </div>
                             ) : (
-                                <div className="p-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs font-semibold text-[#37352f]">New note</span>
-                                        <button
+                                <div className="w-[380px] p-4 bg-background">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <Highlighter className="h-4 w-4 text-primary" />
+                                            <span className="font-medium text-sm">New Highlight</span>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon-sm"
                                             onClick={() => {
                                                 setShowNoteInput(false);
                                                 setSelection(null);
                                                 setNoteInput('');
                                                 window.getSelection()?.removeAllRanges();
                                             }}
-                                            className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f1f1ef] text-[#9b9a97] hover:text-[#37352f] transition-colors"
                                         >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
+                                            <X className="h-4 w-4" />
+                                        </Button>
                                     </div>
-                                    <div className="mb-2 p-2 bg-[#f7f7f5] rounded text-xs text-[#787774] line-clamp-2 border border-[#e9e9e7]">
+
+                                    <div className="mb-3 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground line-clamp-3 border border-border/40">
                                         "{selection.text}"
                                     </div>
+
                                     <textarea
                                         value={noteInput}
                                         onChange={(e) => setNoteInput(e.target.value)}
@@ -829,261 +1271,33 @@ export default function SnapshotViewerPage() {
                                         }}
                                         autoFocus
                                         rows={3}
-                                        placeholder="Write a note..."
-                                        className="w-full px-3 py-2 text-sm bg-white border border-[#e9e9e7] rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-[#37352f]/10 focus:border-[#37352f] placeholder:text-[#9b9a97]"
+                                        placeholder="Add your thoughts..."
+                                        className="w-full px-3 py-2 text-sm bg-background border border-input rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring/50 placeholder:text-muted-foreground"
                                     />
-                                    <div className="mt-2 flex items-center justify-between">
-                                        <span className="text-[10px] text-[#9b9a97]">Press Enter to save</span>
-                                        <button
+
+                                    <div className="mt-3 flex items-center justify-between">
+                                        <span className="text-xs text-muted-foreground">
+                                            Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">Enter</kbd> to save
+                                        </span>
+                                        <Button
+                                            size="sm"
                                             onClick={handleCreateNote}
                                             disabled={!noteInput.trim() || isCreatingNote}
-                                            className="h-7 px-3 text-xs bg-[#37352f] text-white rounded-md hover:bg-[#2c2a29] disabled:opacity-50 transition-colors flex items-center gap-1 font-medium"
                                         >
-                                            {isCreatingNote ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-                                            Save
-                                        </button>
+                                            {isCreatingNote ? (
+                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            ) : (
+                                                <Check className="h-4 w-4 mr-2" />
+                                            )}
+                                            Save Note
+                                        </Button>
                                     </div>
                                 </div>
                             )}
-                        </div>
+                        </Card>
                     </div>
                 );
             })()}
-
-            {/* Main Content - Article style */}
-            <main className="max-w-3xl mx-auto px-5 py-8">
-                <article>
-                    <SnapshotContent
-                        ref={contentRef}
-                        html={highlightedHtml}
-                        panelWidth={panelWidth}
-                    />
-                </article>
-            </main>
-
-            {/* Side Panel */}
-            <div
-                className="sidebar-panel fixed top-12 right-0 bottom-0 z-40 bg-[#f7f7f5] border-l border-[#e9e9e7] flex flex-col transition-all duration-300 ease-out"
-                style={{
-                    width: `${panelWidth}px`,
-                    transform: showPanel ? 'translateX(0)' : 'translateX(100%)'
-                }}
-            >
-                {/* Panel Header - Tabs */}
-                <div className="flex bg-white border-b border-[#e9e9e7]">
-                    <button
-                        onClick={() => setActiveTab('ai')}
-                        className={`flex-1 h-11 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                            activeTab === 'ai' ? 'text-[#37352f]' : 'text-[#9b9a97] hover:text-[#787774]'
-                        }`}
-                    >
-                        <Sparkles className="h-4 w-4" />
-                        <span>AI</span>
-                        {activeTab === 'ai' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#37352f]" />}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('notes')}
-                        className={`flex-1 h-11 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                            activeTab === 'notes' ? 'text-[#37352f]' : 'text-[#9b9a97] hover:text-[#787774]'
-                        }`}
-                    >
-                        <MessageSquareText className="h-4 w-4" />
-                        <span>Notes</span>
-                        {notes.length > 0 && (
-                            <span className={`h-5 min-w-5 px-1.5 rounded-full text-[11px] flex items-center justify-center ${
-                                activeTab === 'notes' ? 'bg-[#37352f] text-white' : 'bg-[#e9e9e7] text-[#9b9a97]'
-                            }`}>
-                                {notes.length}
-                            </span>
-                        )}
-                        {activeTab === 'notes' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#37352f]" />}
-                    </button>
-                </div>
-
-                {/* Panel Content */}
-                <div className="flex-1 overflow-y-auto">
-                    {/* AI Tab */}
-                    {activeTab === 'ai' && (
-                        <div className="flex flex-col h-full">
-                            {!summary && !summaryLoading && !summaryError && (
-                                <div className="flex flex-col items-center text-center py-16 px-6">
-                                    <button
-                                        onClick={handleGenerateSummary}
-                                        className="mb-4 group"
-                                    >
-                                        <div className="h-14 w-14 rounded-lg bg-[#f1f1ef] group-hover:bg-[#e9e9e7] flex items-center justify-center transition-all border border-[#e9e9e7]">
-                                            <Sparkles className="h-6 w-6 text-[#787774]" />
-                                        </div>
-                                    </button>
-                                    <h3 className="text-sm font-semibold text-[#37352f] mb-1.5">Generate AI Summary</h3>
-                                    <p className="text-sm text-[#9b9a97] max-w-[220px] leading-relaxed">
-                                        Get key points and takeaways from this content
-                                    </p>
-                                </div>
-                            )}
-
-                            {summaryLoading && (
-                                <div className="px-4 py-6 space-y-3">
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="h-8 w-8 rounded-md bg-[#f1f1ef] flex items-center justify-center">
-                                            <Sparkles className="h-4 w-4 text-[#9b9a97] animate-pulse" />
-                                        </div>
-                                        <span className="text-sm text-[#9b9a97]">Generating summary...</span>
-                                    </div>
-                                    {['Analyzing content', 'Extracting key points'].map((item, i) => (
-                                        <div key={item} className="bg-white rounded-md p-4 border border-[#e9e9e7]">
-                                            <div className="h-3 w-20 bg-[#e9e9e7] rounded animate-pulse mb-2" />
-                                            <div className="space-y-1.5">
-                                                {[1, 2].map((j) => (
-                                                    <div key={j} className="h-2 bg-[#f1f1ef] rounded animate-pulse" style={{ width: `${60 + Math.random() * 30}%` }} />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {summaryError && !summaryLoading && (
-                                <div className="text-center py-16 px-6">
-                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#ffe2dd] text-[#d44c47] mb-3">
-                                        <X className="h-4 w-4" />
-                                    </div>
-                                    <h3 className="text-sm font-semibold text-[#37352f] mb-1.5">Generation Failed</h3>
-                                    <p className="text-sm text-[#9b9a97] mb-4 max-w-[200px]">{summaryError}</p>
-                                    <button
-                                        onClick={handleGenerateSummary}
-                                        className="h-8 px-4 text-sm bg-[#37352f] text-white rounded-md hover:bg-[#2c2a29] transition-colors font-medium"
-                                    >
-                                        Try Again
-                                    </button>
-                                </div>
-                            )}
-
-                            {summary && !summaryLoading && (
-                                <div className="flex flex-col h-full">
-                                    {/* Simple header */}
-                                    <div className="px-4 py-3 border-b border-[#e9e9e7] bg-white flex items-center justify-between">
-                                        <span className="text-sm font-semibold text-[#37352f]">AI Summary</span>
-                                        <button
-                                            onClick={() => handleCopy('all', summary)}
-                                            className="p-1.5 rounded hover:bg-[#f1f1ef] text-[#9b9a97] hover:text-[#37352f] transition-colors"
-                                            title={copiedKey === 'all' ? 'Copied' : 'Copy'}
-                                        >
-                                            {copiedKey === 'all' ? (
-                                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                </svg>
-                                            ) : (
-                                                <Copy className="h-3.5 w-3.5" />
-                                            )}
-                                        </button>
-                                    </div>
-
-                                    {/* Summary content */}
-                                    <div className="flex-1 overflow-y-auto p-4">
-                                        <div className="bg-white rounded-md border border-[#e9e9e7] p-4">
-                                            <ReactMarkdown
-                                                components={{
-                                                    p: ({ children }) => <p className="text-sm text-[#37352f] leading-relaxed mb-3 last:mb-0">{children}</p>,
-                                                    strong: ({ children }) => <strong className="font-semibold text-[#37352f]">{children}</strong>,
-                                                    ul: ({ children }) => <ul className="space-y-1.5 my-2 pl-1">{children}</ul>,
-                                                    ol: ({ children }) => <ol className="space-y-1.5 my-2 pl-1">{children}</ol>,
-                                                    li: ({ children }) => (
-                                                        <li className="text-sm text-[#37352f] flex items-start gap-2">
-                                                            <span className="flex-shrink-0 w-1 h-1 rounded-full bg-[#787774] mt-2" />
-                                                            <span>{children}</span>
-                                                        </li>
-                                                    ),
-                                                    h1: ({ children }) => <h1 className="text-sm font-semibold text-[#37352f] mb-2 mt-3">{children}</h1>,
-                                                    h2: ({ children }) => <h2 className="text-sm font-semibold text-[#37352f] mb-2 mt-3">{children}</h2>,
-                                                    h3: ({ children }) => <h3 className="text-sm font-semibold text-[#37352f] mb-2 mt-3">{children}</h3>,
-                                                }}
-                                            >
-                                                {summary}
-                                            </ReactMarkdown>
-                                        </div>
-                                    </div>
-
-                                    {/* Action buttons */}
-                                    <div className="p-3 border-t border-[#e9e9e7] bg-white">
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={handleGenerateSummary}
-                                                className="flex-1 h-8 text-sm bg-[#f1f1ef] text-[#37352f] rounded-md hover:bg-[#e9e9e7] transition-colors flex items-center justify-center gap-1.5 font-medium"
-                                            >
-                                                <Loader2 className="h-3.5 w-3.5" />
-                                                Regenerate
-                                            </button>
-                                            <button
-                                                onClick={() => handleCopy('all', summary)}
-                                                className="flex-1 h-8 text-sm bg-[#37352f] text-white rounded-md hover:bg-[#2c2a29] transition-colors flex items-center justify-center gap-1.5 font-medium"
-                                            >
-                                                {copiedKey === 'all' ? (
-                                                    <>
-                                                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                        </svg>
-                                                        Copied
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Copy className="h-3.5 w-3.5" />
-                                                        Copy
-                                                    </>
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Notes Tab */}
-                    {activeTab === 'notes' && (
-                        <div className="flex flex-col h-full">
-                            {notesLoading && (
-                                <div className="flex items-center justify-center py-20">
-                                    <div className="flex flex-col items-center gap-3">
-                                        <Loader2 className="h-5 w-5 text-[#9b9a97] animate-spin" />
-                                        <p className="text-sm text-[#9b9a97]">Loading notes...</p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {!notesLoading && notes.length > 0 && (
-                                <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                                    {notes.map(note => (
-                                        <div key={note.id} id={`note-${note.id}`}>
-                                            <NoteCard
-                                                note={note}
-                                                isOwner={isOwner}
-                                                onEdit={handleEditNote}
-                                                onDelete={handleDeleteNote}
-                                                onHighlightClick={handleHighlightClick}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {!notesLoading && notes.length === 0 && (
-                                <div className="flex flex-col items-center text-center py-20 px-6">
-                                    <div className="h-12 w-12 rounded-lg bg-[#f1f1ef] flex items-center justify-center mb-3">
-                                        <MessageSquareText className="h-5 w-5 text-[#9b9a97]" />
-                                    </div>
-                                    <h3 className="text-sm font-semibold text-[#37352f] mb-1.5">No notes yet</h3>
-                                    <p className="text-sm text-[#9b9a97] max-w-[200px] leading-relaxed">
-                                        {currentUserId
-                                            ? 'Select any text in the article to add a note'
-                                            : 'Log in to add notes'}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
 
             {/* Delete Confirmation Dialog */}
             <DeleteConfirmDialog

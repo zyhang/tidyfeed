@@ -38,10 +38,10 @@ internal.use('*', internalServiceAuth);
 
 /**
  * POST /api/internal/bot-save
- * 
+ *
  * Called by tidyfeed-bot-worker when a user mentions @tidyfeedapp
  * to save a tweet/thread.
- * 
+ *
  * Payload:
  * {
  *   "handle": "elonmusk",           // Twitter handle (without @)
@@ -49,13 +49,14 @@ internal.use('*', internalServiceAuth);
  *   "tweet_text": "...",            // Optional: tweet content
  *   "media_urls": ["..."],          // Optional: media URLs
  *   "author_handle": "...",         // Optional: original tweet author
- *   "author_name": "..."            // Optional: author display name
+ *   "author_name": "...",           // Optional: author display name
+ *   "avatar_url": "..."             // Optional: author avatar URL
  * }
  */
 internal.post('/bot-save', async (c) => {
     try {
         const body = await c.req.json();
-        const { handle, tweet_url, tweet_text, media_urls, author_handle, author_name, mention_id } = body;
+        const { handle, tweet_url, tweet_text, media_urls, author_handle, author_name, avatar_url, mention_id } = body;
 
         // Validate required fields
         if (!handle) {
@@ -130,9 +131,10 @@ internal.post('/bot-save', async (c) => {
         }
 
         // Build author info JSON
-        const authorInfo = author_handle || author_name ? JSON.stringify({
+        const authorInfo = author_handle || author_name || avatar_url ? JSON.stringify({
             handle: author_handle || null,
-            name: author_name || null
+            name: author_name || null,
+            avatar: avatar_url || null
         }) : null;
 
         // Build media URLs JSON
