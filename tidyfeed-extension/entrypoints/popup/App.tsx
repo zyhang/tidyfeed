@@ -8,11 +8,22 @@ interface UserInfo {
   email?: string;
   avatar_url?: string;
   storage_usage?: number; // bytes
+  storage_limit?: number; // bytes
   saved_posts_count?: number;
 }
 
 // Backend URL
 const BACKEND_URL = 'https://api.tidyfeed.app';
+const DEFAULT_STORAGE_LIMIT = 500 * 1024 * 1024;
+
+function formatBytes(bytes: number, decimals = 1) {
+  if (!bytes) return '0 B';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
 
 function App() {
   const adsBlocked = useStorageValue<number>('stats_ads_blocked', 0);
@@ -95,6 +106,7 @@ function App() {
 
           // Fetch actual storage usage from downloads API (same as web)
           let storageUsage = 0;
+          let storageLimit = DEFAULT_STORAGE_LIMIT;
           try {
             const storageRes = await fetch(`${BACKEND_URL}/api/downloads/usage`, {
               method: 'GET',
@@ -104,6 +116,9 @@ function App() {
             if (storageRes.ok) {
               const storageData = await storageRes.json();
               storageUsage = storageData.usage || 0;
+              if (storageData.limit) {
+                storageLimit = storageData.limit;
+              }
               console.log('[TidyFeed] Storage usage from API:', storageUsage);
             }
           } catch (e) {
@@ -116,6 +131,7 @@ function App() {
             email: user.email,
             avatar_url: user.avatarUrl || user.avatar_url || user.picture, // API uses camelCase
             storage_usage: storageUsage,
+            storage_limit: storageLimit,
             saved_posts_count: user.savedPostsCount || 0, // from backend
           });
           await browser.storage.local.set({ user_type: 'authenticated' });
@@ -301,14 +317,14 @@ function App() {
                   <span className="text-[10px] text-zinc-500">{userInfo?.saved_posts_count || 0} items saved</span>
                 </div>
                 <span className="text-[10px] text-zinc-400">
-                  {((userInfo?.storage_usage || 0) / (1024 * 1024)).toFixed(1)} MB / 500 MB
+                  {formatBytes(userInfo?.storage_usage || 0)} / {formatBytes(userInfo?.storage_limit || DEFAULT_STORAGE_LIMIT)}
                 </span>
               </div>
               <div className="w-full h-1.5 bg-zinc-700 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500 ease-out"
                   style={{
-                    width: `${Math.min(100, ((userInfo?.storage_usage || 0) / (500 * 1024 * 1024)) * 100)}%`
+                    width: `${Math.min(100, ((userInfo?.storage_usage || 0) / (userInfo?.storage_limit || DEFAULT_STORAGE_LIMIT)) * 100)}%`
                   }}
                 />
               </div>

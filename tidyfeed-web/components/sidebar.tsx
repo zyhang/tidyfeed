@@ -3,11 +3,10 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Tag, ChevronLeft, Menu, Hash, ChevronDown, ChevronRight, Loader2, LogOut, FolderOpen, Video, Image } from "lucide-react"
+import { Home, Tag, ChevronLeft, Menu, Hash, ChevronDown, ChevronRight, Loader2, FolderOpen, Video, Image } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { StorageIndicator } from "./StorageIndicator"
-import { UserNav } from "./user-nav"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -189,19 +188,11 @@ export function Sidebar({ className, ...props }: SidebarProps) {
 
             </nav>
 
-            {/* Bottom Section: Storage & Profile */}
+            {/* Bottom Section: Storage */}
             <div className="border-t bg-background z-10">
                 {/* Storage Panel */}
                 <div className="p-3 pb-4">
                     <StorageIndicator isCollapsed={isCollapsed} />
-                </div>
-
-                {/* Separator */}
-                <div className="h-px bg-border mx-3" />
-
-                {/* Profile Button */}
-                <div className="p-3">
-                    <UserNav isCollapsed={isCollapsed} />
                 </div>
             </div>
         </aside>

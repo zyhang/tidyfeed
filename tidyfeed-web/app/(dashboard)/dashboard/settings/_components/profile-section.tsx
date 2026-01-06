@@ -113,6 +113,7 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
 
     const PlanIcon = planInfo ? getPlanIcon(planInfo.plan) : Sparkles
     const isPaidPlan = planInfo?.plan === 'pro' || planInfo?.plan === 'ultra'
+    const isCollectionUnlimited = !!planInfo && planInfo.plan !== 'free' && !Number.isFinite(planInfo.usage.collection.limit)
 
     return (
         <div className="space-y-6">
@@ -159,13 +160,13 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">Saved this month</span>
                                     <span className="font-medium">
-                                        {planInfo.usage.collection.limit === Infinity
+                                        {isCollectionUnlimited
                                             ? 'Unlimited'
                                             : `${planInfo.usage.collection.used} / ${planInfo.usage.collection.limit}`
                                         }
                                     </span>
                                 </div>
-                                {planInfo.usage.collection.limit !== Infinity && (
+                                {!isCollectionUnlimited && (
                                     <Progress
                                         value={(planInfo.usage.collection.used / planInfo.usage.collection.limit) * 100}
                                         className="h-2"
