@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS users (
     storage_usage INTEGER DEFAULT 0,
     plan TEXT DEFAULT 'free',
     plan_expires_at DATETIME,
+    stripe_customer_id TEXT,
+    stripe_subscription_id TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -60,7 +60,7 @@ export class StripeService {
      * Verify and construct webhook event
      */
     async constructEvent(body: string, signature: string) {
-        return this.stripe.webhooks.constructEvent(
+        return this.stripe.webhooks.constructEventAsync(
             body,
             signature,
             this.env.STRIPE_WEBHOOK_SECRET
