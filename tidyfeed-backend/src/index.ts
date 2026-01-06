@@ -561,7 +561,7 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 		// Fetch fresh user data from DB
 		console.log('[/auth/me] Fetching user from DB...');
 		const dbUser = await c.env.DB.prepare(
-			'SELECT id, email, name, avatar_url, created_at, storage_usage, preferences, custom_ai_prompt FROM users WHERE id = ?'
+			'SELECT id, email, name, avatar_url, created_at, storage_usage, preferences, custom_ai_prompt, plan FROM users WHERE id = ?'
 		).bind(payload.sub).first<{
 			id: string;
 			email: string;
@@ -571,6 +571,7 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 			storage_usage: number;
 			preferences: string;
 			custom_ai_prompt: string;
+			plan: string | null;
 		}>();
 
 		console.log('[/auth/me] DB query complete, user found:', !!dbUser);
@@ -612,7 +613,8 @@ app.get('/auth/me', cookieAuthMiddleware, async (c) => {
 				storageUsage,
 				savedPostsCount: savedCount?.count || 0,
 				preferences: parsedPreferences,
-				customAiPrompt: dbUser.custom_ai_prompt
+				customAiPrompt: dbUser.custom_ai_prompt,
+				plan: dbUser.plan || 'free',
 			},
 		};
 

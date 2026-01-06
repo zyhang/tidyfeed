@@ -13,7 +13,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Settings, LogOut, User } from "lucide-react"
+import { Settings, LogOut, User, Sparkles, Zap, Crown } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -22,6 +22,7 @@ interface UserData {
     name: string
     email: string
     avatarUrl: string
+    plan?: string
 }
 
 export function UserNav() {
@@ -105,6 +106,16 @@ export function UserNav() {
               .slice(0, 2)
         : 'U'
 
+    const getPlanIcon = (plan?: string) => {
+        switch (plan) {
+            case 'pro': return Zap
+            case 'ultra': return Crown
+            default: return Sparkles
+        }
+    }
+
+    const PlanIcon = getPlanIcon(user.plan)
+
     return (
         <div className="p-3">
             <DropdownMenu>
@@ -117,9 +128,12 @@ export function UserNav() {
                             <AvatarImage src={user.avatarUrl} alt={user.name} />
                             <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                         </Avatar>
-                        <div className="flex flex-col items-start text-sm">
-                            <span className="font-medium truncate max-w-[140px]">{user.name || 'User'}</span>
-                            <span className="text-muted-foreground text-xs truncate max-w-[140px]">
+                        <div className="flex flex-col items-start text-sm flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-medium truncate">{user.name || 'User'}</span>
+                                <PlanIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            </div>
+                            <span className="text-muted-foreground text-xs truncate">
                                 {user.email}
                             </span>
                         </div>
