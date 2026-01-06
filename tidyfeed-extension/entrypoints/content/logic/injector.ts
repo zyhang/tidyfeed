@@ -91,23 +91,15 @@ const BOOKMARK_BUTTON_ACTIVE_STYLES = `
   line-height: 1;
 `;
 
-// Premium Icons with TidyFeed "T" Badge
-// Default: Outline bookmark with subtle "T" badge
-const BOOKMARK_ICON_OUTLINE = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Bookmark ribbon -->
-  <path d="M17 3H7C5.9 3 5 3.9 5 5V21L12 18L19 21V5C19 3.9 18.1 3 17 3Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <!-- TidyFeed "T" badge -->
-  <circle cx="18" cy="6" r="4.5" fill="rgb(113, 118, 123)" stroke="rgb(21, 32, 43)" stroke-width="1.5"/>
-  <text x="18" y="8.5" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="6" font-weight="700" fill="white" text-anchor="middle">T</text>
+// Simple bookmark icons matching X's native button style
+// Default: Outline bookmark
+const BOOKMARK_ICON_OUTLINE = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M19 21L12 18L5 21V5C5 3.89543 5.89543 3 7 3H17C18.1046 3 19 3.89543 19 5V21Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>`;
 
-// Saved: Filled bookmark with highlighted "T" badge and checkmark
-const BOOKMARK_ICON_FILLED = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Filled bookmark ribbon -->
-  <path d="M17 3H7C5.9 3 5 3.9 5 5V21L12 18L19 21V5C19 3.9 18.1 3 17 3Z" fill="currentColor" stroke="none"/>
-  <!-- Highlighted TidyFeed badge with checkmark -->
-  <circle cx="18" cy="6" r="4.5" fill="rgb(0, 186, 124)" stroke="rgb(21, 32, 43)" stroke-width="1.5"/>
-  <path d="M16 6L17.2 7.2L20 4.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+// Saved: Filled bookmark (solid color, matching X's like/bookmark behavior)
+const BOOKMARK_ICON_FILLED = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M19 21L12 18L5 21V5C5 3.89543 5.89543 3 7 3H17C18.1046 3 19 3.89543 19 5V21Z" fill="currentColor" stroke="none"/>
 </svg>`;
 
 
