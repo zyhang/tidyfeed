@@ -125,23 +125,39 @@ export default function PricingPage() {
     }
 
     const handleUpgrade = async (planId: string) => {
+        // Only allow upgrading to paid plans
+        if (planId === 'free') {
+            router.push('/dashboard')
+            return
+        }
+
         setUpgrading(planId)
         try {
-            // For now, this will redirect to Stripe checkout
-            // In production, this would call your backend to create a checkout session
-            toast.info(`Upgrade to ${planId.charAt(0).toUpperCase() + planId.slice(1)} coming soon!`)
-            // TODO: Implement actual Stripe checkout
-            // const response = await fetch(`${API_URL}/api/subscription/checkout`, {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     credentials: 'include',
-            //     body: JSON.stringify({ plan: planId })
-            // })
-            // const { checkoutUrl } = await response.json()
-            // window.location.href = checkoutUrl
-        } catch (error) {
-            toast.error('Failed to initiate upgrade')
-        } finally {
+            const response = await fetch(`${API_URL}/api/stripe/checkout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    plan: planId,
+                    returnUrl: window.location.origin + '/pricing'
+                })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to start checkout')
+            }
+
+            // Redirect to Stripe checkout
+            if (data.url) {
+                window.location.href = data.url
+            } else {
+                throw new Error('No checkout URL returned')
+            }
+        } catch (error: any) {
+            console.error('Upgrade error:', error)
+            toast.error(error.message || 'Failed to initiate upgrade')
             setUpgrading(null)
         }
     }
@@ -276,7 +292,7 @@ export default function PricingPage() {
                                                 : `bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900`
                                         }`}
                                         disabled={isCurrentPlan || loading || upgrading !== null}
-                                        onClick={() => isUpgrade && handleUpgrade(plan.id)}
+                                        onClick={() => handleUpgrade(plan.id)}
                                     >
                                         {upgrading === plan.id ? (
                                             <>
@@ -285,13 +301,13 @@ export default function PricingPage() {
                                             </>
                                         ) : isCurrentPlan ? (
                                             'Current Plan'
-                                        ) : isUpgrade ? (
+                                        ) : plan.id === 'free' ? (
+                                            'Get Started'
+                                        ) : (
                                             <>
                                                 Upgrade to {plan.name}
                                                 <ArrowRight className="ml-2 h-4 w-4" />
                                             </>
-                                        ) : (
-                                            'Get Started'
                                         )}
                                     </Button>
 

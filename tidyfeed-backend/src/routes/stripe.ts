@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { StripeService } from '../services/stripe';
 import { checkQuota, getUserPlan } from '../services/subscription';
 import Stripe from 'stripe';
+import { verify } from 'hono/jwt';
 
 type Bindings = {
     DB: D1Database;
@@ -16,13 +17,39 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// Middleware removed locally - we instantiate StripeService in handlers
+// Cookie-based auth middleware for checkout route
+const cookieAuthMiddleware = async (c: any, next: any) => {
+    let token: string | undefined;
+
+    // Try to get token from cookie
+    const cookieHeader = c.req.header('Cookie');
+    if (cookieHeader) {
+        const cookies = cookieHeader.split(';').reduce((acc: any, cookie: string) => {
+            const [key, value] = cookie.trim().split('=');
+            acc[key] = value;
+            return acc;
+        }, {});
+        token = cookies['auth_token'];
+    }
+
+    if (!token) {
+        return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    try {
+        const payload = await verify(token, c.env.JWT_SECRET);
+        c.set('jwtPayload', payload);
+        await next();
+    } catch (error) {
+        return c.json({ error: 'Invalid token' }, 401);
+    }
+};
 
 /**
  * POST /api/stripe/checkout
  * Create a checkout session
  */
-app.post('/checkout', async (c) => {
+app.post('/checkout', cookieAuthMiddleware, async (c) => {
     // 1. Auth Check
     const payload = c.get('jwtPayload') as { sub: string; email: string } | undefined;
     if (!payload) {
@@ -134,7 +161,7 @@ async function handleSubscriptionCheckoutCompleted(db: D1Database, session: Stri
 async function handleSubscriptionUpdated(db: D1Database, subscription: Stripe.Subscription) {
     const customerId = subscription.customer as string;
     const status = subscription.status;
-    const currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+    const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000).toISOString();
 
     // We assume 1 subscription per user for now, or lookup by customer_id
     // If status is active, we ensure plan is set correctly.
@@ -166,7 +193,7 @@ async function handleSubscriptionUpdated(db: D1Database, subscription: Stripe.Su
 
 async function handleSubscriptionDeleted(db: D1Database, subscription: Stripe.Subscription) {
     const customerId = subscription.customer as string;
-    const currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString(); // Typically now
+    const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000).toISOString(); // Typically now
 
     // Downgrade to free immediately or at end of period?
     // Deleted usually means NOW.
