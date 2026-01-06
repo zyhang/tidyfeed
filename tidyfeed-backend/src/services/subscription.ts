@@ -188,14 +188,11 @@ export async function checkQuota(
 
 /**
  * Get storage usage for a user (bytes)
- * Uses existing storage tracking from video_downloads
+ * Uses the storage_usage column from users table which tracks all cached media (images, videos, etc.)
  */
 export async function getStorageUsage(db: D1Database, userId: string): Promise<number> {
     const result = await db.prepare(
-        `SELECT SUM(file_size) as usage 
-         FROM video_downloads 
-         WHERE user_id = ? 
-           AND status = 'completed'`
+        'SELECT storage_usage as usage FROM users WHERE id = ?'
     ).bind(userId).first<{ usage: number }>();
 
     return result?.usage || 0;
