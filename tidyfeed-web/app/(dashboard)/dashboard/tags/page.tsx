@@ -25,9 +25,13 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Hash, Plus, Edit2, Trash2, Loader2 } from 'lucide-react'
+import { Hash, Plus, Edit2, Trash2 } from 'lucide-react'
 import { toast, Toaster } from 'sonner'
 import Link from 'next/link'
+
+// Design System Components
+import { PageHeader } from '@/components/layout'
+import { PageLoading, EmptyState, PageSkeleton } from '@/components/feedback'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -141,27 +145,18 @@ export default function TagsPage() {
     }
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-        )
+        return <PageSkeleton type="grid" items={6} />
     }
 
     return (
         <>
             <Toaster position="top-right" />
-            <div className="flex flex-col gap-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold">Tags</h1>
-                        <p className="text-muted-foreground">
-                            Organize your tweets with tags
-                        </p>
-                    </div>
 
-                    {/* Create Tag Dialog */}
+            {/* Page Header */}
+            <PageHeader
+                title="Tags"
+                description="Organize your tweets with tags"
+                actions={
                     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                         <DialogTrigger asChild>
                             <Button>
@@ -183,6 +178,7 @@ export default function TagsPage() {
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') handleCreateTag()
                                 }}
+                                autoFocus
                             />
                             <DialogFooter>
                                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
@@ -194,112 +190,114 @@ export default function TagsPage() {
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
-                </div>
+                }
+            />
 
-                {/* Empty State */}
-                {tags.length === 0 && (
-                    <div className="text-center py-12">
-                        <Hash className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <p className="text-muted-foreground">
-                            No tags yet. Create your first tag to organize tweets!
-                        </p>
-                    </div>
-                )}
+            {/* Empty State */}
+            {tags.length === 0 && (
+                <EmptyState
+                    icon={<Hash />}
+                    title="No tags yet"
+                    description="Create your first tag to organize tweets!"
+                    action={{
+                        label: 'Create Tag',
+                        onClick: () => setIsCreateOpen(true),
+                    }}
+                />
+            )}
 
-                {/* Tags Grid */}
-                {tags.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {tags.map((tag) => (
-                            <Card key={tag.id} className="hover:shadow-md transition-shadow">
-                                <CardContent className="p-4">
-                                    <div className="flex items-center justify-between">
-                                        <Link
-                                            href={`/dashboard/tags/${tag.id}`}
-                                            className="flex items-center gap-2 hover:text-primary transition-colors flex-1"
+            {/* Tags Grid */}
+            {tags.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {tags.map((tag) => (
+                        <Card key={tag.id} className="hover:shadow-md transition-shadow group">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between gap-2">
+                                    <Link
+                                        href={`/dashboard/tags/${tag.id}`}
+                                        className="flex items-center gap-2 hover:text-primary transition-colors flex-1 min-w-0"
+                                    >
+                                        <Hash className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                        <span className="font-medium truncate">{tag.name}</span>
+                                        <Badge variant="secondary" className="ml-2 flex-shrink-0">
+                                            {tag.tweet_count}
+                                        </Badge>
+                                    </Link>
+
+                                    <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => openEditDialog(tag)}
                                         >
-                                            <Hash className="h-5 w-5 text-muted-foreground" />
-                                            <span className="font-medium">{tag.name}</span>
-                                            <Badge variant="secondary" className="ml-2">
-                                                {tag.tweet_count}
-                                            </Badge>
-                                        </Link>
+                                            <Edit2 className="h-4 w-4" />
+                                        </Button>
 
-                                        <div className="flex items-center gap-1">
-                                            {/* Edit Button */}
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => openEditDialog(tag)}
-                                            >
-                                                <Edit2 className="h-4 w-4" />
-                                            </Button>
-
-                                            {/* Delete Button */}
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="text-destructive hover:text-destructive"
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-destructive hover:text-destructive"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete Tag</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Are you sure you want to delete &quot;{tag.name}&quot;?
+                                                        This will remove the tag from all associated tweets.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        onClick={() => handleDeleteTag(tag.id)}
+                                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                                     >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Delete Tag</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            Are you sure you want to delete &quot;{tag.name}&quot;?
-                                                            This will remove the tag from all associated tweets.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction
-                                                            onClick={() => handleDeleteTag(tag.id)}
-                                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                                        >
-                                                            Delete
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </div>
+                                                        Delete
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
 
-                {/* Edit Tag Dialog */}
-                <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Rename Tag</DialogTitle>
-                            <DialogDescription>
-                                Enter a new name for the tag.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <Input
-                            placeholder="Tag name"
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleRenameTag()
-                            }}
-                        />
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button onClick={handleRenameTag}>
-                                Save
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            </div>
+            {/* Edit Tag Dialog */}
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Rename Tag</DialogTitle>
+                        <DialogDescription>
+                            Enter a new name for the tag.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Input
+                        placeholder="Tag name"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRenameTag()
+                        }}
+                        autoFocus
+                    />
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleRenameTag}>
+                            Save
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     )
 }

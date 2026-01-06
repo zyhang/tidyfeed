@@ -181,9 +181,10 @@ internal.post('/bot-save', async (c) => {
                         return;
                     }
 
-                    // Collect all media items and avatar URLs
+                    // Collect all media items, avatar URLs, and link card images
                     const allMedia = [...(tweetData.media || [])];
                     const avatarUrls: string[] = [];
+                    const cardImageUrls: string[] = [];
 
                     if (tweetData.author?.profile_image_url) {
                         avatarUrls.push(tweetData.author.profile_image_url.replace('_normal', '_bigger'));
@@ -195,6 +196,9 @@ internal.post('/bot-save', async (c) => {
                         }
                         if (tweetData.quoted_tweet.author?.profile_image_url) {
                             avatarUrls.push(tweetData.quoted_tweet.author.profile_image_url.replace('_normal', '_bigger'));
+                        }
+                        if (tweetData.quoted_tweet.card?.image?.url) {
+                            cardImageUrls.push(tweetData.quoted_tweet.card.image.url);
                         }
                     }
 
@@ -212,8 +216,18 @@ internal.post('/bot-save', async (c) => {
                         console.log(`[Bot/AutoCache] Failed to fetch comments for ${xPostId}`);
                     }
 
+                    if (tweetData.card?.image?.url) {
+                        cardImageUrls.push(tweetData.card.image.url);
+                    }
+
                     // Cache all images to R2
-                    const { urlMap } = await cacheMediaToR2(c.env.MEDIA_BUCKET!, xPostId, allMedia, avatarUrls);
+                    const { urlMap } = await cacheMediaToR2(
+                        c.env.MEDIA_BUCKET!,
+                        xPostId,
+                        allMedia,
+                        avatarUrls,
+                        cardImageUrls
+                    );
 
                     // Replace URLs in tweet data with cached URLs
                     const cachedTweetData = replaceMediaUrls(tweetData, urlMap);

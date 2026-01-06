@@ -1,16 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Loader2, User, Sparkles, Zap, Crown, ArrowRight, Gem } from 'lucide-react'
+
+// Design System Components
+import { Section } from '@/components/layout'
+import { Progress } from '@/components/ui/progress'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -115,97 +116,91 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
 
     return (
         <div className="space-y-6">
-            {/* Subscription Plan Card */}
+            {/* Subscription Plan Section */}
             {loadingPlan ? (
-                <Card>
-                    <CardContent className="flex items-center justify-center h-32">
+                <Section>
+                    <div className="flex items-center justify-center h-24">
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </CardContent>
-                </Card>
+                    </div>
+                </Section>
             ) : planInfo ? (
-                <Card className={isPaidPlan ? 'border-violet-200 dark:border-violet-800 bg-gradient-to-br from-violet-50/50 to-purple-50/50 dark:from-violet-950/20 dark:to-purple-950/20' : ''}>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${planConfig[planInfo.plan as keyof typeof planConfig]?.color || planConfig.free.color}`}>
-                                    <PlanIcon className="h-6 w-6" />
-                                </div>
-                                <div>
-                                    <CardTitle className="capitalize">
-                                        {planConfig[planInfo.plan as keyof typeof planConfig]?.name || 'Free'} Plan
-                                    </CardTitle>
-                                    <CardDescription>
-                                        {isPaidPlan && planInfo.expiresAt
-                                            ? `Renews on ${new Date(planInfo.expiresAt).toLocaleDateString()}`
-                                            : 'Upgrade anytime for more features'
-                                        }
-                                    </CardDescription>
-                                </div>
+                <Section
+                    title={
+                        <div className="flex items-center gap-3">
+                            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${planConfig[planInfo.plan as keyof typeof planConfig]?.color || planConfig.free.color}`}>
+                                <PlanIcon className="h-5 w-5" />
                             </div>
-                            <Badge variant={isPaidPlan ? 'default' : 'secondary'} className="capitalize">
-                                {planInfo.plan}
-                            </Badge>
+                            <div>
+                                <h2 className="text-lg font-semibold">
+                                    {planConfig[planInfo.plan as keyof typeof planConfig]?.name || 'Free'} Plan
+                                </h2>
+                                <p className="text-sm text-muted-foreground">
+                                    {isPaidPlan && planInfo.expiresAt
+                                        ? `Renews on ${new Date(planInfo.expiresAt).toLocaleDateString()}`
+                                        : 'Upgrade anytime for more features'
+                                    }
+                                </p>
+                            </div>
                         </div>
-                    </CardHeader>
-                    <CardContent>
+                    }
+                    actions={
+                        <Badge variant={isPaidPlan ? 'default' : 'secondary'} className="capitalize">
+                            {planInfo.plan}
+                        </Badge>
+                    }
+                    className={isPaidPlan ? 'border-violet-200 dark:border-violet-800 bg-gradient-to-br from-violet-50/50 to-purple-50/50 dark:from-violet-950/20 dark:to-purple-950/20' : ''}
+                    noPadding
+                >
+                    <div className="p-6 space-y-6">
                         {/* Usage Bars */}
-                        <div className="space-y-4 mb-6">
+                        <div className="space-y-4">
                             {/* Collections */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Saved this month</span>
-                                    <span className="font-medium">
-                                        {planInfo.usage.collection.used}
-                                        {planInfo.usage.collection.limit !== Infinity && ` / ${planInfo.usage.collection.limit}`}
-                                    </span>
-                                </div>
-                                {planInfo.usage.collection.limit !== Infinity && (
-                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-violet-500 rounded-full transition-all"
-                                            style={{ width: `${Math.min(100, (planInfo.usage.collection.used / planInfo.usage.collection.limit) * 100)}%` }}
-                                        />
+                            {planInfo.usage.collection.limit !== Infinity && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-muted-foreground">Saved this month</span>
+                                        <span className="font-medium">
+                                            {planInfo.usage.collection.used} / {planInfo.usage.collection.limit}
+                                        </span>
                                     </div>
-                                )}
-                            </div>
+                                    <Progress
+                                        value={(planInfo.usage.collection.used / planInfo.usage.collection.limit) * 100}
+                                        className="h-2"
+                                    />
+                                </div>
+                            )}
 
                             {/* Storage */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Storage used</span>
-                                    <span className="font-medium">
-                                        {formatBytes(planInfo.usage.storage.used)}
-                                        {planInfo.usage.storage.limit !== Infinity && ` / ${formatBytes(planInfo.usage.storage.limit)}`}
-                                    </span>
-                                </div>
-                                {planInfo.usage.storage.limit !== Infinity && (
-                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-amber-500 rounded-full transition-all"
-                                            style={{ width: `${Math.min(100, (planInfo.usage.storage.used / planInfo.usage.storage.limit) * 100)}%` }}
-                                        />
+                            {planInfo.usage.storage.limit !== Infinity && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-muted-foreground">Storage used</span>
+                                        <span className="font-medium">
+                                            {formatBytes(planInfo.usage.storage.used)} / {formatBytes(planInfo.usage.storage.limit)}
+                                        </span>
                                     </div>
-                                )}
-                            </div>
+                                    <Progress
+                                        value={(planInfo.usage.storage.used / planInfo.usage.storage.limit) * 100}
+                                        className="h-2 [&>div]:bg-amber-500"
+                                    />
+                                </div>
+                            )}
 
                             {/* AI Summaries */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">AI summaries this month</span>
-                                    <span className="font-medium">
-                                        {planInfo.usage.aiSummary.used}
-                                        {planInfo.usage.aiSummary.limit !== Infinity && ` / ${planInfo.usage.aiSummary.limit}`}
-                                    </span>
-                                </div>
-                                {planInfo.usage.aiSummary.limit !== Infinity && (
-                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-emerald-500 rounded-full transition-all"
-                                            style={{ width: `${Math.min(100, (planInfo.usage.aiSummary.used / planInfo.usage.aiSummary.limit) * 100)}%` }}
-                                        />
+                            {planInfo.usage.aiSummary.limit !== Infinity && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-muted-foreground">AI summaries this month</span>
+                                        <span className="font-medium">
+                                            {planInfo.usage.aiSummary.used} / {planInfo.usage.aiSummary.limit}
+                                        </span>
                                     </div>
-                                )}
-                            </div>
+                                    <Progress
+                                        value={(planInfo.usage.aiSummary.used / planInfo.usage.aiSummary.limit) * 100}
+                                        className="h-2 [&>div]:bg-emerald-500"
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* Upgrade Button */}
@@ -218,25 +213,20 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
                                 </Button>
                             </Link>
                         )}
-                    </CardContent>
-                </Card>
+                    </div>
+                </Section>
             ) : null}
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Profile</CardTitle>
-                    <CardDescription>
-                        Manage your public profile information.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
+            {/* Profile Section */}
+            <Section title="Profile" description="Manage your public profile information.">
+                <div className="space-y-6">
                     {/* Avatar & Email */}
                     <div className="flex items-center gap-4">
-                        <Avatar className="h-20 w-20">
+                        <Avatar className="h-16 w-16">
                             <AvatarImage src={user.avatarUrl} />
-                            <AvatarFallback><User className="h-10 w-10" /></AvatarFallback>
+                            <AvatarFallback><User className="h-8 w-8" /></AvatarFallback>
                         </Avatar>
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                             <h3 className="font-medium">{user.name}</h3>
                             <p className="text-sm text-muted-foreground">{user.email}</p>
                         </div>
@@ -244,10 +234,9 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
 
                     {/* Nickname Input */}
                     <div className="space-y-2">
-                        <Label htmlFor="name">Display Name</Label>
+                        <label className="text-sm font-medium">Display Name</label>
                         <div className="flex gap-2 max-w-md">
                             <Input
-                                id="name"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder="Enter your display name"
@@ -261,26 +250,24 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
                             </Button>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </Section>
 
-            {/* Delete Account Zone */}
-            <Card className="border-red-100 dark:border-red-900/20">
-                <CardHeader>
-                    <CardTitle className="text-red-600">Delete Account</CardTitle>
-                    <CardDescription>
-                        Permanently remove your account and all of its content.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-md text-sm text-red-600 mb-4">
+            {/* Delete Account Section */}
+            <Section
+                title="Delete Account"
+                description="Permanently remove your account and all of its content."
+                className="border-red-100 dark:border-red-900/20"
+            >
+                <div className="space-y-4">
+                    <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-md text-sm text-red-600">
                         Deleting your account will irreversibly delete all of your data, including your highlights, tags, notes, and more.
                     </div>
                     <Button variant="destructive" disabled>
                         Delete Account
                     </Button>
-                </CardContent>
-            </Card>
+                </div>
+            </Section>
         </div>
     )
 }

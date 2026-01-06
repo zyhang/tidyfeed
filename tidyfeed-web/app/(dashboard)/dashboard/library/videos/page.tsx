@@ -1,9 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, Video, RefreshCw, ArrowUpDown, Play, ExternalLink } from 'lucide-react'
+import { Video, ArrowUpDown, RefreshCw, Play, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+
+// Design System Components
+import { PageHeader } from '@/components/layout'
+import { PageLoading, EmptyState, ErrorState } from '@/components/feedback'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -79,56 +83,61 @@ export default function LibraryVideosPage() {
     }
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-        )
+        return <PageLoading />
     }
 
     if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] text-muted-foreground">
-                <p className="mb-4">{error}</p>
-                <Button variant="outline" onClick={fetchVideos}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Retry
-                </Button>
-            </div>
-        )
+        return <ErrorState message={error} onRetry={fetchVideos} />
     }
 
     if (videos.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] text-muted-foreground">
-                <Video className="h-12 w-12 mb-4 opacity-50" />
-                <p className="text-lg mb-2">No videos yet</p>
-                <p className="text-sm">Use the Cloud Save button on X.com to save videos</p>
-            </div>
+            <>
+                <PageHeader
+                    title="Videos"
+                    description="Your saved video library"
+                    actions={
+                        <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setSortAsc(!sortAsc)}>
+                                <ArrowUpDown className="h-4 w-4 mr-2" />
+                                {sortAsc ? 'Oldest' : 'Newest'}
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={fetchVideos}>
+                                <RefreshCw className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    }
+                />
+                <EmptyState
+                    icon={<Video />}
+                    title="No videos yet"
+                    description="Use the Cloud Save button on X.com to save videos"
+                />
+            </>
         )
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">Videos</h1>
-                    <p className="text-sm text-muted-foreground">{videos.length} saved</p>
-                </div>
-                <div className="flex gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSortAsc(!sortAsc)}
-                    >
-                        <ArrowUpDown className="h-4 w-4 mr-2" />
-                        {sortAsc ? 'Oldest First' : 'Newest First'}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={fetchVideos}>
-                        <RefreshCw className="h-4 w-4" />
-                    </Button>
-                </div>
-            </div>
+        <>
+            <PageHeader
+                title="Videos"
+                description={`${videos.length} saved`}
+                actions={
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSortAsc(!sortAsc)}
+                        >
+                            <ArrowUpDown className="h-4 w-4 mr-2" />
+                            {sortAsc ? 'Oldest First' : 'Newest First'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={fetchVideos}>
+                            <RefreshCw className="h-4 w-4" />
+                        </Button>
+                    </div>
+                }
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {videos.map((video) => (
@@ -150,6 +159,7 @@ export default function LibraryVideosPage() {
                                         controls
                                         autoPlay
                                         className="w-full h-full"
+                                        onPause={() => setPlayingId(null)}
                                     />
                                 ) : (
                                     <button
@@ -186,6 +196,6 @@ export default function LibraryVideosPage() {
                     </Card>
                 ))}
             </div>
-        </div>
+        </>
     )
 }

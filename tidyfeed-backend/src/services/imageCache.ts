@@ -22,13 +22,14 @@ export async function cacheMediaToR2(
     mediaBucket: R2Bucket,
     tweetId: string,
     media: TikHubMedia[],
-    avatarUrls: string[] = []
+    avatarUrls: string[] = [],
+    cardImageUrls: string[] = []
 ): Promise<{ urlMap: Map<string, string>; totalSize: number }> {
     const urlMap = new Map<string, string>();
     let totalSize = 0;
 
     // Collect all URLs to cache
-    const urlsToCache: { url: string; type: 'media' | 'avatar' }[] = [];
+    const urlsToCache: { url: string; type: 'media' | 'avatar' | 'card' }[] = [];
 
     // Add media URLs (images only - videos handled by Python worker)
     for (const m of media) {
@@ -48,7 +49,14 @@ export async function cacheMediaToR2(
         }
     }
 
-    console.log(`[MediaCache] Built urlsToCache: ${urlsToCache.length} items (media: ${media.length}, avatars: ${avatarUrls.length})`);
+    // Add link preview card images
+    for (const cardImageUrl of cardImageUrls) {
+        if (cardImageUrl) {
+            urlsToCache.push({ url: cardImageUrl, type: 'card' });
+        }
+    }
+
+    console.log(`[MediaCache] Built urlsToCache: ${urlsToCache.length} items (media: ${media.length}, avatars: ${avatarUrls.length}, cards: ${cardImageUrls.length})`);
 
     // Process images with concurrency limit to avoid overwhelming the worker
     const CONCURRENCY_LIMIT = 5;
@@ -174,7 +182,7 @@ async function cacheImageToR2(
     mediaBucket: R2Bucket,
     tweetId: string,
     imageUrl: string,
-    type: 'media' | 'avatar'
+    type: 'media' | 'avatar' | 'card'
 ): Promise<CachedMediaResult | null> {
     try {
         // Generate a unique filename based on URL hash
@@ -330,6 +338,16 @@ export function replaceMediaUrls(
     // Replace quoted tweet URLs recursively
     if (replaced.quoted_tweet) {
         replaced.quoted_tweet = replaceMediaUrls(replaced.quoted_tweet, urlMap);
+    }
+
+    if (replaced.card?.image?.url) {
+        const cachedUrl = findCachedUrl(replaced.card.image.url, urlMap);
+        if (cachedUrl) {
+            replaced.card = {
+                ...replaced.card,
+                image: { ...replaced.card.image, url: cachedUrl },
+            };
+        }
     }
 
     return replaced;

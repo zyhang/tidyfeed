@@ -1,8 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2, ImageIcon, RefreshCw, ArrowUpDown, X } from 'lucide-react'
+import { ImageIcon, RefreshCw, ArrowUpDown, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+
+// Design System Components
+import { PageHeader } from '@/components/layout'
+import { PageLoading, EmptyState, ErrorState } from '@/components/feedback'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -70,72 +74,81 @@ export default function LibraryImagesPage() {
     }, [])
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-        )
+        return <PageLoading />
     }
 
     if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] text-muted-foreground">
-                <p className="mb-4">{error}</p>
-                <Button variant="outline" onClick={fetchImages}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Retry
-                </Button>
-            </div>
-        )
+        return <ErrorState message={error} onRetry={fetchImages} />
     }
 
     if (images.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] text-muted-foreground">
-                <ImageIcon className="h-12 w-12 mb-4 opacity-50" />
-                <p className="text-lg mb-2">No images yet</p>
-                <p className="text-sm">Save posts with images using TidyFeed</p>
-            </div>
+            <>
+                <PageHeader
+                    title="Images"
+                    description={`${images.length} saved`}
+                    actions={
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSortAsc(!sortAsc)}
+                            >
+                                <ArrowUpDown className="h-4 w-4 mr-2" />
+                                {sortAsc ? 'Oldest First' : 'Newest First'}
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={fetchImages}>
+                                <RefreshCw className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    }
+                />
+                <EmptyState
+                    icon={<ImageIcon />}
+                    title="No images yet"
+                    description="Save posts with images using TidyFeed"
+                />
+            </>
         )
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">Images</h1>
-                    <p className="text-sm text-muted-foreground">{images.length} saved</p>
-                </div>
-                <div className="flex gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSortAsc(!sortAsc)}
-                    >
-                        <ArrowUpDown className="h-4 w-4 mr-2" />
-                        {sortAsc ? 'Oldest First' : 'Newest First'}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={fetchImages}>
-                        <RefreshCw className="h-4 w-4" />
-                    </Button>
-                </div>
-            </div>
+        <>
+            <PageHeader
+                title="Images"
+                description={`${images.length} saved`}
+                actions={
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSortAsc(!sortAsc)}
+                        >
+                            <ArrowUpDown className="h-4 w-4 mr-2" />
+                            {sortAsc ? 'Oldest First' : 'Newest First'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={fetchImages}>
+                            <RefreshCw className="h-4 w-4" />
+                        </Button>
+                    </div>
+                }
+            />
 
             {/* Masonry Grid */}
             <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
                 {images.map((image, index) => (
                     <div
                         key={`${image.id}-${index}`}
-                        className="break-inside-avoid group relative cursor-pointer"
+                        className="break-inside-avoid group relative cursor-pointer rounded-lg overflow-hidden"
                         onClick={() => setLightboxUrl(image.url)}
                     >
                         <img
                             src={image.url}
                             alt=""
                             loading="lazy"
-                            className="w-full rounded-lg hover:opacity-90 transition-opacity"
+                            className="w-full hover:scale-105 transition-transform duration-200"
                         />
-                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                             <span className="text-xs text-white">{formatDate(image.createdAt)}</span>
                         </div>
                     </div>
@@ -145,11 +158,11 @@ export default function LibraryImagesPage() {
             {/* Lightbox */}
             {lightboxUrl && (
                 <div
-                    className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
                     onClick={() => setLightboxUrl(null)}
                 >
                     <button
-                        className="absolute top-4 right-4 text-white hover:text-gray-300"
+                        className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors"
                         onClick={() => setLightboxUrl(null)}
                     >
                         <X className="h-8 w-8" />
@@ -162,6 +175,6 @@ export default function LibraryImagesPage() {
                     />
                 </div>
             )}
-        </div>
+        </>
     )
 }

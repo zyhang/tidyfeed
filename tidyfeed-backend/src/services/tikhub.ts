@@ -37,6 +37,7 @@ export interface TikHubTweetData {
             display_url: string;
         }[];
     };
+    card?: TikHubCard;
 }
 
 export interface TikHubMedia {
@@ -48,6 +49,18 @@ export interface TikHubMedia {
     video_info?: {
         duration_millis?: number;
         variants?: { url: string; bitrate?: number; content_type: string }[];
+    };
+}
+
+export interface TikHubCard {
+    url: string;
+    title?: string;
+    description?: string;
+    site?: string;
+    image?: {
+        url: string;
+        width?: number;
+        height?: number;
     };
 }
 
@@ -199,6 +212,11 @@ export class TikHubService {
         const tweet = data.tweet || data.data || data;
         const user = tweet.user || tweet.author || {};
         const legacy = tweet.legacy || tweet;
+        const noteText =
+            tweet.note_tweet?.note_tweet_results?.result?.text ||
+            tweet.note_tweet?.text ||
+            legacy.note_tweet?.note_tweet_results?.result?.text ||
+            legacy.note_tweet?.text;
 
         // Create media array from possible locations
         let mediaArray: any[] = [];
@@ -221,21 +239,29 @@ export class TikHubService {
             if (Array.isArray(tweet.media)) mediaArray = tweet.media;
         }
 
+        const entities = {
+            urls: Array.isArray(legacy.entities?.urls) ? (legacy.entities.urls as any[]).map((u: any) => ({
+                url: u.url,
+                expanded_url: u.expanded_url || u.url,
+                display_url: u.display_url || u.url,
+            })) : [],
+        };
+
         // Debug: Log entities to help diagnose link issues
-        const urlsCount = Array.isArray(legacy.entities?.urls) ? legacy.entities.urls.length : 0;
+        const urlsCount = entities.urls.length;
         console.log(`[TikHub] Parsed tweet ${tweet.rest_id || tweet.id}:`, {
-            hasText: !!(legacy.full_text || legacy.text || tweet.text),
+            hasText: !!(noteText || legacy.full_text || legacy.text || tweet.text),
             urlsCount,
             firstUrl: urlsCount > 0 ? {
-                url: legacy.entities.urls[0].url,
-                display_url: legacy.entities.urls[0].display_url,
-                expanded_url: legacy.entities.urls[0].expanded_url,
+                url: entities.urls[0].url,
+                display_url: entities.urls[0].display_url,
+                expanded_url: entities.urls[0].expanded_url,
             } : null,
         });
 
         return {
             id: tweet.rest_id || tweet.id_str || tweet.id || tweet.tweet_id || '',
-            text: legacy.full_text || legacy.text || tweet.text || '',
+            text: noteText || legacy.full_text || legacy.text || tweet.text || '',
             created_at: legacy.created_at || tweet.created_at || '',
             author: {
                 id: user.rest_id || user.id_str || user.id || '',
@@ -256,13 +282,8 @@ export class TikHubService {
                 view_count: tweet.views?.count ? parseInt(tweet.views.count) : (typeof tweet.views === 'string' ? parseInt(tweet.views) : (tweet.views || 0)),
             },
             source: legacy.source || '',
-            entities: {
-                urls: Array.isArray(legacy.entities?.urls) ? (legacy.entities.urls as any[]).map((u: any) => ({
-                    url: u.url,
-                    expanded_url: u.expanded_url || u.url,
-                    display_url: u.display_url || u.url,
-                })) : [],
-            },
+            entities,
+            card: this.parseCard(tweet, entities),
         };
     }
 
@@ -321,6 +342,96 @@ export class TikHubService {
                 } : undefined,
             };
         });
+    }
+
+    /**
+     * Parse link card data (Twitter card / preview)
+     */
+    private parseCard(
+        tweet: any,
+        entities?: { urls: { url: string; expanded_url: string; display_url: string }[] }
+    ): TikHubCard | undefined {
+        const rawCard = tweet.card || tweet.legacy?.card || tweet.card?.legacy;
+        if (!rawCard) return undefined;
+
+        const legacy = rawCard.legacy || rawCard;
+        const bindings = legacy.binding_values || rawCard.binding_values;
+        const bindingMap = new Map<string, any>();
+
+        if (Array.isArray(bindings)) {
+            for (const item of bindings) {
+                if (!item) continue;
+                const key = item.key;
+                const value = item.value || item;
+                if (key) bindingMap.set(key, value);
+            }
+        } else if (bindings && typeof bindings === 'object') {
+            for (const [key, value] of Object.entries(bindings)) {
+                if (key) bindingMap.set(key, value);
+            }
+        }
+
+        const getString = (keys: string[]): string | undefined => {
+            for (const key of keys) {
+                const value = bindingMap.get(key);
+                const str =
+                    value?.string_value ||
+                    value?.value?.string_value ||
+                    value?.stringValue;
+                if (typeof str === 'string' && str.trim()) return str.trim();
+            }
+            return undefined;
+        };
+
+        const getImage = (keys: string[]): { url: string; width?: number; height?: number } | undefined => {
+            for (const key of keys) {
+                const value = bindingMap.get(key);
+                const image =
+                    value?.image_value ||
+                    value?.value?.image_value ||
+                    value?.image;
+                if (image?.url) {
+                    return {
+                        url: image.url,
+                        width: image.width,
+                        height: image.height,
+                    };
+                }
+            }
+            return undefined;
+        };
+
+        const title = getString(['summary_title', 'title', 'card_title']);
+        const description = getString(['summary_description', 'description', 'card_description']);
+        const site = getString(['site', 'domain', 'vanity_url']);
+        const url = getString(['card_url', 'url', 'destination_url']);
+        const image = getImage([
+            'summary_photo_image_full_size_original',
+            'summary_photo_image_large',
+            'summary_photo_image_small',
+            'thumbnail_image_original',
+            'thumbnail_image',
+            'photo_image_full_size_original',
+            'photo_image_large',
+            'photo_image_small',
+            'player_image_large',
+            'player_image_small',
+        ]);
+
+        const entityUrl = entities?.urls?.[0]?.expanded_url;
+        const normalizedUrl = entityUrl || url || '';
+
+        if (!normalizedUrl && !title && !description && !image?.url) {
+            return undefined;
+        }
+
+        return {
+            url: normalizedUrl,
+            title,
+            description,
+            site,
+            image,
+        };
     }
 
     /**

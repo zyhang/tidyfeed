@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { CloudVideoPlayer } from '@/components/CloudVideoPlayer'
-import { Loader2, Cloud, RefreshCw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Cloud } from 'lucide-react'
+
+// Design System Components
+import { PageHeader } from '@/components/layout'
+import { PageLoading, EmptyState, ErrorState } from '@/components/feedback'
 
 interface Download {
     id: number
@@ -67,44 +70,43 @@ export default function DownloadsPage() {
     }, [])
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-        )
+        return <PageLoading />
     }
 
     if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] text-muted-foreground">
-                <p className="mb-4">{error}</p>
-                <Button variant="outline" onClick={fetchDownloads}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Retry
-                </Button>
-            </div>
-        )
+        return <ErrorState message={error} onRetry={fetchDownloads} />
     }
 
     if (downloads.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] text-muted-foreground">
-                <Cloud className="h-12 w-12 mb-4 opacity-50" />
-                <p className="text-lg mb-2">No cloud downloads yet</p>
-                <p className="text-sm">Use the Cloud Save button on X.com to download videos</p>
-            </div>
+            <>
+                <PageHeader
+                    title="Cloud Downloads"
+                    description="Manage your cloud video downloads"
+                />
+                <EmptyState
+                    icon={<Cloud />}
+                    title="No cloud downloads yet"
+                    description="Use the Cloud Save button on X.com to download videos"
+                />
+            </>
         )
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Cloud Downloads</h1>
-                <Button variant="outline" size="sm" onClick={fetchDownloads}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh
-                </Button>
-            </div>
+        <>
+            <PageHeader
+                title="Cloud Downloads"
+                description={`${downloads.length} total`}
+                actions={
+                    <button
+                        onClick={fetchDownloads}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        Refresh
+                    </button>
+                }
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {downloads.map((download) => (
@@ -120,6 +122,6 @@ export default function DownloadsPage() {
                     />
                 ))}
             </div>
-        </div>
+        </>
     )
 }

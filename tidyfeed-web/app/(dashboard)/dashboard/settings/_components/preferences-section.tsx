@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+
+// Design System Components
+import { Section } from '@/components/layout'
+import { ToggleSetting } from '@/components/forms'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -44,28 +45,16 @@ export function PreferencesSection({ preferences, onUpdate }: PreferencesSection
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Preferences</CardTitle>
-                <CardDescription>
-                    Manage your application preferences.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="flex items-center justify-between space-x-2">
-                    <div className="space-y-0.5">
-                        <Label htmlFor="auto-download" className="text-base">Auto-download Videos</Label>
-                        <p className="text-sm text-muted-foreground">
-                            Automatically download videos from saved tweets to your library.
-                        </p>
-                    </div>
-                    <Switch
-                        id="auto-download"
-                        checked={autoDownload}
-                        onCheckedChange={handleToggle}
-                    />
-                </div>
-            </CardContent>
-        </Card>
+        <Section
+            title="Preferences"
+            description="Manage your application preferences."
+        >
+            <ToggleSetting
+                label="Auto-download Videos"
+                description="Automatically download videos from saved tweets to your library."
+                checked={autoDownload}
+                onCheckedChange={handleToggle}
+            />
+        </Section>
     )
 }

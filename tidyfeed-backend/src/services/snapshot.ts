@@ -10,7 +10,7 @@
  * - Dark/light mode (system preference)
  */
 
-import type { TikHubTweetData, TikHubComment, TikHubMedia } from './tikhub';
+import type { TikHubTweetData, TikHubComment, TikHubMedia, TikHubCard } from './tikhub';
 import { TikHubService } from './tikhub';
 
 interface SnapshotOptions {
@@ -132,6 +132,8 @@ function renderTweetContent(tweet: TikHubTweetData): string {
 
 		<div class="tweet-text">${formatTweetText(tweet.text, tweet.entities)}</div>
 
+		${tweet.card ? renderLinkCard(tweet.card) : ''}
+
 		${images.length > 0 && !hasVideo ? renderMediaGallery(images) : ''}
 		${video ? renderVideo(video) : ''}
 		${tweet.quoted_tweet ? renderQuotedTweet(tweet.quoted_tweet) : ''}
@@ -158,6 +160,36 @@ function renderMediaGallery(images: TikHubMedia[]): string {
 					<img src="${img.url}" alt="Image ${i + 1}" loading="lazy">
 				</a>
 			`).join('')}
+		</div>
+	`;
+}
+
+/**
+ * Render link preview card
+ */
+function renderLinkCard(card: TikHubCard, variant: 'default' | 'compact' = 'default'): string {
+	if (!card.url && !card.title && !card.description && !card.image?.url) {
+		return '';
+	}
+
+	const title = card.title ? escapeHtml(card.title) : '';
+	const description = card.description ? escapeHtml(card.description) : '';
+	const site = card.site ? escapeHtml(card.site) : '';
+	const url = card.url ? escapeHtml(card.url) : '';
+	const imageUrl = card.image?.url ? escapeHtml(card.image.url) : '';
+
+	const variantClass = variant === 'compact' ? ' link-card-compact' : '';
+
+	return `
+		<div class="link-card${variantClass}">
+			<a href="${url}" target="_blank" rel="noopener">
+				${imageUrl ? `<img src="${imageUrl}" alt="" class="link-card-image" loading="lazy">` : ''}
+				<div class="link-card-body">
+					${title ? `<div class="link-card-title">${title}</div>` : ''}
+					${description ? `<div class="link-card-description">${description}</div>` : ''}
+					${site || url ? `<div class="link-card-site">${site || url}</div>` : ''}
+				</div>
+			</a>
 		</div>
 	`;
 }
@@ -226,6 +258,7 @@ function renderQuotedTweet(quoted: TikHubTweetData): string {
 				<span class="quoted-handle">@${escapeHtml(screenName)}</span>
 			</div>
 			<div class="quoted-text">${formatTweetText(truncateText(quoted.text || '', 280), quoted.entities)}</div>
+			${quoted.card ? renderLinkCard(quoted.card, 'compact') : ''}
 			${images.length > 0 && !hasVideo ? `<div class="quoted-media"><img src="${images[0].url}" alt="" loading="lazy"></div>` : ''}
 			${video ? renderQuotedVideo(video) : ''}
 		</div>
@@ -409,6 +442,56 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 			color: var(--link);
 		}
 		.tweet-text a:hover { text-decoration: underline; }
+
+		.link-card {
+			border: 1px solid var(--border);
+			border-radius: 16px;
+			overflow: hidden;
+			margin-bottom: 12px;
+			background: var(--card-bg);
+		}
+		.link-card a { display: block; }
+		.link-card-image {
+			width: 100%;
+			display: block;
+			background: var(--hover);
+			object-fit: cover;
+			max-height: 320px;
+		}
+		.link-card-body {
+			padding: 12px;
+		}
+		.link-card-title {
+			font-weight: 700;
+			font-size: 15px;
+			color: var(--text);
+			margin-bottom: 4px;
+		}
+		.link-card-description {
+			color: var(--text-secondary);
+			font-size: 14px;
+			line-height: 1.4;
+		}
+		.link-card-site {
+			margin-top: 8px;
+			color: var(--text-secondary);
+			font-size: 12px;
+			text-transform: uppercase;
+			letter-spacing: 0.3px;
+		}
+		.link-card-compact .link-card-body {
+			padding: 8px 10px;
+		}
+		.link-card-compact .link-card-title {
+			font-size: 13px;
+		}
+		.link-card-compact .link-card-description {
+			font-size: 12px;
+		}
+		.link-card-compact .link-card-site {
+			font-size: 11px;
+			margin-top: 6px;
+		}
 
 		.media-gallery {
 			display: grid;
