@@ -49,12 +49,6 @@ function formatBytes(bytes: number): string {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-function formatLimit(value: number, isBytes = false): string {
-    if (value === Infinity) return 'Unlimited'
-    if (value === null || value === undefined) return 'Unlimited'
-    return isBytes ? formatBytes(value) : value.toString()
-}
-
 function getPlanIcon(plan: string) {
     switch (plan) {
         case 'pro': return Zap
@@ -165,7 +159,10 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">Saved this month</span>
                                     <span className="font-medium">
-                                        {planInfo.usage.collection.used} / {formatLimit(planInfo.usage.collection.limit)}
+                                        {planInfo.usage.collection.limit === Infinity
+                                            ? 'Unlimited'
+                                            : `${planInfo.usage.collection.used} / ${planInfo.usage.collection.limit}`
+                                        }
                                     </span>
                                 </div>
                                 {planInfo.usage.collection.limit !== Infinity && (
@@ -181,7 +178,10 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">Storage used</span>
                                     <span className="font-medium">
-                                        {formatBytes(planInfo.usage.storage.used)} / {formatLimit(planInfo.usage.storage.limit, true)}
+                                        {planInfo.usage.storage.limit === Infinity
+                                            ? 'Unlimited'
+                                            : `${formatBytes(planInfo.usage.storage.used)} / ${formatBytes(planInfo.usage.storage.limit)}`
+                                        }
                                     </span>
                                 </div>
                                 {planInfo.usage.storage.limit !== Infinity && (
@@ -197,7 +197,10 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">AI summaries this month</span>
                                     <span className="font-medium">
-                                        {planInfo.usage.aiSummary.used} / {formatLimit(planInfo.usage.aiSummary.limit)}
+                                        {planInfo.usage.aiSummary.limit === Infinity
+                                            ? 'Unlimited'
+                                            : `${planInfo.usage.aiSummary.used} / ${planInfo.usage.aiSummary.limit}`
+                                        }
                                     </span>
                                 </div>
                                 {planInfo.usage.aiSummary.limit !== Infinity && (
