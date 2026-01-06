@@ -598,6 +598,19 @@ export default defineBackground(() => {
 
     // QUEUE_DOWNLOAD message handler removed: cloud download is disabled in this build.
 
+    // Open a new tab for Reader View
+    if (message.type === 'OPEN_TAB') {
+      browser.tabs.create({ url: message.url })
+        .then((tab) => {
+          sendResponse({ success: true, tabId: tab.id });
+        })
+        .catch((error) => {
+          console.error('[TidyFeed] Failed to open tab:', error);
+          sendResponse({ success: false, error: error.message });
+        });
+      return true;
+    }
+
   });
 });
 

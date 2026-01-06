@@ -114,7 +114,25 @@ export function UserNav() {
         }
     }
 
+    const getPlanLabel = (plan?: string) => {
+        switch (plan) {
+            case 'pro': return 'Pro'
+            case 'ultra': return 'Ultra'
+            default: return 'Free'
+        }
+    }
+
+    const getPlanColor = (plan?: string) => {
+        switch (plan) {
+            case 'pro': return 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+            case 'ultra': return 'bg-purple-500/10 text-purple-600 border-purple-500/20'
+            default: return 'bg-muted text-muted-foreground border-border'
+        }
+    }
+
     const PlanIcon = getPlanIcon(user.plan)
+    const planLabel = getPlanLabel(user.plan)
+    const planColor = getPlanColor(user.plan)
 
     return (
         <div className="p-3">
@@ -129,9 +147,15 @@ export function UserNav() {
                             <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col items-start text-sm flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2">
                                 <span className="font-medium truncate">{user.name || 'User'}</span>
-                                <PlanIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                <span className={`
+                                    flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-medium shrink-0
+                                    ${planColor}
+                                `}>
+                                    <PlanIcon className="h-3 w-3" />
+                                    <span className="leading-none">{planLabel}</span>
+                                </span>
                             </div>
                             <span className="text-muted-foreground text-xs truncate">
                                 {user.email}
@@ -141,8 +165,17 @@ export function UserNav() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel>
-                        <div className="flex flex-col">
-                            <span>{user.name || 'User'}</span>
+                        <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                                <span>{user.name || 'User'}</span>
+                                <span className={`
+                                    flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-medium shrink-0
+                                    ${planColor}
+                                `}>
+                                    <PlanIcon className="h-3 w-3" />
+                                    <span className="leading-none">{planLabel}</span>
+                                </span>
+                            </div>
                             <span className="text-xs font-normal text-muted-foreground">
                                 {user.email}
                             </span>

@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Tag, Hash, ChevronDown, ChevronRight, Loader2, FolderOpen, Video, Image } from "lucide-react"
+import { Home, Tag, Hash, ChevronDown, ChevronRight, Loader2, FolderOpen, Video, Image, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { StorageIndicator } from "./StorageIndicator"
 import { UserNav } from "./user-nav"
@@ -41,6 +41,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
 
     // Library sub-menu items
     const libraryItems = [
+        { title: "Articles", icon: BookOpen, href: "/dashboard/library/articles" },
         { title: "Video", icon: Video, href: "/dashboard/library/videos" },
         { title: "Image", icon: Image, href: "/dashboard/library/images" },
     ]

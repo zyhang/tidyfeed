@@ -27,7 +27,7 @@ export default defineConfig({
     },
 
     // Manifest v3 的权限分离
-    permissions: ['storage', 'activeTab', 'scripting', 'alarms', 'cookies'],
+    permissions: ['storage', 'activeTab', 'scripting', 'alarms', 'cookies', 'tabs'],
     host_permissions: [
       '*://*.x.com/*',
       '*://*.twitter.com/*',
@@ -36,6 +36,7 @@ export default defineConfig({
       '*://pbs.twimg.com/*',
       '*://*.tidyfeed.app/*',
       'https://*.googleusercontent.com/*',
+      '<all_urls>', // For Reader View feature on all websites
     ],
     content_security_policy: {
       extension_pages: "script-src 'self'; object-src 'self'; img-src 'self' https://*.googleusercontent.com",
