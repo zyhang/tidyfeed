@@ -7,9 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
-interface StorageIndicatorProps extends React.HTMLAttributes<HTMLDivElement> {
-    isCollapsed?: boolean
-}
+interface StorageIndicatorProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 function formatBytes(bytes: number, decimals = 1) {
     if (!+bytes) return '0 B'
@@ -20,7 +18,7 @@ function formatBytes(bytes: number, decimals = 1) {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
 }
 
-export function StorageIndicator({ isCollapsed, className, ...props }: StorageIndicatorProps) {
+export function StorageIndicator({ className, ...props }: StorageIndicatorProps) {
     const [usage, setUsage] = React.useState(0)
     const [limit, setLimit] = React.useState(1073741824) // Default 1GB
     const [loading, setLoading] = React.useState(true)
@@ -69,25 +67,6 @@ export function StorageIndicator({ isCollapsed, className, ...props }: StorageIn
 
     // Tooltip content
     const tooltipText = `${formatBytes(usage)} used of ${formatBytes(limit)}`
-
-    if (isCollapsed) {
-        return (
-            <TooltipProvider>
-                <Tooltip delayDuration={0}>
-                    <TooltipTrigger asChild>
-                        <div className={cn("px-2 py-3 flex justify-center", className)} {...props}>
-                            <div
-                                className={cn("w-2 h-2 rounded-full transition-colors duration-500", colorClass)}
-                            />
-                        </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                        <p>{tooltipText}</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-        )
-    }
 
     return (
         <div className={cn("px-4 py-3", className)} {...props}>

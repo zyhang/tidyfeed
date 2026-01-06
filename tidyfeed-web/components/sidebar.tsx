@@ -3,9 +3,8 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Tag, ChevronLeft, Menu, Hash, ChevronDown, ChevronRight, Loader2, FolderOpen, Video, Image } from "lucide-react"
+import { Home, Tag, Hash, ChevronDown, ChevronRight, Loader2, FolderOpen, Video, Image } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { StorageIndicator } from "./StorageIndicator"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
@@ -19,7 +18,6 @@ interface TagItem {
 interface SidebarProps extends React.HTMLAttributes<HTMLElement> { }
 
 export function Sidebar({ className, ...props }: SidebarProps) {
-    const [isCollapsed, setIsCollapsed] = React.useState(false)
     const [libraryExpanded, setLibraryExpanded] = React.useState(false)
     const [tagsExpanded, setTagsExpanded] = React.useState(false)
     const [tags, setTags] = React.useState<TagItem[]>([])
@@ -49,63 +47,44 @@ export function Sidebar({ className, ...props }: SidebarProps) {
     return (
         <aside
             className={cn(
-                "relative flex flex-col border-r bg-background transition-all duration-300",
-                isCollapsed ? "w-[64px]" : "w-[240px]",
+                "relative flex flex-col border-r bg-background w-[240px]",
                 className
             )}
             {...props}
         >
-            <div className="flex items-center p-4 h-16 border-b">
-                {!isCollapsed && <span className="text-xl font-bold ml-2">TidyFeed</span>}
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn("ml-auto", isCollapsed && "mx-auto")}
-                    onClick={() => setIsCollapsed(!isCollapsed)}
-                >
-                    {isCollapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-                </Button>
-            </div>
-
             <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
                 {/* My Feed */}
                 <Link
                     href="/dashboard"
                     className={cn(
                         "flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
-                        pathname === '/dashboard' && "bg-accent text-accent-foreground",
-                        isCollapsed && "justify-center px-2"
+                        pathname === '/dashboard' && "bg-accent text-accent-foreground"
                     )}
                 >
                     <Home className="h-5 w-5" />
-                    {!isCollapsed && <span>My Feed</span>}
+                    <span>My Feed</span>
                 </Link>
 
                 {/* Library Menu */}
                 <div>
                     <button
-                        onClick={() => !isCollapsed && setLibraryExpanded(!libraryExpanded)}
+                        onClick={() => setLibraryExpanded(!libraryExpanded)}
                         className={cn(
                             "w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
-                            pathname.startsWith('/dashboard/library') && "bg-accent text-accent-foreground",
-                            isCollapsed && "justify-center px-2"
+                            pathname.startsWith('/dashboard/library') && "bg-accent text-accent-foreground"
                         )}
                     >
                         <FolderOpen className="h-5 w-5" />
-                        {!isCollapsed && (
-                            <>
-                                <span className="flex-1 text-left">Library</span>
-                                {libraryExpanded ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                    <ChevronRight className="h-4 w-4" />
-                                )}
-                            </>
+                        <span className="flex-1 text-left">Library</span>
+                        {libraryExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                        ) : (
+                            <ChevronRight className="h-4 w-4" />
                         )}
                     </button>
 
                     {/* Library submenu */}
-                    {!isCollapsed && libraryExpanded && (
+                    {libraryExpanded && (
                         <div className="ml-4 mt-1 space-y-1">
                             {libraryItems.map((item) => (
                                 <Link
@@ -127,28 +106,23 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                 {/* Tags Menu */}
                 <div>
                     <button
-                        onClick={() => !isCollapsed && setTagsExpanded(!tagsExpanded)}
+                        onClick={() => setTagsExpanded(!tagsExpanded)}
                         className={cn(
                             "w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
-                            pathname.startsWith('/dashboard/tags') && "bg-accent text-accent-foreground",
-                            isCollapsed && "justify-center px-2"
+                            pathname.startsWith('/dashboard/tags') && "bg-accent text-accent-foreground"
                         )}
                     >
                         <Tag className="h-5 w-5" />
-                        {!isCollapsed && (
-                            <>
-                                <span className="flex-1 text-left">Tags</span>
-                                {tagsExpanded ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                    <ChevronRight className="h-4 w-4" />
-                                )}
-                            </>
+                        <span className="flex-1 text-left">Tags</span>
+                        {tagsExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                        ) : (
+                            <ChevronRight className="h-4 w-4" />
                         )}
                     </button>
 
                     {/* Tags submenu */}
-                    {!isCollapsed && tagsExpanded && (
+                    {tagsExpanded && (
                         <div className="ml-4 mt-1 space-y-1">
                             <Link
                                 href="/dashboard/tags"
@@ -192,7 +166,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
             <div className="border-t bg-background z-10">
                 {/* Storage Panel */}
                 <div className="p-3 pb-4">
-                    <StorageIndicator isCollapsed={isCollapsed} />
+                    <StorageIndicator />
                 </div>
             </div>
         </aside>
