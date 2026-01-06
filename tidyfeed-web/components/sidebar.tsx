@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { Home, Tag, Hash, ChevronDown, ChevronRight, Loader2, FolderOpen, Video, Image } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { StorageIndicator } from "./StorageIndicator"
+import { UserNav } from "./user-nav"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tidyfeed.app'
 
@@ -162,12 +163,14 @@ export function Sidebar({ className, ...props }: SidebarProps) {
 
             </nav>
 
-            {/* Bottom Section: Storage */}
+            {/* Bottom Section: Storage & User */}
             <div className="border-t bg-background z-10">
                 {/* Storage Panel */}
-                <div className="p-3 pb-4">
+                <div className="p-3 pb-2">
                     <StorageIndicator />
                 </div>
+                {/* User Nav */}
+                <UserNav />
             </div>
         </aside>
     )

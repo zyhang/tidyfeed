@@ -5,6 +5,7 @@
  */
 
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { TikHubService } from '../services/tikhub';
 import { generateTweetSnapshot } from '../services/snapshot';
 import { cacheMediaToR2, replaceMediaUrls } from '../services/imageCache';
@@ -19,6 +20,136 @@ type Bindings = {
 };
 
 const caching = new Hono<{ Bindings: Bindings }>();
+
+async function queueSnapshotVideos(
+    c: Context<{ Bindings: Bindings }>,
+    params: {
+        tweetId: string;
+        tweetData: any;
+        cachedTweetData: any;
+        comments: any[];
+        includeComments: boolean;
+        urlMap?: Map<string, string>;
+    }
+) {
+    const { tweetId, tweetData, cachedTweetData, comments, includeComments, urlMap } = params;
+    const hasVideo = tweetData.media?.some((m: any) => m.type === 'video' || m.type === 'animated_gif') || false;
+    const hasQuotedVideo = tweetData.quoted_tweet?.media?.some((m: any) => m.type === 'video' || m.type === 'animated_gif') || false;
+
+    if (!hasVideo && !hasQuotedVideo) return;
+
+    const getThumbnailUrl = (media: any) => {
+        if (!media.preview_url) return undefined;
+        return (urlMap && urlMap.get(media.preview_url)) || media.preview_url;
+    };
+
+    const videosToQueue: { videoUrl: string; key: string; thumbnailUrl?: string }[] = [];
+
+    const mainMedia = tweetData.media || [];
+    mainMedia.forEach((media: any, index: number) => {
+        if (media.type === 'video' || media.type === 'animated_gif') {
+            const videoUrl = TikHubService.getBestVideoUrl(media);
+            if (videoUrl) {
+                const thumbnailUrl = getThumbnailUrl(media);
+                videosToQueue.push({ videoUrl, key: `${index}`, thumbnailUrl });
+            }
+        }
+    });
+
+    const quotedMedia = tweetData.quoted_tweet?.media || [];
+    quotedMedia.forEach((media: any, index: number) => {
+        if (media.type === 'video' || media.type === 'animated_gif') {
+            const videoUrl = TikHubService.getBestVideoUrl(media);
+            if (videoUrl) {
+                const thumbnailUrl = getThumbnailUrl(media);
+                videosToQueue.push({ videoUrl, key: `quoted_${index}`, thumbnailUrl });
+            }
+        }
+    });
+
+    if (videosToQueue.length === 0) return;
+
+    const webAppUrl = c.env.WEB_APP_URL || 'https://tidyfeed.app';
+    const apiUrl = webAppUrl.includes('tidyfeed.app')
+        ? 'https://api.tidyfeed.app'
+        : webAppUrl.replace(/^(https?:\/\/)([^/]+)/, '$1api.$2');
+    let dataUpdated = false;
+
+    videosToQueue.forEach(({ videoUrl, key }) => {
+        const predictedUrl = `${apiUrl}/api/videos/${tweetId}/${key}.mp4`;
+
+        const updateMedia = (mediaList: any[]) => {
+            mediaList.forEach(m => {
+                if ((m.type === 'video' || m.type === 'animated_gif') && m.video_info?.variants) {
+                    const hasMatchingVariant = m.video_info.variants.some((v: any) => v.url === videoUrl);
+
+                    if (hasMatchingVariant) {
+                        m.video_info.variants.forEach((v: any) => {
+                            if (v.content_type === 'video/mp4') {
+                                v.url = predictedUrl;
+                                dataUpdated = true;
+                            }
+                        });
+                    }
+                }
+            });
+        };
+
+        if (cachedTweetData.media) updateMedia(cachedTweetData.media);
+        if (cachedTweetData.quoted_tweet?.media) updateMedia(cachedTweetData.quoted_tweet.media);
+    });
+
+    if (dataUpdated) {
+        await c.env.DB.prepare(
+            `UPDATE cached_tweets SET cached_data = ?, updated_at = CURRENT_TIMESTAMP WHERE tweet_id = ?`
+        ).bind(JSON.stringify(cachedTweetData), tweetId).run();
+
+        const snapshotHtml = generateTweetSnapshot(cachedTweetData, comments, {
+            includeComments,
+            theme: 'auto',
+        });
+
+        const r2Key = `snapshots/${tweetId}.html`;
+        await c.env.MEDIA_BUCKET.put(r2Key, snapshotHtml, {
+            httpMetadata: { contentType: 'text/html; charset=utf-8' },
+        });
+        console.log(`[Caching] Regenerated snapshot with predicted video URLs for ${tweetId}`);
+    }
+
+    for (const { videoUrl, key, thumbnailUrl } of videosToQueue) {
+        try {
+            const metadata = { video_index: key, ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }) };
+            const existingTask = await c.env.DB.prepare(
+                `SELECT id, metadata, status, r2_key FROM video_downloads WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' AND status != 'invalid' LIMIT 1`
+            ).bind(tweetId, videoUrl).first<{ id: number; metadata: string | null; status: string; r2_key: string | null }>();
+
+            if (!existingTask) {
+                await c.env.DB.prepare(
+                    `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status, metadata)
+                     VALUES (?, ?, 'snapshot_video', ?, ?, 'pending', ?)`
+                ).bind('system', `https://x.com/i/status/${tweetId}`, tweetId, videoUrl, JSON.stringify(metadata)).run();
+                console.log(`[Caching] Queued video download for tweet ${tweetId} (index ${key})`);
+            } else {
+                const expectedKeyPart = `/${key}.`;
+                const needsRedownload = !existingTask.r2_key || !existingTask.r2_key.includes(expectedKeyPart);
+
+                if (needsRedownload) {
+                    console.log(`[Caching] Existing video has wrong filename (${existingTask.r2_key}), forcing re-download as ${key}`);
+                    await c.env.DB.prepare(
+                        `UPDATE video_downloads SET metadata = ?, status = 'pending', r2_key = NULL WHERE id = ?`
+                    ).bind(JSON.stringify(metadata), existingTask.id).run();
+                } else {
+                    await c.env.DB.prepare(
+                        `UPDATE video_downloads SET metadata = ? WHERE id = ?`
+                    ).bind(JSON.stringify(metadata), existingTask.id).run();
+                    console.log(`[Caching] Updated metadata for existing task ${existingTask.id} (index ${key})`);
+                }
+            }
+        } catch (err) {
+            console.error(`[Caching] Failed to queue video:`, err);
+        }
+    }
+}
 
 // ============================================
 // Public Routes (no auth required)
@@ -158,11 +289,26 @@ caching.post('/cache', async (c) => {
         // Check if already cached and fresh - skip if force=true
         if (!force) {
             const existing = await c.env.DB.prepare(
-                `SELECT cached_at, snapshot_r2_key FROM cached_tweets 
+                `SELECT cached_at, snapshot_r2_key, cached_data, comments_data FROM cached_tweets 
 				 WHERE tweet_id = ? AND cached_at > datetime('now', ?)`
-            ).bind(cleanTweetId, ttlWindow).first<{ cached_at: string; snapshot_r2_key: string }>();
+            ).bind(cleanTweetId, ttlWindow).first<{ cached_at: string; snapshot_r2_key: string; cached_data: string | null; comments_data: string | null }>();
 
             if (existing?.snapshot_r2_key) {
+                if (existing.cached_data) {
+                    try {
+                        const cachedTweetData = JSON.parse(existing.cached_data);
+                        const comments = existing.comments_data ? JSON.parse(existing.comments_data) : [];
+                        await queueSnapshotVideos(c, {
+                            tweetId: cleanTweetId,
+                            tweetData: cachedTweetData,
+                            cachedTweetData,
+                            comments,
+                            includeComments: include_comments,
+                        });
+                    } catch (error) {
+                        console.warn('[Caching] Failed to queue videos for cached tweet:', error);
+                    }
+                }
                 return c.json({
                     success: true,
                     cached: true,
@@ -288,139 +434,14 @@ caching.post('/cache', async (c) => {
             totalSize
         ).run();
 
-        // Queue video downloads for Python worker (if any videos detected)
-        if (hasVideo || hasQuotedVideo) {
-            const videosToQueue: { videoUrl: string; key: string; thumbnailUrl?: string }[] = [];
-
-            // Main tweet videos
-            const mainMedia = tweetData.media || [];
-            mainMedia.forEach((media, index) => {
-                if (media.type === 'video' || media.type === 'animated_gif') {
-                    const videoUrl = TikHubService.getBestVideoUrl(media);
-                    if (videoUrl) {
-                        // Get cached thumbnail URL from urlMap
-                        const thumbnailUrl = media.preview_url ? (urlMap.get(media.preview_url) || media.preview_url) : undefined;
-                        videosToQueue.push({ videoUrl, key: `${index}`, thumbnailUrl });
-                    }
-                }
-            });
-
-            // Quoted tweet videos
-            const quotedMedia = tweetData.quoted_tweet?.media || [];
-            quotedMedia.forEach((media, index) => {
-                if (media.type === 'video' || media.type === 'animated_gif') {
-                    const videoUrl = TikHubService.getBestVideoUrl(media);
-                    if (videoUrl) {
-                        // Get cached thumbnail URL from urlMap
-                        const thumbnailUrl = media.preview_url ? (urlMap.get(media.preview_url) || media.preview_url) : undefined;
-                        videosToQueue.push({ videoUrl, key: `quoted_${index}`, thumbnailUrl });
-                    }
-                }
-            });
-
-            // Update tweetData with predicted URLs immediately
-            // For tidyfeed.app, use api.tidyfeed.app; otherwise prepend 'api.' to domain
-            const webAppUrl = c.env.WEB_APP_URL || 'https://tidyfeed.app';
-            const apiUrl = webAppUrl.includes('tidyfeed.app')
-                ? 'https://api.tidyfeed.app'
-                : webAppUrl.replace(/^(https?:\/\/)([^/]+)/, '$1api.$2');
-            let dataUpdated = false;
-
-            videosToQueue.forEach(({ videoUrl, key }) => {
-                // key is now "0", "1", ... or "quoted_0", "quoted_1", ...
-                const predictedUrl = `${apiUrl}/api/videos/${cleanTweetId}/${key}.mp4`;
-
-                // Helper to update media URL
-                const updateMedia = (mediaList: any[]) => {
-                    mediaList.forEach(m => {
-                        if ((m.type === 'video' || m.type === 'animated_gif') && m.video_info?.variants) {
-                            const hasMatchingVariant = m.video_info.variants.some((v: any) => v.url === videoUrl);
-
-                            if (hasMatchingVariant) {
-                                // Replace ALL mp4 variants with our cached URL
-                                // This ensures the snapshot will pick it up regardless of bitrate sorting
-                                m.video_info.variants.forEach((v: any) => {
-                                    if (v.content_type === 'video/mp4') {
-                                        v.url = predictedUrl;
-                                        dataUpdated = true;
-                                    }
-                                });
-                            }
-                        }
-                    });
-                };
-
-                if (cachedTweetData.media) updateMedia(cachedTweetData.media);
-                if (cachedTweetData.quoted_tweet?.media) updateMedia(cachedTweetData.quoted_tweet.media);
-            });
-
-            // If we updated URLs, re-generate snapshot IMMEDIATELY with predicted URLs
-            if (dataUpdated) {
-                // Update cached_data in DB with the updated cachedTweetData
-                await c.env.DB.prepare(
-                    `UPDATE cached_tweets SET cached_data = ?, updated_at = CURRENT_TIMESTAMP WHERE tweet_id = ?`
-                ).bind(JSON.stringify(cachedTweetData), cleanTweetId).run();
-
-                // Regenerate snapshot with cachedTweetData (has both cached image URLs and predicted video URLs)
-                const snapshotHtml = generateTweetSnapshot(cachedTweetData, comments, {
-                    includeComments: include_comments,
-                    theme: 'auto',
-                });
-
-                // Upload updated snapshot
-                await c.env.MEDIA_BUCKET.put(r2Key, snapshotHtml, {
-                    httpMetadata: { contentType: 'text/html; charset=utf-8' },
-                });
-                console.log(`[Caching] Regenerated snapshot with predicted video URLs for ${cleanTweetId}`);
-            } else {
-                // debugLogs.push removed
-            }
-
-            for (const { videoUrl, key, thumbnailUrl } of videosToQueue) {
-                try {
-                    // Build metadata with video_index and optional thumbnail_url
-                    const metadata = { video_index: key, ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }) };
-
-                    // Check if task already exists
-                    const existingTask = await c.env.DB.prepare(
-                        `SELECT id, metadata, status, r2_key FROM video_downloads WHERE tweet_id = ? AND video_url = ? AND task_type = 'snapshot_video' AND status != 'invalid' LIMIT 1`
-                    ).bind(cleanTweetId, videoUrl).first<{ id: number; metadata: string | null; status: string; r2_key: string | null }>();
-
-                    if (!existingTask) {
-                        await c.env.DB.prepare(
-                            `INSERT INTO video_downloads (user_id, tweet_url, task_type, tweet_id, video_url, status, metadata)
-                             VALUES (?, ?, 'snapshot_video', ?, ?, 'pending', ?)`
-                        ).bind('system', `https://x.com/i/status/${cleanTweetId}`, cleanTweetId, videoUrl, JSON.stringify(metadata)).run();
-                        console.log(`[Caching] Queued video download for tweet ${cleanTweetId} (index ${key})`);
-                    } else {
-                        // Check if R2 key matches expected key
-                        // Expected: videos/{tweet_id}/{key}.mp4
-                        // Use a loose check on extension since it might be m3u8 or something else in theory, 
-                        // but strictly we expect internal uploads to match `key`.
-                        // The worker uploads to `videos/{tweet_id}/{videoIndex}.{ext}`.
-                        // So checking if r2_key contains `/${key}.` is sufficient.
-
-                        const expectedKeyPart = `/${key}.`;
-                        const needsRedownload = !existingTask.r2_key || !existingTask.r2_key.includes(expectedKeyPart);
-
-                        if (needsRedownload) {
-                            console.log(`[Caching] Existing video has wrong filename (${existingTask.r2_key}), forcing re-download as ${key}`);
-                            await c.env.DB.prepare(
-                                `UPDATE video_downloads SET metadata = ?, status = 'pending', r2_key = NULL WHERE id = ?`
-                            ).bind(JSON.stringify(metadata), existingTask.id).run();
-                        } else {
-                            // Key matches, just update metadata (idempotent)
-                            await c.env.DB.prepare(
-                                `UPDATE video_downloads SET metadata = ? WHERE id = ?`
-                            ).bind(JSON.stringify(metadata), existingTask.id).run();
-                            console.log(`[Caching] Updated metadata for existing task ${existingTask.id} (index ${key})`);
-                        }
-                    }
-                } catch (err) {
-                    console.error(`[Caching] Failed to queue video:`, err);
-                }
-            }
-        }
+        await queueSnapshotVideos(c, {
+            tweetId: cleanTweetId,
+            tweetData,
+            cachedTweetData,
+            comments,
+            includeComments: include_comments,
+            urlMap,
+        });
 
         console.log(`[Caching] Cached tweet ${cleanTweetId} with ${urlMap.size} images and ${comments.length} comments`);
 
