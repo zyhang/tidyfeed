@@ -155,52 +155,55 @@ export function ProfileSection({ user, onUpdate }: ProfileSectionProps) {
                         {/* Usage Bars */}
                         <div className="space-y-4">
                             {/* Collections */}
-                            {planInfo.usage.collection.limit !== Infinity && (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">Saved this month</span>
-                                        <span className="font-medium">
-                                            {planInfo.usage.collection.used} / {planInfo.usage.collection.limit}
-                                        </span>
-                                    </div>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Saved this month</span>
+                                    <span className="font-medium">
+                                        {planInfo.usage.collection.used}
+                                        {planInfo.usage.collection.limit !== Infinity && ` / ${planInfo.usage.collection.limit}`}
+                                    </span>
+                                </div>
+                                {planInfo.usage.collection.limit !== Infinity && (
                                     <Progress
                                         value={(planInfo.usage.collection.used / planInfo.usage.collection.limit) * 100}
                                         className="h-2"
                                     />
-                                </div>
-                            )}
+                                )}
+                            </div>
 
                             {/* Storage */}
-                            {planInfo.usage.storage.limit !== Infinity && (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">Storage used</span>
-                                        <span className="font-medium">
-                                            {formatBytes(planInfo.usage.storage.used)} / {formatBytes(planInfo.usage.storage.limit)}
-                                        </span>
-                                    </div>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Storage used</span>
+                                    <span className="font-medium">
+                                        {formatBytes(planInfo.usage.storage.used)}
+                                        {planInfo.usage.storage.limit !== Infinity && ` / ${formatBytes(planInfo.usage.storage.limit)}`}
+                                    </span>
+                                </div>
+                                {planInfo.usage.storage.limit !== Infinity && (
                                     <Progress
                                         value={(planInfo.usage.storage.used / planInfo.usage.storage.limit) * 100}
                                         className="h-2 [&>div]:bg-amber-500"
                                     />
-                                </div>
-                            )}
+                                )}
+                            </div>
 
                             {/* AI Summaries */}
-                            {planInfo.usage.aiSummary.limit !== Infinity && (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">AI summaries this month</span>
-                                        <span className="font-medium">
-                                            {planInfo.usage.aiSummary.used} / {planInfo.usage.aiSummary.limit}
-                                        </span>
-                                    </div>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">AI summaries this month</span>
+                                    <span className="font-medium">
+                                        {planInfo.usage.aiSummary.used}
+                                        {planInfo.usage.aiSummary.limit !== Infinity && ` / ${planInfo.usage.aiSummary.limit}`}
+                                    </span>
+                                </div>
+                                {planInfo.usage.aiSummary.limit !== Infinity && (
                                     <Progress
                                         value={(planInfo.usage.aiSummary.used / planInfo.usage.aiSummary.limit) * 100}
                                         className="h-2 [&>div]:bg-emerald-500"
                                     />
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
 
                         {/* Upgrade Button */}
