@@ -46,25 +46,25 @@ function getLocaleString(key: string): string {
     return LOCALE_STRINGS[key]?.[locale] || LOCALE_STRINGS[key]?.['en'] || key;
 }
 
-// Button Styles - Optimized for perfect alignment with X action buttons
-// Design system: 34x34px touch target (padding-based) matching X's interaction patterns
+// Button Styles - Match X's circular button design exactly
+// X's buttons are 34x34px circles with centered 18px icons
 const BUTTON_STYLES = `
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 34px;
-  min-height: 34px;
-  padding: 7px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   cursor: pointer;
   color: rgb(113, 118, 123);
   background: transparent;
   border: none;
-  transition: all 0.15s ease-out;
+  transition: background-color 0.2s;
   position: relative;
   flex-shrink: 0;
   outline: none;
-  line-height: 1;
+  padding: 0;
+  margin: 0;
 `;
 
 const BOOKMARK_BUTTON_HOVER_STYLES = `
@@ -73,22 +73,22 @@ const BOOKMARK_BUTTON_HOVER_STYLES = `
 `;
 
 const BOOKMARK_BUTTON_ACTIVE_STYLES = `
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 34px;
-  min-height: 34px;
-  padding: 7px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   cursor: pointer;
   color: rgb(0, 186, 124);
   background: transparent;
   border: none;
-  transition: all 0.15s ease-out;
+  transition: background-color 0.2s;
   position: relative;
   flex-shrink: 0;
   outline: none;
-  line-height: 1;
+  padding: 0;
+  margin: 0;
 `;
 
 // Simple bookmark icons matching X's native button style
@@ -506,7 +506,9 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
 
     // OPTIMISTIC UI: Toggle the icon (only after auth check passes for saves)
     button.innerHTML = newSavedState ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
-    button.style.cssText = newSavedState ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+    // Apply base styles
+    const baseStyles = newSavedState ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+    button.style.cssText = baseStyles;
     button.setAttribute('aria-label', newSavedState ? getLocaleString('saved') : getLocaleString('bookmark'));
     button.setAttribute('title', newSavedState ? getLocaleString('saved') : getLocaleString('bookmark'));
 
@@ -547,7 +549,8 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
                 showLoginToast();
                 // Rollback optimistic UI update since save failed
                 button.innerHTML = isCurrentlySaved ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
-                button.style.cssText = isCurrentlySaved ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+                const rollbackStyles = isCurrentlySaved ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+                button.style.cssText = rollbackStyles;
                 button.setAttribute('aria-label', isCurrentlySaved ? getLocaleString('saved') : getLocaleString('bookmark'));
                 // Rollback storage
                 if (newSavedState) {
@@ -573,7 +576,8 @@ async function handleBookmarkClick(event: MouseEvent): Promise<void> {
 
         // Rollback on error
         button.innerHTML = isCurrentlySaved ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
-        button.style.cssText = isCurrentlySaved ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+        const errorRollbackStyles = isCurrentlySaved ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+        button.style.cssText = errorRollbackStyles;
 
         // Rollback storage
         const storageRollback = await browser.storage.local.get('saved_x_ids');
@@ -608,19 +612,18 @@ async function createBookmarkButton(tweetId: string): Promise<HTMLButtonElement>
     button.innerHTML = isSaved ? BOOKMARK_ICON_FILLED : BOOKMARK_ICON_OUTLINE;
     button.style.cssText = isSaved ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
 
-    // Enhanced hover effects with smooth transitions
+    // Hover effects - properly toggle background color
     button.addEventListener('mouseenter', () => {
         if (!button.disabled) {
-            // Apply hover style without disrupting base style by adding class-like approach
-            const baseStyle = button.innerHTML === BOOKMARK_ICON_FILLED ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
-            button.style.cssText = baseStyle + BOOKMARK_BUTTON_HOVER_STYLES;
+            button.style.backgroundColor = 'rgba(0, 186, 124, 0.1)';
+            button.style.color = 'rgb(0, 186, 124)';
         }
     });
 
     button.addEventListener('mouseleave', () => {
         if (!button.disabled) {
-            // Restore base style smoothly via transition
-            button.style.cssText = button.innerHTML === BOOKMARK_ICON_FILLED ? BOOKMARK_BUTTON_ACTIVE_STYLES : BUTTON_STYLES;
+            button.style.backgroundColor = 'transparent';
+            button.style.color = isSaved ? 'rgb(0, 186, 124)' : 'rgb(113, 118, 123)';
         }
     });
 

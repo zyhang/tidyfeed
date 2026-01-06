@@ -180,6 +180,10 @@ caching.post('/cache', async (c) => {
             return c.json({ error: 'Failed to fetch tweet from TikHub' }, 502);
         }
 
+        // Note: Long-form article content is already included in tweetData.text
+        // via TikHub's note_tweet field (see tikhub.ts parseTweetData)
+        // No separate fetching needed.
+
         const commentsLimitSetting = await getSetting(c.env.DB, 'cache_comments_limit');
         const commentsLimit = Number.isFinite(Number(commentsLimitSetting))
             ? Math.max(0, Number(commentsLimitSetting))

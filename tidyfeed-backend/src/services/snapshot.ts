@@ -110,6 +110,10 @@ function renderTweetContent(tweet: TikHubTweetData): string {
 	const images = tweet.media?.filter(m => m.type === 'photo') || [];
 	const video = tweet.media?.find(m => m.type === 'video' || m.type === 'animated_gif');
 
+	// Detect long-form content: text is long (>500 chars) and no images/videos
+	// Long-form article content from X's note_tweet feature is already in tweet.text
+	const isLongForm = tweet.text.length > 500 && !hasVideo && images.length === 0;
+
 	return `
 		<header class="tweet-header">
 			<a href="https://x.com/${tweet.author.screen_name}" class="author-avatar" target="_blank" rel="noopener">
@@ -130,9 +134,11 @@ function renderTweetContent(tweet: TikHubTweetData): string {
 			</a>
 		</header>
 
-		<div class="tweet-text">${formatTweetText(tweet.text, tweet.entities)}</div>
+		${isLongForm ? renderLongFormContent(tweet) : ''}
 
-		${tweet.card ? renderLinkCard(tweet.card) : ''}
+		${!isLongForm ? `<div class="tweet-text">${formatTweetText(tweet.text, tweet.entities)}</div>` : ''}
+
+		${tweet.card && !isLongForm ? renderLinkCard(tweet.card) : ''}
 
 		${images.length > 0 && !hasVideo ? renderMediaGallery(images) : ''}
 		${video ? renderVideo(video) : ''}
@@ -142,6 +148,41 @@ function renderTweetContent(tweet: TikHubTweetData): string {
 			<a href="https://x.com/${tweet.author.screen_name}/status/${tweet.id}" target="_blank" rel="noopener">
 				<time datetime="${tweet.created_at}">${formatFullDate(tweet.created_at)}</time>
 			</a>
+		</div>
+	`;
+}
+
+/**
+ * Render long-form article content
+ * Takes a tweet with long-form text (from note_tweet) and formats it nicely
+ */
+function renderLongFormContent(tweet: TikHubTweetData): string {
+	// Format article content with paragraphs
+	const paragraphs = tweet.text.split('\n\n').filter(p => p.trim());
+	const formattedContent = paragraphs.map(p => {
+		const trimmed = p.trim();
+		// Check if this is a heading (all caps or short + ends with colon)
+		const isHeading = trimmed.length < 100 && (
+			trimmed === trimmed.toUpperCase() ||
+			trimmed.endsWith(':')
+		);
+		const tag = isHeading ? 'h3' : 'p';
+		return `<${tag}>${escapeHtml(trimmed)}</${tag}>`;
+	}).join('\n');
+
+	// Use author name from tweet
+	const authorDisplay = escapeHtml(tweet.author.name);
+
+	return `
+		<div class="long-form-article">
+			<div class="article-content">
+				${formattedContent}
+			</div>
+			<div class="article-meta">
+				<span>By ${authorDisplay}</span>
+				<span>·</span>
+				<time>${formatFullDate(tweet.created_at)}</time>
+			</div>
 		</div>
 	`;
 }
@@ -674,6 +715,43 @@ function getStyles(theme: 'light' | 'dark' | 'auto'): string {
 			width: 22px;
 			height: 22px;
 			margin-left: 3px;
+		}
+
+		/* Long-form article styles */
+		.long-form-article {
+			margin-bottom: 16px;
+			padding: 16px;
+			border: 1px solid var(--border);
+			border-radius: 16px;
+			background: var(--card-bg);
+		}
+		.article-content {
+			font-size: 17px;
+			line-height: 1.6;
+			color: var(--text);
+		}
+		.article-content p {
+			margin-bottom: 16px;
+		}
+		.article-content h3 {
+			font-size: 18px;
+			font-weight: 700;
+			margin-top: 20px;
+			margin-bottom: 12px;
+			color: var(--text);
+		}
+		.article-content h3:first-child {
+			margin-top: 0;
+		}
+		.article-meta {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			margin-top: 16px;
+			padding-top: 12px;
+			border-top: 1px solid var(--border);
+			font-size: 13px;
+			color: var(--text-secondary);
 		}
 	`;
 }

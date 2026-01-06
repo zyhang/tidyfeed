@@ -59,7 +59,7 @@ function Button({ variant = 'secondary', className = '', children, ...props }: R
     );
 }
 
-// Linear-style Note Card
+// Notion-style Note Card
 function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
     note: Note;
     isOwner: boolean;
@@ -101,13 +101,13 @@ function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
     };
 
     return (
-        <div className="group rounded-lg border border-[#e5e5e5] bg-white overflow-hidden">
+        <div className="group rounded-md border border-[#e9e9e7] bg-white overflow-hidden">
             {/* Quote section */}
             <button
                 onClick={() => onHighlightClick(note)}
-                className="w-full text-left p-3 pb-2 border-b border-[#f5f5f5] hover:bg-[#fafafa] transition-colors"
+                className="w-full text-left p-3 pb-2 border-b border-[#f1f1ef] hover:bg-[#f7f7f5] transition-colors"
             >
-                <p className="text-sm text-[#737373] leading-relaxed line-clamp-2 font-serif">
+                <p className="text-sm text-[#787774] leading-relaxed line-clamp-2">
                     "{note.selected_text}"
                 </p>
             </button>
@@ -115,7 +115,7 @@ function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
             {/* Note content */}
             <div className="p-3">
                 {isEditing ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         <textarea
                             value={editContent}
                             onChange={(e) => setEditContent(e.target.value)}
@@ -130,41 +130,41 @@ function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
                                 }
                             }}
                             autoFocus
-                            rows={4}
-                            className="w-full px-3 py-2 text-sm text-[#171717] bg-white border border-[#e5e5e5] rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-[#171717]/10 placeholder:text-[#a3a3a3]"
+                            rows={3}
+                            className="w-full px-3 py-2 text-sm text-[#37352f] bg-white border border-[#e9e9e7] rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-[#37352f]/10 focus:border-[#37352f] placeholder:text-[#9b9a97]"
                             placeholder="Your note..."
                         />
                         <div className="flex items-center justify-end gap-2">
-                            <Button
+                            <button
                                 onClick={() => {
                                     setIsEditing(false);
                                     setEditContent(note.note_content);
                                 }}
                                 disabled={isSaving}
-                                variant="ghost"
+                                className="h-7 px-3 text-xs text-[#787774] hover:text-[#37352f] hover:bg-[#f1f1ef] rounded-md transition-colors"
                             >
                                 Cancel
-                            </Button>
-                            <Button
+                            </button>
+                            <button
                                 onClick={handleSave}
                                 disabled={isSaving || !editContent.trim()}
-                                variant="primary"
+                                className="h-7 px-3 text-xs bg-[#37352f] text-white rounded-md hover:bg-[#2c2a29] disabled:opacity-50 transition-colors flex items-center gap-1"
                             >
                                 {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
                                 Save
-                            </Button>
+                            </button>
                         </div>
                     </div>
                 ) : (
-                    <p className="text-sm text-[#404040] leading-relaxed whitespace-pre-wrap">
+                    <p className="text-sm text-[#37352f] leading-relaxed whitespace-pre-wrap">
                         {note.note_content}
                     </p>
                 )}
             </div>
 
             {/* Footer */}
-            <div className="px-3 py-2 flex items-center justify-between border-t border-[#f5f5f5]">
-                <span className="text-xs text-[#a3a3a3]">
+            <div className="px-3 py-2 flex items-center justify-between border-t border-[#f1f1ef] bg-[#f7f7f5]">
+                <span className="text-xs text-[#9b9a97]">
                     {formatTime(note.created_at)}
                 </span>
 
@@ -172,15 +172,17 @@ function NoteCard({ note, isOwner, onEdit, onDelete, onHighlightClick }: {
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                             onClick={() => setIsEditing(true)}
-                            className="p-1.5 rounded hover:bg-[#f5f5f5] text-[#a3a3a3] hover:text-[#404040] transition-colors"
+                            className="p-1.5 rounded hover:bg-white hover:shadow-sm text-[#9b9a97] hover:text-[#37352f] transition-all"
+                            title="Edit note"
                         >
-                            <Pencil className="h-3.5 w-3.5" />
+                            <Pencil className="h-3 w-3" />
                         </button>
                         <button
                             onClick={() => onDelete(note.id)}
-                            className="p-1.5 rounded hover:bg-[#fef2f2] text-[#a3a3a3] hover:text-[#ef4444] transition-colors"
+                            className="p-1.5 rounded hover:bg-[#ffe2dd] hover:shadow-sm text-[#9b9a97] hover:text-[#d44c47] transition-all"
+                            title="Delete note"
                         >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3 w-3" />
                         </button>
                     </div>
                 )}
@@ -593,14 +595,14 @@ export default function SnapshotViewerPage() {
         const style = doc.createElement('style');
         style.textContent = `
             .note-highlight {
-                background: #fef3c7;
-                border-bottom: 2px solid #f59e0b;
+                background: #fbf3db;
+                border-bottom: 2px solid #d3c5a5;
                 cursor: pointer;
                 padding: 1px 0;
                 border-radius: 2px;
             }
             .note-highlight:hover {
-                background: #fde68a;
+                background: #f5eda8;
             }
         `;
         doc.head.appendChild(style);
@@ -651,8 +653,8 @@ export default function SnapshotViewerPage() {
         styleEl.id = 'active-selection-style';
         styleEl.textContent = `
             .active-selection {
-                background: #e0f2fe;
-                border-bottom: 2px solid #0ea5e9;
+                background: #def7ec;
+                border-bottom: 2px solid #0f7b6c;
                 border-radius: 2px;
                 padding: 1px 0;
             }
@@ -674,8 +676,8 @@ export default function SnapshotViewerPage() {
         return (
             <div className="min-h-screen bg-white flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="h-5 w-5 text-[#a3a3a3] animate-spin" />
-                    <p className="text-sm text-[#737373]">Loading...</p>
+                    <Loader2 className="h-5 w-5 text-[#9b9a97] animate-spin" />
+                    <p className="text-sm text-[#9b9a97]">Loading...</p>
                 </div>
             </div>
         );
@@ -684,7 +686,12 @@ export default function SnapshotViewerPage() {
     if (error) {
         return (
             <div className="min-h-screen bg-white flex items-center justify-center">
-                <p className="text-[#737373] text-sm">{error}</p>
+                <div className="text-center">
+                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#ffe2dd] text-[#d44c47] mb-3">
+                        <X className="h-4 w-4" />
+                    </div>
+                    <p className="text-sm text-[#9b9a97]">{error}</p>
+                </div>
             </div>
         );
     }
@@ -695,20 +702,37 @@ export default function SnapshotViewerPage() {
 
     return (
         <div className="min-h-screen bg-white">
-            {/* Minimal Header */}
-            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b border-[#e5e5e5]">
-                <div className="max-w-3xl mx-auto px-4 h-12 flex items-center">
-                    <div className="flex items-center gap-2 text-[#a3a3a3] text-sm">
-                        <PanelLeft className="h-4 w-4" />
-                        <span>Snapshot</span>
+            {/* Notion-style Header */}
+            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-[#e9e9e7]">
+                <div className="max-w-6xl mx-auto px-5 h-12 flex items-center">
+                    {/* Left: Back button */}
+                    <button
+                        onClick={() => router.back()}
+                        className="flex items-center gap-1.5 text-[#787774] hover:text-[#37352f] transition-colors text-sm font-medium"
+                    >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                        <span>Back</span>
+                    </button>
+
+                    {/* Center: Breadcrumb-like title */}
+                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+                        <span className="text-sm text-[#787774]">TidyFeed</span>
+                        <svg className="h-3 w-3 text-[#9b9a97]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <span className="text-sm text-[#9b9a97]">Snapshot</span>
                     </div>
-                    <div className="ml-auto flex items-center gap-2">
+
+                    {/* Right: AI Chat toggle */}
+                    <div className="ml-auto flex items-center">
                         <button
                             onClick={() => setShowPanel(!showPanel)}
-                            className={`h-8 px-3 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                            className={`flex items-center gap-2 px-3 h-8 rounded-md text-sm font-medium transition-all ${
                                 showPanel
-                                    ? 'bg-[#f5f5f5] text-[#171717]'
-                                    : 'bg-[#171717] text-white hover:bg-[#262626]'
+                                    ? 'bg-[#f1f1ef] text-[#37352f]'
+                                    : 'bg-[#37352f] text-white hover:bg-[#2c2a29]'
                             }`}
                         >
                             {showPanel ? (
@@ -719,7 +743,7 @@ export default function SnapshotViewerPage() {
                             ) : (
                                 <>
                                     <Sparkles className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">AI & Notes</span>
+                                    <span className="hidden sm:inline">AI</span>
                                 </>
                             )}
                         </button>
@@ -736,17 +760,17 @@ export default function SnapshotViewerPage() {
                     ? Math.min(selection.rect.right + window.scrollX + 12, window.innerWidth - toolbarWidth - 12)
                     : Math.max(12, selection.rect.left + window.scrollX - toolbarWidth - 12);
                 const verticalCenter = selection.rect.top + window.scrollY + selection.rect.height / 2;
-                const toolbarHeight = showNoteInput ? 200 : 44;
+                const toolbarHeight = showNoteInput ? 200 : 42;
                 const top = Math.max(60, Math.min(verticalCenter - toolbarHeight / 2, window.innerHeight + window.scrollY - toolbarHeight - 12));
 
                 return (
                     <div
-                        className="note-toolbar fixed z-[70] animate-in fade-in duration-200"
+                        className="note-toolbar fixed z-[70] animate-in fade-in slide-in-from-bottom-2 duration-200"
                         style={{ left, top }}
                     >
-                        <div className={`bg-white rounded-md border border-[#e5e5e5] overflow-hidden ${showNoteInput ? 'w-[360px]' : 'w-[180px]'}`}>
+                        <div className={`bg-white rounded-md border border-[#e9e9e7] shadow-lg overflow-hidden ${showNoteInput ? 'w-[360px]' : 'w-[180px]'}`}>
                             {!showNoteInput ? (
-                                <div className="flex items-center p-1">
+                                <div className="flex items-center p-1 gap-1">
                                     <button
                                         onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => {
@@ -754,7 +778,7 @@ export default function SnapshotViewerPage() {
                                             setShowPanel(true);
                                             setActiveTab('notes');
                                         }}
-                                        className="flex-1 h-8 flex items-center justify-center gap-1.5 px-3 rounded bg-[#171717] text-white text-sm hover:bg-[#262626] transition-colors"
+                                        className="flex-1 h-8 flex items-center justify-center gap-1.5 px-2 rounded bg-[#37352f] text-white text-xs hover:bg-[#2c2a29] transition-colors font-medium"
                                     >
                                         <Plus className="h-3.5 w-3.5" />
                                         <span>Add note</span>
@@ -764,7 +788,7 @@ export default function SnapshotViewerPage() {
                                             setSelection(null);
                                             window.getSelection()?.removeAllRanges();
                                         }}
-                                        className="h-8 w-8 flex items-center justify-center rounded hover:bg-[#f5f5f5] text-[#a3a3a3] transition-colors"
+                                        className="h-8 w-8 flex items-center justify-center rounded hover:bg-[#f1f1ef] text-[#9b9a97] hover:text-[#37352f] transition-colors"
                                     >
                                         <X className="h-3.5 w-3.5" />
                                     </button>
@@ -772,7 +796,7 @@ export default function SnapshotViewerPage() {
                             ) : (
                                 <div className="p-3">
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs font-medium text-[#171717]">New note</span>
+                                        <span className="text-xs font-semibold text-[#37352f]">New note</span>
                                         <button
                                             onClick={() => {
                                                 setShowNoteInput(false);
@@ -780,12 +804,12 @@ export default function SnapshotViewerPage() {
                                                 setNoteInput('');
                                                 window.getSelection()?.removeAllRanges();
                                             }}
-                                            className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f5f5f5] text-[#a3a3a3] transition-colors"
+                                            className="h-6 w-6 flex items-center justify-center rounded hover:bg-[#f1f1ef] text-[#9b9a97] hover:text-[#37352f] transition-colors"
                                         >
                                             <X className="h-3.5 w-3.5" />
                                         </button>
                                     </div>
-                                    <div className="mb-2 p-2 bg-[#fafafa] rounded text-xs text-[#737373] line-clamp-2">
+                                    <div className="mb-2 p-2 bg-[#f7f7f5] rounded text-xs text-[#787774] line-clamp-2 border border-[#e9e9e7]">
                                         "{selection.text}"
                                     </div>
                                     <textarea
@@ -806,14 +830,14 @@ export default function SnapshotViewerPage() {
                                         autoFocus
                                         rows={3}
                                         placeholder="Write a note..."
-                                        className="w-full px-3 py-2 text-sm bg-white border border-[#e5e5e5] rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-[#171717]/10 placeholder:text-[#a3a3a3]"
+                                        className="w-full px-3 py-2 text-sm bg-white border border-[#e9e9e7] rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-[#37352f]/10 focus:border-[#37352f] placeholder:text-[#9b9a97]"
                                     />
                                     <div className="mt-2 flex items-center justify-between">
-                                        <span className="text-[10px] text-[#a3a3a3]">Enter to save</span>
+                                        <span className="text-[10px] text-[#9b9a97]">Press Enter to save</span>
                                         <button
                                             onClick={handleCreateNote}
                                             disabled={!noteInput.trim() || isCreatingNote}
-                                            className="h-8 px-3 text-sm bg-[#171717] text-white rounded-md hover:bg-[#262626] disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                                            className="h-7 px-3 text-xs bg-[#37352f] text-white rounded-md hover:bg-[#2c2a29] disabled:opacity-50 transition-colors flex items-center gap-1 font-medium"
                                         >
                                             {isCreatingNote ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
                                             Save
@@ -826,9 +850,9 @@ export default function SnapshotViewerPage() {
                 );
             })()}
 
-            {/* Main Content */}
-            <main className="max-w-3xl mx-auto px-4 py-8">
-                <article className="prose prose-gray max-w-none">
+            {/* Main Content - Article style */}
+            <main className="max-w-3xl mx-auto px-5 py-8">
+                <article>
                     <SnapshotContent
                         ref={contentRef}
                         html={highlightedHtml}
@@ -839,40 +863,40 @@ export default function SnapshotViewerPage() {
 
             {/* Side Panel */}
             <div
-                className="sidebar-panel fixed top-12 right-0 bottom-0 z-40 bg-white border-l border-[#e5e5e5] flex flex-col transition-all duration-200 ease-out"
+                className="sidebar-panel fixed top-12 right-0 bottom-0 z-40 bg-[#f7f7f5] border-l border-[#e9e9e7] flex flex-col transition-all duration-300 ease-out"
                 style={{
                     width: `${panelWidth}px`,
                     transform: showPanel ? 'translateX(0)' : 'translateX(100%)'
                 }}
             >
                 {/* Panel Header - Tabs */}
-                <div className="flex border-b border-[#e5e5e5]">
+                <div className="flex bg-white border-b border-[#e9e9e7]">
                     <button
                         onClick={() => setActiveTab('ai')}
-                        className={`flex-1 h-11 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors relative ${
-                            activeTab === 'ai' ? 'text-[#171717]' : 'text-[#a3a3a3] hover:text-[#404040]'
+                        className={`flex-1 h-11 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
+                            activeTab === 'ai' ? 'text-[#37352f]' : 'text-[#9b9a97] hover:text-[#787774]'
                         }`}
                     >
                         <Sparkles className="h-4 w-4" />
                         <span>AI</span>
-                        {activeTab === 'ai' && <span className="absolute bottom-0 left-0 right-0 h-px bg-[#171717]" />}
+                        {activeTab === 'ai' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#37352f]" />}
                     </button>
                     <button
                         onClick={() => setActiveTab('notes')}
-                        className={`flex-1 h-11 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors relative ${
-                            activeTab === 'notes' ? 'text-[#171717]' : 'text-[#a3a3a3] hover:text-[#404040]'
+                        className={`flex-1 h-11 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
+                            activeTab === 'notes' ? 'text-[#37352f]' : 'text-[#9b9a97] hover:text-[#787774]'
                         }`}
                     >
                         <MessageSquareText className="h-4 w-4" />
                         <span>Notes</span>
                         {notes.length > 0 && (
-                            <span className={`h-5 min-w-5 px-1 rounded-full text-[11px] flex items-center justify-center ${
-                                activeTab === 'notes' ? 'bg-[#171717] text-white' : 'bg-[#f5f5f5] text-[#737373]'
+                            <span className={`h-5 min-w-5 px-1.5 rounded-full text-[11px] flex items-center justify-center ${
+                                activeTab === 'notes' ? 'bg-[#37352f] text-white' : 'bg-[#e9e9e7] text-[#9b9a97]'
                             }`}>
                                 {notes.length}
                             </span>
                         )}
-                        {activeTab === 'notes' && <span className="absolute bottom-0 left-0 right-0 h-px bg-[#171717]" />}
+                        {activeTab === 'notes' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#37352f]" />}
                     </button>
                 </div>
 
@@ -880,41 +904,38 @@ export default function SnapshotViewerPage() {
                 <div className="flex-1 overflow-y-auto">
                     {/* AI Tab */}
                     {activeTab === 'ai' && (
-                        <div className="p-4">
+                        <div className="flex flex-col h-full">
                             {!summary && !summaryLoading && !summaryError && (
-                                <div className="flex flex-col items-center text-center py-12 px-4">
+                                <div className="flex flex-col items-center text-center py-16 px-6">
                                     <button
                                         onClick={handleGenerateSummary}
                                         className="mb-4 group"
                                     >
-                                        <div className="h-14 w-14 rounded-lg bg-[#f5f5f5] group-hover:bg-[#e5e5e5] flex items-center justify-center transition-colors border border-[#e5e5e5]">
-                                            <Sparkles className="h-6 w-6 text-[#737373]" />
+                                        <div className="h-14 w-14 rounded-lg bg-[#f1f1ef] group-hover:bg-[#e9e9e7] flex items-center justify-center transition-all border border-[#e9e9e7]">
+                                            <Sparkles className="h-6 w-6 text-[#787774]" />
                                         </div>
                                     </button>
-                                    <h3 className="text-sm font-medium text-[#171717] mb-1">Generate AI Summary</h3>
-                                    <p className="text-xs text-[#737373] max-w-[200px]">
-                                        Get an intelligent analysis with key points and takeaways
+                                    <h3 className="text-sm font-semibold text-[#37352f] mb-1.5">Generate AI Summary</h3>
+                                    <p className="text-sm text-[#9b9a97] max-w-[220px] leading-relaxed">
+                                        Get key points and takeaways from this content
                                     </p>
                                 </div>
                             )}
 
                             {summaryLoading && (
-                                <div className="space-y-3 py-4">
+                                <div className="px-4 py-6 space-y-3">
                                     <div className="flex items-center gap-3 mb-4">
-                                        <div className="h-8 w-8 rounded-md bg-[#f5f5f5] flex items-center justify-center">
-                                            <Sparkles className="h-4 w-4 text-[#a3a3a3] animate-pulse" />
+                                        <div className="h-8 w-8 rounded-md bg-[#f1f1ef] flex items-center justify-center">
+                                            <Sparkles className="h-4 w-4 text-[#9b9a97] animate-pulse" />
                                         </div>
-                                        <div className="flex-1">
-                                            <div className="h-3.5 w-24 bg-[#f5f5f5] rounded animate-pulse mb-2" />
-                                            <div className="h-3 w-32 bg-[#fafafa] rounded animate-pulse" />
-                                        </div>
+                                        <span className="text-sm text-[#9b9a97]">Generating summary...</span>
                                     </div>
-                                    {['Summary', 'Key Points', 'Topics'].map((item, i) => (
-                                        <div key={item} className="bg-[#fafafa] rounded-md p-4">
-                                            <div className="h-3.5 w-20 bg-[#f5f5f5] rounded animate-pulse mb-2" />
+                                    {['Analyzing content', 'Extracting key points'].map((item, i) => (
+                                        <div key={item} className="bg-white rounded-md p-4 border border-[#e9e9e7]">
+                                            <div className="h-3 w-20 bg-[#e9e9e7] rounded animate-pulse mb-2" />
                                             <div className="space-y-1.5">
-                                                {[1, 2, 3].map((j) => (
-                                                    <div key={j} className="h-2.5 bg-[#f5f5f5] rounded animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} />
+                                                {[1, 2].map((j) => (
+                                                    <div key={j} className="h-2 bg-[#f1f1ef] rounded animate-pulse" style={{ width: `${60 + Math.random() * 30}%` }} />
                                                 ))}
                                             </div>
                                         </div>
@@ -923,15 +944,15 @@ export default function SnapshotViewerPage() {
                             )}
 
                             {summaryError && !summaryLoading && (
-                                <div className="text-center py-12">
-                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#fef2f2] text-[#ef4444] mb-3">
+                                <div className="text-center py-16 px-6">
+                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#ffe2dd] text-[#d44c47] mb-3">
                                         <X className="h-4 w-4" />
                                     </div>
-                                    <h3 className="text-sm font-medium text-[#171717] mb-1">Generation Failed</h3>
-                                    <p className="text-xs text-[#737373] mb-4">{summaryError}</p>
+                                    <h3 className="text-sm font-semibold text-[#37352f] mb-1.5">Generation Failed</h3>
+                                    <p className="text-sm text-[#9b9a97] mb-4 max-w-[200px]">{summaryError}</p>
                                     <button
                                         onClick={handleGenerateSummary}
-                                        className="h-8 px-3 text-sm bg-[#171717] text-white rounded-md hover:bg-[#262626] transition-colors"
+                                        className="h-8 px-4 text-sm bg-[#37352f] text-white rounded-md hover:bg-[#2c2a29] transition-colors font-medium"
                                     >
                                         Try Again
                                     </button>
@@ -939,83 +960,79 @@ export default function SnapshotViewerPage() {
                             )}
 
                             {summary && !summaryLoading && (
-                                <div className="space-y-4">
-                                    {/* Header */}
-                                    <div className="flex items-center justify-between pb-3 border-b border-[#f5f5f5]">
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-8 w-8 rounded-md bg-[#f5f5f5] flex items-center justify-center border border-[#e5e5e5]">
-                                                <Sparkles className="h-4 w-4 text-[#737373]" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-medium text-[#171717]">AI Summary</h3>
-                                                <p className="text-[10px] text-[#a3a3a3]">Generated by AI</p>
-                                            </div>
-                                        </div>
+                                <div className="flex flex-col h-full">
+                                    {/* Simple header */}
+                                    <div className="px-4 py-3 border-b border-[#e9e9e7] bg-white flex items-center justify-between">
+                                        <span className="text-sm font-semibold text-[#37352f]">AI Summary</span>
                                         <button
                                             onClick={() => handleCopy('all', summary)}
-                                            className="p-1.5 rounded hover:bg-[#f5f5f5] text-[#a3a3a3] hover:text-[#404040] transition-colors"
+                                            className="p-1.5 rounded hover:bg-[#f1f1ef] text-[#9b9a97] hover:text-[#37352f] transition-colors"
                                             title={copiedKey === 'all' ? 'Copied' : 'Copy'}
                                         >
                                             {copiedKey === 'all' ? (
-                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                                 </svg>
                                             ) : (
-                                                <Copy className="h-4 w-4" />
+                                                <Copy className="h-3.5 w-3.5" />
                                             )}
                                         </button>
                                     </div>
 
                                     {/* Summary content */}
-                                    <div className="bg-[#fafafa] rounded-md p-4 border border-[#f5f5f5]">
-                                        <ReactMarkdown
-                                            components={{
-                                                p: ({ children }) => <p className="text-sm text-[#404040] leading-relaxed mb-2 last:mb-0">{children}</p>,
-                                                strong: ({ children }) => <strong className="font-medium text-[#171717]">{children}</strong>,
-                                                ul: ({ children }) => <ul className="space-y-1 my-2">{children}</ul>,
-                                                ol: ({ children }) => <ol className="space-y-1 my-2">{children}</ol>,
-                                                li: ({ children }) => (
-                                                    <li className="text-sm text-[#404040] flex items-start gap-2">
-                                                        <span className="flex-shrink-0 w-1 h-1 rounded-full bg-[#737373] mt-1.5" />
-                                                        <span>{children}</span>
-                                                    </li>
-                                                ),
-                                                h1: ({ children }) => <h1 className="text-sm font-medium text-[#171717] mb-2">{children}</h1>,
-                                                h2: ({ children }) => <h2 className="text-sm font-medium text-[#171717] mb-2">{children}</h2>,
-                                                h3: ({ children }) => <h3 className="text-sm font-medium text-[#171717] mb-2">{children}</h3>,
-                                            }}
-                                        >
-                                            {summary}
-                                        </ReactMarkdown>
+                                    <div className="flex-1 overflow-y-auto p-4">
+                                        <div className="bg-white rounded-md border border-[#e9e9e7] p-4">
+                                            <ReactMarkdown
+                                                components={{
+                                                    p: ({ children }) => <p className="text-sm text-[#37352f] leading-relaxed mb-3 last:mb-0">{children}</p>,
+                                                    strong: ({ children }) => <strong className="font-semibold text-[#37352f]">{children}</strong>,
+                                                    ul: ({ children }) => <ul className="space-y-1.5 my-2 pl-1">{children}</ul>,
+                                                    ol: ({ children }) => <ol className="space-y-1.5 my-2 pl-1">{children}</ol>,
+                                                    li: ({ children }) => (
+                                                        <li className="text-sm text-[#37352f] flex items-start gap-2">
+                                                            <span className="flex-shrink-0 w-1 h-1 rounded-full bg-[#787774] mt-2" />
+                                                            <span>{children}</span>
+                                                        </li>
+                                                    ),
+                                                    h1: ({ children }) => <h1 className="text-sm font-semibold text-[#37352f] mb-2 mt-3">{children}</h1>,
+                                                    h2: ({ children }) => <h2 className="text-sm font-semibold text-[#37352f] mb-2 mt-3">{children}</h2>,
+                                                    h3: ({ children }) => <h3 className="text-sm font-semibold text-[#37352f] mb-2 mt-3">{children}</h3>,
+                                                }}
+                                            >
+                                                {summary}
+                                            </ReactMarkdown>
+                                        </div>
                                     </div>
 
-                                    {/* Actions */}
-                                    <div className="flex gap-2 pt-2">
-                                        <button
-                                            onClick={handleGenerateSummary}
-                                            className="flex-1 h-9 text-sm bg-[#f5f5f5] text-[#171717] rounded-md hover:bg-[#e5e5e5] transition-colors flex items-center justify-center gap-1.5 border border-[#e5e5e5]"
-                                        >
-                                            <Loader2 className="h-3.5 w-3.5" />
-                                            Regenerate
-                                        </button>
-                                        <button
-                                            onClick={() => handleCopy('all', summary)}
-                                            className="flex-1 h-9 text-sm bg-[#171717] text-white rounded-md hover:bg-[#262626] transition-colors flex items-center justify-center gap-1.5"
-                                        >
-                                            {copiedKey === 'all' ? (
-                                                <>
-                                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                    Copied
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Copy className="h-3.5 w-3.5" />
-                                                    Copy All
-                                                </>
-                                            )}
-                                        </button>
+                                    {/* Action buttons */}
+                                    <div className="p-3 border-t border-[#e9e9e7] bg-white">
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleGenerateSummary}
+                                                className="flex-1 h-8 text-sm bg-[#f1f1ef] text-[#37352f] rounded-md hover:bg-[#e9e9e7] transition-colors flex items-center justify-center gap-1.5 font-medium"
+                                            >
+                                                <Loader2 className="h-3.5 w-3.5" />
+                                                Regenerate
+                                            </button>
+                                            <button
+                                                onClick={() => handleCopy('all', summary)}
+                                                className="flex-1 h-8 text-sm bg-[#37352f] text-white rounded-md hover:bg-[#2c2a29] transition-colors flex items-center justify-center gap-1.5 font-medium"
+                                            >
+                                                {copiedKey === 'all' ? (
+                                                    <>
+                                                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                        Copied
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                        Copy
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -1024,15 +1041,18 @@ export default function SnapshotViewerPage() {
 
                     {/* Notes Tab */}
                     {activeTab === 'notes' && (
-                        <div className="p-4">
+                        <div className="flex flex-col h-full">
                             {notesLoading && (
-                                <div className="flex items-center justify-center py-12">
-                                    <Loader2 className="h-5 w-5 text-[#a3a3a3] animate-spin" />
+                                <div className="flex items-center justify-center py-20">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <Loader2 className="h-5 w-5 text-[#9b9a97] animate-spin" />
+                                        <p className="text-sm text-[#9b9a97]">Loading notes...</p>
+                                    </div>
                                 </div>
                             )}
 
                             {!notesLoading && notes.length > 0 && (
-                                <div className="space-y-3">
+                                <div className="flex-1 overflow-y-auto p-4 space-y-2">
                                     {notes.map(note => (
                                         <div key={note.id} id={`note-${note.id}`}>
                                             <NoteCard
@@ -1048,14 +1068,14 @@ export default function SnapshotViewerPage() {
                             )}
 
                             {!notesLoading && notes.length === 0 && (
-                                <div className="flex flex-col items-center text-center py-12">
-                                    <div className="h-12 w-12 rounded-md bg-[#f5f5f5] flex items-center justify-center mb-3 border border-[#e5e5e5]">
-                                        <MessageSquareText className="h-5 w-5 text-[#a3a3a3]" />
+                                <div className="flex flex-col items-center text-center py-20 px-6">
+                                    <div className="h-12 w-12 rounded-lg bg-[#f1f1ef] flex items-center justify-center mb-3">
+                                        <MessageSquareText className="h-5 w-5 text-[#9b9a97]" />
                                     </div>
-                                    <h3 className="text-sm font-medium text-[#171717] mb-1">No notes yet</h3>
-                                    <p className="text-xs text-[#737373] max-w-[180px]">
+                                    <h3 className="text-sm font-semibold text-[#37352f] mb-1.5">No notes yet</h3>
+                                    <p className="text-sm text-[#9b9a97] max-w-[200px] leading-relaxed">
                                         {currentUserId
-                                            ? 'Select any text to add a note'
+                                            ? 'Select any text in the article to add a note'
                                             : 'Log in to add notes'}
                                     </p>
                                 </div>
